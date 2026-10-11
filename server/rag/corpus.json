@@ -1,0 +1,211 @@
+[
+  {
+    "id": "js-const-let",
+    "lang": "javascript",
+    "tags": ["es6", "variable", "scope", "tdz"],
+    "title": "const 与 let（ES6）",
+    "content": "const 和 let 是 ES6（2015 年）引入的声明方式，用来取代 var。var 有两个老毛病：作用域是整个函数而不是最近的一对花括号，而且允许重复声明同一个名字而不报错，在稍大的程序里会制造很难排查的 bug。const 和 let 把作用域限制在最近的块内，并且都有「暂时性死区」——声明之前访问会直接报错，而不是悄悄得到 undefined。二者的区别只有一条：const 声明的名字不能再指向别的东西，let 可以重新赋值。注意 const 只保证「名字不变」，如果它指向的是对象，对象内部照样能改。",
+    "source": {
+      "label": "MDN · const",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Statements/const"
+    }
+  },
+  {
+    "id": "js-arrow-function",
+    "lang": "javascript",
+    "tags": ["es6", "function", "this", "callback"],
+    "title": "箭头函数（ES6）",
+    "content": "箭头函数是 ES6（2015）引入的简写语法，(a, b) => a + b 等价于 function (a, b) { return a + b; }。它被发明出来主要为了解决两件事：一是写法冗长，写回调时 function 关键字和 return 显得很啰嗦；二是 this 的指向问题——传统函数的 this 取决于「谁调用它」，在回调里经常丢掉原本的上下文，需要写 const self = this 这类绕法。箭头函数不产生自己的 this，它直接沿用定义位置上外层的 this，这个问题就消失了。代价是箭头函数不能被 new 调用，也没有自己的 arguments。",
+    "source": {
+      "label": "MDN · 箭头函数",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Functions/Arrow_functions"
+    }
+  },
+  {
+    "id": "js-array-map",
+    "lang": "javascript",
+    "tags": ["array", "map", "functional", "es5"],
+    "title": "Array.prototype.map",
+    "content": "map 把数组里每个元素交给同一个函数处理一遍，把返回值收集成一个新数组，长度和原数组一样。它 2009 年随 ES5 进入 JavaScript 标准。在此之前，把数组每个元素变换一次要手写 for 循环加 push，代码里「遍历」和「变换规则」混在一起。map 把这两件事拆开：你只描述「怎么变换一个元素」，遍历交给语言。它不改动原数组，返回新数组——这也是函数式编程风格的体现。注意它的回调实际会收到三个参数（当前元素、下标、原数组），通常只用第一个。",
+    "source": {
+      "label": "MDN · Array.prototype.map",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/map"
+    }
+  },
+  {
+    "id": "js-array-filter",
+    "lang": "javascript",
+    "tags": ["array", "filter", "functional", "es5"],
+    "title": "Array.prototype.filter",
+    "content": "filter 用一个判断函数逐个测试数组元素，把返回 true 的挑出来组成新数组，其余的丢掉。它和 map 一样是 2009 年 ES5 引入的。判断函数可以接收当前元素、下标、原数组三个参数。filter 同样不改动原数组。它最常见的用途是从一堆数据里筛选符合条件的子集，比如只留已付款的订单。注意：如果判断函数写的不是严格的布尔值，JavaScript 会按真假值（truthy / falsy）来判断，比如空字符串和 0 都会被当作「不要」。",
+    "source": {
+      "label": "MDN · Array.prototype.filter",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/filter"
+    }
+  },
+  {
+    "id": "js-array-reduce",
+    "lang": "javascript",
+    "tags": ["array", "reduce", "functional", "es5", "accumulate"],
+    "title": "Array.prototype.reduce",
+    "content": "reduce 把数组「折叠」成一个值。它接收两样东西：一个累加函数 (累计值, 当前元素) => 新的累计值，以及一个初始值。遍历时，上一次的返回值会作为下一次的「累计值」传进来，最后返回最终的累计结果。它 2009 年随 ES5 进入标准。map 是「一变多」，reduce 是「多变一」——求和、求最值、把数组拼成对象、统计词频，都靠它。它把「怎么累积」从「怎么遍历」里解耦出来。如果省略初始值，reduce 会拿数组第一个元素当初始值并从第二个开始遍历，但空数组会直接报错，所以显式写初始值更安全。",
+    "source": {
+      "label": "MDN · Array.prototype.reduce",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce"
+    }
+  },
+  {
+    "id": "js-closure",
+    "lang": "javascript",
+    "tags": ["closure", "scope", "function"],
+    "title": "闭包（Closure）",
+    "content": "闭包指一个函数记住了它被定义时所在的那个作用域，即使外层函数已经执行完毕，它依然能访问外层的变量。JavaScript 从 1995 年诞生起就支持闭包，因为它是按词法作用域设计的。闭包的实用价值在于「造出带私有状态的东西」：外层函数存放数据，内层函数读写它，然后把内层函数返回出去——数据只能通过内层函数访问，外部改不了。计数器、函数工厂、以及后来的模块模式都建立在这个机制上。需要注意的是，闭包会让外层变量一直留在内存里不被回收，循环里创建闭包时要特别留意变量捕获的是哪一个值。",
+    "source": {
+      "label": "MDN · 闭包",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Closures"
+    }
+  },
+  {
+    "id": "js-promise",
+    "lang": "javascript",
+    "tags": ["async", "promise", "es6", "callback-hell"],
+    "title": "Promise（ES6）",
+    "content": "Promise 是一个表示「将来会有结果」的对象，有三种状态：pending（进行中）、fulfilled（成功）、rejected（失败），一旦定型就不再改变。它 2015 年随 ES6 成为标准，但之前已经在 Q、when.js 这类库里流行多年。它要解决的是「回调地狱」：早期异步代码要层层嵌套回调，错误处理要在每一层单独写，代码被挤成向右的三角形。Promise 让异步操作可以链式串联，并且用统一的 .catch 集中处理错误。后来的 async / await 就是在它之上做的语法糖。",
+    "source": {
+      "label": "MDN · Promise",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise"
+    }
+  },
+  {
+    "id": "js-async-await",
+    "lang": "javascript",
+    "tags": ["async", "await", "es2017", "promise"],
+    "title": "async / await（ES2017）",
+    "content": "async / await 是 ES2017（2017 年）引入的语法，让异步代码写起来像同步代码。在函数前面加 async，这个函数就总是返回一个 Promise；在函数体里用 await 等一个 Promise 出结果，后面的代码会等它完成再执行，但并不会阻塞浏览器主线程。它没有引入新机制，只是 Promise 的语法糖——await 表达式实质上等于在那个 Promise 上挂 .then。所以它对错误处理仍然用 try / catch。它在 2017 年落地后迅速成为主流写法，因为相比 then 链，它让「先做 A，再做 B，再做 C」这种顺序逻辑一眼就能看懂。",
+    "source": {
+      "label": "MDN · async function",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Statements/async_function"
+    }
+  },
+  {
+    "id": "js-destructuring",
+    "lang": "javascript",
+    "tags": ["es6", "destructuring", "syntax"],
+    "title": "解构赋值（ES6）",
+    "content": "解构赋值让 JavaScript 能按「形状」从数组或对象里把值取出来，直接赋给变量，不用一层层点下去。数组按位置取：const [a, b] = [1, 2]；对象按键名取：const { name, age } = user。它 2015 年随 ES6 引入，动机是消除大量重复的样板代码——在没有解构之前，取一个对象里的三个字段要写三行 user.xxx。它还能同时声明默认值（{ a = 1 } = obj）和重命名（{ a: x } = obj）。函数参数位置也常用它来直接拆开并声明默认值。",
+    "source": {
+      "label": "MDN · 解构赋值",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Operators/Destructuring_assignment"
+    }
+  },
+  {
+    "id": "js-spread-operator",
+    "lang": "javascript",
+    "tags": ["es6", "spread", "rest", "syntax"],
+    "title": "展开运算符与剩余参数（...）",
+    "content": "三个点「...」在 JavaScript 里承担两个相反的角色。放在表达式里叫展开：把数组或对象「打开」成一个个元素，[].concat(a, b) 可以写成 [...a, ...b]，复制对象用 { ...obj }。放在函数参数或解构位置叫剩余：把剩下的东西收进一个数组，function f(...args) 或 const [first, ...rest] = arr。数组和函数参数的用法 2015 年随 ES6 引入，对象的展开要等到 ES2018。它被引入的动机是替代 apply 和 Object.assign 这类笨重写法，让「拼合」和「收集」变得可以直接写出来。注意展开是浅拷贝，嵌套对象里的引用不会跟着复制。",
+    "source": {
+      "label": "MDN · 展开语法",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Operators/Spread_syntax"
+    }
+  },
+  {
+    "id": "js-template-literal",
+    "lang": "javascript",
+    "tags": ["es6", "string", "syntax"],
+    "title": "模板字符串（ES6）",
+    "content": "模板字符串用反引号包裹字符串，可以在里面用 ${表达式} 直接嵌入变量或计算结果，还能跨行书写。它 2015 年随 ES6 引入。在此之前，拼字符串只能用加号连接，多行字符串要靠 \\n 或者续行符，非常容易写错；把数字或对象插进一句话里还得手写 toString。模板字符串让「拼装文本」这件事读起来就接近最终的样子。除此之外它还有「标签模板」的形式——函数名后面直接跟一个模板字符串，让函数可以接管字符串的组装过程，一些库用它来做 SQL 转义或样式处理。",
+    "source": {
+      "label": "MDN · 模板字符串",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Template_literals"
+    }
+  },
+  {
+    "id": "js-esm",
+    "lang": "javascript",
+    "tags": ["module", "esm", "import", "export"],
+    "title": "ES 模块（import / export）",
+    "content": "ES 模块是 JavaScript 官方的模块系统，用 export 导出、用 import 引入。2015 年随 ES6 写进语言标准，但浏览器真正支持要等到 2017 年前后（Node.js 对它的支持更晚，且需要额外配置）。在它之前，JavaScript 没有官方的模块机制，社区各搞各的：Node 用 CommonJS 的 require / module.exports，浏览器端用 AMD、SeaJS 或者干脆挂在全局变量上。ES 模块的引入让同一套写法能在浏览器和 Node 里通用，也让打包工具可以做静态分析——因为 import 的位置是确定的，工具能在打包时就把没用到的代码去掉（tree shaking）。",
+    "source": {
+      "label": "MDN · JavaScript 模块",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Guide/Modules"
+    }
+  },
+  {
+    "id": "react-jsx",
+    "lang": "react",
+    "tags": ["jsx", "syntax", "component"],
+    "title": "JSX",
+    "content": "JSX 是 JavaScript 的语法扩展，允许在代码里直接写类似 HTML 的标签，比如 const el = <div className=\"box\">你好</div>。它在 Facebook 于 2011 年前后随 React 一起出现，2013 年 React 开源时正式公开。它要解决的问题是：用 document.createElement 或者字符串拼装界面既啰嗦又容易漏掉括号，而且结构看不出来。JSX 让界面的结构在代码里一眼可见，写起来和 HTML 差不多。它不是 HTML——属性用驼峰命名（className、onClick），标签必须闭合，而且它最终会被编译成对 createElement 的调用。表达式要嵌进标签里就用一对花括号。",
+    "source": {
+      "label": "React 官方文档 · 编写标记与 JSX",
+      "url": "https://zh-hans.react.dev/learn/writing-markup-with-jsx"
+    }
+  },
+  {
+    "id": "react-usestate",
+    "lang": "react",
+    "tags": ["hooks", "state", "component"],
+    "title": "useState",
+    "content": "useState 是最基础的 React Hook，用来给函数组件加「状态」——也就是会变化、变化后需要重新渲染界面的数据。写法是 const [count, setCount] = useState(0)，返回一对：当前值和一个更新函数。React 16.8（2019 年 2 月发布）引入 Hooks，此前只有 class 组件能持有状态，写一个简单的计数器也要写 class、constructor、this.state、this.setState 一整套样板代码，而且逻辑分散在多个生命周期方法里。useState 的更新是「替换」而不是「合并」，而且它是异步批量处理的——连续调用两次 setCount(count + 1) 通常只会加一次，要基于上一状态更新应该写成 setCount(c => c + 1)。",
+    "source": {
+      "label": "React 官方文档 · useState",
+      "url": "https://zh-hans.react.dev/reference/react/useState"
+    }
+  },
+  {
+    "id": "react-useeffect",
+    "lang": "react",
+    "tags": ["hooks", "effect", "side-effect", "lifecycle"],
+    "title": "useEffect",
+    "content": "useEffect 用来在渲染之外做「副作用」——请求数据、订阅事件、直接操作 DOM、设定时器这类不属于「算界面」的事。它接收一个函数和一个依赖数组：依赖数组里的值变化时，这个函数就会重新执行。传空数组表示只在挂载后执行一次；不传依赖数组则每次渲染都执行。它 2019 年随 React 16.8 的 Hooks 一起出现，替代了 class 组件里的 componentDidMount / componentDidUpdate / componentWillUnmount 三个生命周期。它最容易被忽略的一点是「清理」：如果函数里返回了另一个函数，React 会在下次执行前或组件卸载时调用它，用来取消订阅、清除定时器，防止内存泄漏。",
+    "source": {
+      "label": "React 官方文档 · useEffect",
+      "url": "https://zh-hans.react.dev/reference/react/useEffect"
+    }
+  },
+  {
+    "id": "react-props",
+    "lang": "react",
+    "tags": ["component", "props", "data-flow"],
+    "title": "Props（组件属性）",
+    "content": "Props 是 React 组件之间传递数据的唯一方式，方向是单向的：从父组件流向子组件。父组件在标签上写属性，子组件通过第一个参数（通常解构写成 function Card({ title, onClick })）接收。Props 是只读的——子组件不能修改收到的 props，这是 React 从 2013 年开源起就定下的硬规则。它带来两个好处：数据流向清晰，出问题时顺着组件树往下找就能定位；以及组件更容易预测和测试，因为同样的 props 总是渲染出同样的结果。如果子组件需要「往回传消息」，做法是父组件把一个函数当作 prop 传下去，子组件调用它。",
+    "source": {
+      "label": "React 官方文档 · 将 Props 传递给组件",
+      "url": "https://zh-hans.react.dev/learn/passing-props-to-a-component"
+    }
+  },
+  {
+    "id": "react-controlled-component",
+    "lang": "react",
+    "tags": ["form", "input", "state", "controlled"],
+    "title": "受控组件",
+    "content": "受控组件指表单元素的值由 React 的状态来掌管：input 的 value 绑定到 state，用户每敲一个字都触发 onChange 去更新 state，界面再由 state 重新渲染出来。这是 React 官方推荐的表单处理方式，从 React 早期就确立。它和「非受控组件」相对——后者把值交给 DOM 自己管，需要时用 ref 去读。受控组件的好处是「界面」和「数据」始终是同一份，可以在 onChange 里立刻做校验、格式化、联动，比如把输入转成大写、或者根据前一个框的内容启用后一个框。代价是每次按键都会触发一次渲染，在超大表单里需要留意性能。",
+    "source": {
+      "label": "React 官方文档 · 响应输入",
+      "url": "https://zh-hans.react.dev/learn/reacting-to-input-with-state"
+    }
+  },
+  {
+    "id": "react-key",
+    "lang": "react",
+    "tags": ["list", "render", "reconciliation", "key"],
+    "title": "列表中的 key",
+    "content": "用 map 渲染列表时，React 要求给每个元素一个 key——一个在同级列表里唯一且稳定的标识。它不是给开发者看的，而是给 React 的「协调」算法用的：重新渲染时，React 靠 key 判断哪些项没变、哪些被新增或删除，从而只更新变化的部分，而不是把整个列表推倒重建。key 应该用数据自身的稳定 id，比如用户 id 或数据库主键；用数组下标当 key 在列表会重排、插入或删除时会让 React 认错元素，导致输入框内容错位、动画乱跳。官方从 React 早期就在控制台对缺失 key 发出警告。",
+    "source": {
+      "label": "React 官方文档 · 渲染列表",
+      "url": "https://zh-hans.react.dev/learn/rendering-lists"
+    }
+  },
+  {
+    "id": "react-state-vs-props",
+    "lang": "react",
+    "tags": ["state", "props", "architecture"],
+    "title": "State 与 Props 的区别",
+    "content": "State 和 Props 都是 React 组件里的数据，区别在于「谁说了算」。Props 由父组件传进来，组件自己不能改，相当于函数的入参；State 由组件内部自己持有和维护，通过 setXxx 更新，更新后会触发重新渲染。判断一个数据该放哪，可以问两个问题：它会不会随用户操作变化？变化后界面要不要跟着变？答案是「会 / 要」就多半是 state。还有一条重要原则叫「状态提升」——当两个兄弟组件需要共享同一份数据时，把这个 state 提到它们共同的父组件里，再通过 props 分发下去，而不是各自存一份。",
+    "source": {
+      "label": "React 官方文档 · State：组件的记忆",
+      "url": "https://zh-hans.react.dev/learn/state-a-components-memory"
+    }
+  }
+]
