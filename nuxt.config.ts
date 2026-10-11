@@ -16,6 +16,7 @@ export default defineNuxtConfig({
       htmlAttrs: { lang: 'zh-CN' },
       meta: [
         { name: 'description', content: '零提示词的代码理解助手：粘贴代码，自动解释' },
+        { name: 'theme-color', content: '#f5f6f8' },
       ],
     },
   },

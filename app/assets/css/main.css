@@ -2,11 +2,36 @@
 
 html,
 body {
-  background-color: #0b1020;
-  color: #e6e9f0;
+  background-color: #f5f6f8;
+  color: #1f2937;
 }
 
 /* 代码区域统一用等宽字体 */
 .font-mono-code {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+/* ------------------------------------------------------------------
+ * Vue Flow 的浅色覆盖
+ *
+ * Vue Flow 自带的 theme-default.css 是给深色背景设计的
+ * （画布控制按钮是深底浅图标），在浅色主题下必须盖掉。
+ * ------------------------------------------------------------------ */
+.vue-flow__controls-button {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  fill: #334155 !important;
+}
+
+.vue-flow__controls-button:hover {
+  background: #f1f5f9 !important;
+}
+
+.vue-flow__controls-button svg {
+  fill: #334155 !important;
+}
+
+/* 连线上的标签底色，深色主题下是深色，这里改成白 */
+.vue-flow__edge-textbg {
+  fill: #ffffff !important;
 }

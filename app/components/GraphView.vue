@@ -43,9 +43,9 @@ const NODE_H = 62
 
 /** 三种节点类型的配色 */
 const TYPE_STYLE: Record<GraphNodeType, { border: string; bg: string; text: string; tag: string }> = {
-  code: { border: '#34d399', bg: 'rgba(52,211,153,0.10)', text: '#6ee7b7', tag: '代码' },
-  tech: { border: '#60a5fa', bg: 'rgba(96,165,250,0.10)', text: '#93c5fd', tag: '技术' },
-  concept: { border: '#fbbf24', bg: 'rgba(251,191,36,0.10)', text: '#fcd34d', tag: '概念' },
+  code: { border: '#10b981', bg: 'rgba(16,185,129,0.08)', text: '#047857', tag: '代码' },
+  tech: { border: '#3b82f6', bg: 'rgba(59,130,246,0.08)', text: '#1d4ed8', tag: '技术' },
+  concept: { border: '#f59e0b', bg: 'rgba(245,158,11,0.10)', text: '#b45309', tag: '概念' },
 }
 
 const layout = computed(() => {
@@ -83,9 +83,9 @@ const layout = computed(() => {
     label: e.label,
     animated: true,
     markerEnd: MarkerType.ArrowClosed,
-    style: { stroke: '#475569' },
-    labelStyle: { fill: '#94a3b8', fontSize: 11 },
-    labelBgStyle: { fill: '#0b1020', fillOpacity: 0.9 },
+    style: { stroke: '#cbd5e1' },
+    labelStyle: { fill: '#64748b', fontSize: 11 },
+    labelBgStyle: { fill: '#ffffff', fillOpacity: 0.9 },
   }))
 
   return { nodes, edges }
@@ -97,7 +97,7 @@ function styleOf(type: GraphNodeType) {
 </script>
 
 <template>
-  <div class="h-[440px] w-full overflow-hidden rounded-lg border border-white/10 bg-black/30">
+  <div class="h-full w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
     <!-- Vue Flow 依赖浏览器 API，必须只在客户端渲染 -->
     <ClientOnly>
       <VueFlow
@@ -109,12 +109,12 @@ function styleOf(type: GraphNodeType) {
         :nodes-connectable="false"
         :elements-selectable="true"
       >
-        <Background :gap="18" pattern-color="#1e293b" />
+        <Background :gap="18" pattern-color="#dbe2ea" />
         <Controls />
 
         <template #node-wb="p">
           <div
-            class="rounded-lg border px-3 py-2 shadow-lg backdrop-blur-sm"
+            class="rounded-lg border px-3 py-2 shadow-sm"
             :style="{
               width: `${NODE_W}px`,
               minHeight: `${NODE_H}px`,
@@ -125,10 +125,10 @@ function styleOf(type: GraphNodeType) {
             <div class="text-[10px] font-medium tracking-wider" :style="{ color: styleOf(p.data.type).text }">
               {{ styleOf(p.data.type).tag }}
             </div>
-            <div class="mt-0.5 text-[13px] font-semibold leading-tight text-slate-100">
+            <div class="mt-0.5 text-[13px] font-semibold leading-tight text-slate-800">
               {{ p.data.label }}
             </div>
-            <div v-if="p.data.detail" class="mt-0.5 text-[11px] leading-snug text-slate-400">
+            <div v-if="p.data.detail" class="mt-0.5 text-[11px] leading-snug text-slate-500">
               {{ p.data.detail }}
             </div>
           </div>
@@ -136,7 +136,7 @@ function styleOf(type: GraphNodeType) {
       </VueFlow>
 
       <template #fallback>
-        <div class="flex h-full items-center justify-center text-sm text-slate-600">图加载中…</div>
+        <div class="flex h-full items-center justify-center text-sm text-slate-400">图加载中…</div>
       </template>
     </ClientOnly>
   </div>
