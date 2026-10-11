@@ -15,7 +15,7 @@ const done = ref(false)
 
 let controller: AbortController | null = null
 
-/** 四个固定小标题，必须与 server/utils/prompt.ts 里的 SECTIONS 一致 */
+/** 四个文字小标题，必须与 server/utils/prompt.ts 里的约定一致 */
 const SECTION_TITLES = [
   '一、逐词逐句',
   '二、局部关系与作用',
@@ -23,10 +23,15 @@ const SECTION_TITLES = [
   '四、技术溯源',
 ] as const
 
+/** 第五部分是给图用的 JSON，不当作正文渲染 */
+const GRAPH_TITLE = '五、知识框架图'
+
 /** 把流式返回的文本按四个小标题切成块，边流边渲染 */
 const sections = computed(() => {
   const text = output.value
   const found: { title: string; body: string }[] = []
+  // 切分边界 = 四个文字标题 + 图标题，避免图的 JSON 混进第四段正文
+  const boundaries = [...SECTION_TITLES, GRAPH_TITLE]
 
   for (let i = 0; i < SECTION_TITLES.length; i++) {
     const title = SECTION_TITLES[i]!
@@ -34,8 +39,7 @@ const sections = computed(() => {
     if (start === -1) continue
 
     const bodyStart = start + `## ${title}`.length
-    // 下一段的起点，就是这个块的终点
-    const nextTitle = SECTION_TITLES[i + 1]
+    const nextTitle = boundaries[i + 1]
     const end = nextTitle ? text.indexOf(`## ${nextTitle}`) : -1
 
     found.push({
@@ -46,6 +50,49 @@ const sections = computed(() => {
 
   return found
 })
+
+/**
+ * 从流式文本里把图 JSON 抠出来。
+ *
+ * 两种写法都兼容：
+ *   1. 正常情况 —— 三个反引号包起来的 json 代码块
+ *   2. 兜底 —— 模型忘了加代码围栏，就直接把标题后面的整段当 JSON 试
+ *
+ * 流式过程中 JSON 是不完整的，解析失败就返回 null，
+ * 等它流完自然会解析成功，图到时候自己出现。
+ */
+const graphData = computed(() => {
+  const start = output.value.indexOf(`## ${GRAPH_TITLE}`)
+  if (start === -1) return null
+
+  const rest = output.value.slice(start + `## ${GRAPH_TITLE}`.length)
+  const fenced = rest.match(/```(?:json)?\s*([\s\S]*?)```/)
+  const candidate = (fenced ? fenced[1] : rest).trim()
+
+  // 没闭合围栏时，candidate 会带着后面的内容，先退一步只取到最后一个 }
+  const trimmed = fenced ? candidate : candidate.slice(0, candidate.lastIndexOf('}') + 1)
+
+  try {
+    const parsed = JSON.parse(trimmed)
+    if (!Array.isArray(parsed?.nodes) || !Array.isArray(parsed?.edges)) return null
+    if (parsed.nodes.length === 0) return null
+    return parsed as { nodes: GraphNode[]; edges: GraphEdge[] }
+  } catch {
+    return null
+  }
+})
+
+interface GraphNode {
+  id: string
+  label: string
+  type: 'code' | 'tech' | 'concept'
+  detail?: string
+}
+interface GraphEdge {
+  from: string
+  to: string
+  label?: string
+}
 
 const isEmpty = computed(() => output.value.trim().length === 0)
 
@@ -287,6 +334,29 @@ function clearAll() {
         </div>
       </section>
     </main>
+
+    <!-- 知识框架图：等 AI 把 JSON 流完之后自动出现 -->
+    <section v-if="graphData" class="mx-auto max-w-[1400px] px-6 pb-2">
+      <div class="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+        <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span class="text-sm text-slate-400">知识框架图</span>
+          <div class="flex items-center gap-3 text-[11px] text-slate-500">
+            <span class="inline-flex items-center gap-1.5">
+              <span class="h-2.5 w-2.5 rounded-sm bg-emerald-400" />代码
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="h-2.5 w-2.5 rounded-sm bg-blue-400" />技术
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="h-2.5 w-2.5 rounded-sm bg-amber-400" />概念
+            </span>
+          </div>
+          <span class="text-[11px] text-slate-600">可拖拽节点 · 滚轮缩放</span>
+        </div>
+
+        <GraphView :data="graphData" />
+      </div>
+    </section>
 
     <footer class="px-6 pb-6 text-center text-xs text-slate-600">
       麦穗团队 · 传智杯 AI Web 开发挑战赛 · M0
