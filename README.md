@@ -145,6 +145,9 @@ node --env-file=.env scripts/rag-probe.mjs
 
 ## 本地运行
 
+**环境要求**：Node.js **≥ 22.21**
+（本项目在 22.14 上实测过，会触发 Nuxt 的"版本不受支持"警告，虽然能跑但不建议。）
+
 ```bash
 # 1. 安装依赖
 npm install
@@ -163,6 +166,9 @@ npm run dev
 
 > 只想看最基本的"贴代码 → 解释"效果：**只填 `NUXT_LLM_API_KEY` 就能跑**，
 > 知识库检索会自动跳过（这是设计好的降级，不是报错）。
+
+> **关于端口**：开发服务器默认用 **3000**。
+> 如果这个端口被别的程序（比如另一个 Node 项目）占着，Vite 会自动换到 3001/3002 —— 留意终端里实际打印的地址。
 
 ---
 
@@ -212,11 +218,20 @@ AI-Web/
 ├── scripts/
 │   ├── build-embeddings.mjs       # npm run rag:build
 │   └── rag-probe.mjs              # 检索阈值校准探针
+├── docs/                          # 设计文档
+│   └── 知识库设计说明.md           #   为什么语料是"手写卡片"而不是下载文档
 ├── nuxt.config.ts                 # 框架配置 + 服务端私有配置
 ├── package.json                   # 依赖清单
+├── .npmrc                         # 固定使用官方 npm 源（原因见下）
 ├── .env.example                   # 环境变量模板（可提交）
-└── .env                           # 真实密钥（已被 .gitignore 排除）
+├── .env                           # 真实密钥（已被 .gitignore 排除）
+└── .gitignore                     # 排除 .env / node_modules / .nuxt / .output
 ```
+
+> **关于 `.npmrc`**：这里把 npm 源固定成了官方源 `registry.npmjs.org`。
+> 原因是国内镜像（`registry.npmmirror.com`）的元数据同步有延迟，
+> 某些较新的依赖会解析失败（报 `ETARGET ... No matching version found`）。
+> 这个文件只影响本项目，不改动系统全局配置。
 
 ---
 
