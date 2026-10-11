@@ -339,5 +339,126 @@
       "label": "PEP 484 · Type Hints",
       "url": "https://peps.python.org/pep-0484/"
     }
+  },
+  {
+    "id": "vue-ref",
+    "lang": "vue",
+    "tags": ["vue3", "reactivity", "composition-api", "ref"],
+    "title": "ref() 响应式引用",
+    "content": "ref 是 Vue 3 组合式 API 里创建响应式数据最常用的方式，把一个普通值包成对象，通过 .value 读写。Vue 3 在 2020 年 9 月发布，用组合式 API 取代了 Vue 2 的选项式写法。为什么需要这层包装？因为 JavaScript 的原始类型（数字、字符串）是按值传递的，没法像对象那样「拦截读写」；把它装进一个对象，Vue 才能通过 getter/setter 记录谁读了它、谁改了它，从而知道该重新渲染哪部分。这也是为什么在 <script setup> 里写 ref 要用 .value，而在模板里不用 —— 模板编译时 Vue 会自动帮你拆包。",
+    "source": {
+      "label": "Vue 官方文档 · ref()",
+      "url": "https://cn.vuejs.org/api/reactivity-core.html#ref"
+    }
+  },
+  {
+    "id": "vue-reactive",
+    "lang": "vue",
+    "tags": ["vue3", "reactivity", "composition-api", "reactive"],
+    "title": "reactive() 与 ref() 的区别",
+    "content": "reactive 用来把一个对象变成响应式的，直接改属性就能触发更新，不用写 .value。它和 ref 的分工是：reactive 只能用于对象和数组，ref 什么类型都能装。官方推荐「优先用 ref」，原因有两个：一是 ref 可以整体替换（obj.value = 新对象），而 reactive 一旦解构或重新赋值就丢失响应性；二是把 reactive 对象解构出来会立刻失去响应性，这是新手最常踩的坑。所以现在的主流写法是组合式函数里一律用 ref，需要传对象时也包在 ref 里。",
+    "source": {
+      "label": "Vue 官方文档 · reactive()",
+      "url": "https://cn.vuejs.org/api/reactivity-core.html#reactive"
+    }
+  },
+  {
+    "id": "vue-computed",
+    "lang": "vue",
+    "tags": ["vue3", "computed", "caching"],
+    "title": "computed 计算属性",
+    "content": "computed 用来声明一个「由其他响应式数据推导出来的值」，它会自动追踪依赖，依赖变了才重新计算，而且会把结果缓存起来 —— 只要依赖没变，反复读它都不会重算。这正是它和普通函数最大的区别：如果在模板里直接调用一个函数做同样的计算，每次重新渲染都会重新执行一遍。Computed 缓存的价值在开销大的计算上尤其明显，比如过滤一个大列表。注意 computed 是只读的，要写就得传 get/set 两个函数。",
+    "source": {
+      "label": "Vue 官方文档 · computed()",
+      "url": "https://cn.vuejs.org/api/reactivity-core.html#computed"
+    }
+  },
+  {
+    "id": "vue-watch",
+    "lang": "vue",
+    "tags": ["vue3", "watch", "side-effect"],
+    "title": "watch 与 watchEffect",
+    "content": "watch 用来观察响应式数据的变化，变化时执行一段副作用（发请求、写 localStorage、操作 DOM 这类不算「算值」的事）。它需要显式指定要观察哪个数据源，好处是能拿到变化前后的旧值和新值。watchEffect 则不用指定数据源，它会自动收集执行过程中读到的所有响应式数据，并在依赖变化时重新执行 —— 写起来更省事，但不容易看出它到底依赖了什么。选择标准：需要在变化时做「有具体目标」的动作，用 watch；只是想跟着数据重新跑一段逻辑，用 watchEffect。",
+    "source": {
+      "label": "Vue 官方文档 · watch()",
+      "url": "https://cn.vuejs.org/api/reactivity-core.html#watch"
+    }
+  },
+  {
+    "id": "vue-v-model",
+    "lang": "vue",
+    "tags": ["vue", "v-model", "form", "two-way-binding"],
+    "title": "v-model 双向绑定",
+    "content": "v-model 是 Vue 的表单双向绑定语法，用在一行里同时完成「把数据填进输入框」和「用户输入写回数据」两件事。它本质上是语法糖：<input v-model=\"name\"> 展开后就是 :value=\"name\" @input=\"name = $event.target.value\"，也就是「绑定值 + 监听输入事件」两个动作的简写。这正是 Vue 从 2014 年诞生起最出名的特性 —— 它把 React 那种「受控组件」要手写的两个步骤合成了一个。Vue 3 里 v-model 还可以用在自定义组件上，默认对应 prop 名 modelValue 和事件名 update:modelValue。",
+    "source": {
+      "label": "Vue 官方文档 · 表单输入绑定",
+      "url": "https://cn.vuejs.org/guide/essentials/forms.html"
+    }
+  },
+  {
+    "id": "vue-v-if-v-for",
+    "lang": "vue",
+    "tags": ["vue", "directive", "v-if", "v-for", "render"],
+    "title": "v-if 与 v-for",
+    "content": "v-if 根据条件决定要不要渲染这个元素，条件为假时元素根本不存在于 DOM 里；v-show 则始终渲染，只是切换 display 属性。所以切换频繁时用 v-show（省去反复创建销毁的开销），条件很少变时用 v-if。v-for 用来遍历数组或对象渲染列表，官方要求给每一项加 key —— 这和 React 的 key 是同一个道理：Vue 靠 key 判断哪些项是复用的、哪些是新增或删除的，从而只更新变化的部分。Vue 2 里 v-if 和 v-for 写在同一元素上时 v-for 优先级更高，Vue 3 把这个顺序反了过来，官方建议永远不要把它们写在同一个元素上。",
+    "source": {
+      "label": "Vue 官方文档 · 条件渲染",
+      "url": "https://cn.vuejs.org/guide/essentials/conditional.html"
+    }
+  },
+  {
+    "id": "css-flexbox",
+    "lang": "css",
+    "tags": ["css", "layout", "flexbox", "css3"],
+    "title": "Flexbox 弹性布局",
+    "content": "Flex 布局把容器里的子元素排成一行或一列，然后通过 justify-content（主轴对齐）和 align-items（交叉轴对齐）来分配空间。它 2009 年提出、2012 年前后定稿为 CSS3 的一部分，2013 年起各浏览器陆续支持。在它之前，做「水平垂直居中」「一行里自动分配宽度」这些事要靠 float、table-cell、绝对定位加负边距这类技巧，代码又长又难懂，还容易在不同浏览器下表现不一致。Flex 把这些需求变成了几个直白的属性。注意它是一维的 —— 只能控制一行或一列的方向，要真正的二维网格得用 Grid。",
+    "source": {
+      "label": "MDN · 弹性盒子布局",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/CSS/CSS_flexible_box_layout/Basic_concepts_of_flexbox"
+    }
+  },
+  {
+    "id": "css-grid",
+    "lang": "css",
+    "tags": ["css", "layout", "grid", "two-dimensional"],
+    "title": "Grid 网格布局",
+    "content": "Grid 是二维布局系统，可以同时控制行和列，用 grid-template-columns 定义列宽、用 grid-area 把子元素摆到指定位置。CSS Grid Layout Level 1 在 2017 年成为 W3C 正式推荐标准，主流浏览器同年跟上。它和 Flex 的区别是维度：Flex 是一维的（排成一行或一列），Grid 是二维的（行列同时规划）。所以「导航栏里几个按钮排开」用 Flex 更合适，「整个页面的版式分成三栏两行」用 Grid 更直接。它最大的一次思路转变是：布局可以先由父容器规划好网格，子元素再往里放，而不必靠子元素自己挤位置。",
+    "source": {
+      "label": "MDN · CSS 网格布局",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/CSS/CSS_grid_layout"
+    }
+  },
+  {
+    "id": "css-position",
+    "lang": "css",
+    "tags": ["css", "position", "layout", "sticky"],
+    "title": "position 定位",
+    "content": "position 决定一个元素怎么脱离正常文档流去摆位置。static 是默认值（按文档流走）；relative 相对自己的原位置偏移，但仍占着原来的空间；absolute 相对最近的「已定位祖先」偏移，并且不再占空间；fixed 相对浏览器窗口固定，滚动时不动；sticky 是个混合体 —— 元素平时像 relative 一样跟着滚，滚到设定的阈值（top/bottom）时变成 fixed 黏住。sticky 是较晚才普及的（各浏览器 2017 年前后支持），它解决了「表头吸顶」「侧边栏跟滚」这类以前必须写 JavaScript 监听 scroll 才能做的事。",
+    "source": {
+      "label": "MDN · position",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/CSS/position"
+    }
+  },
+  {
+    "id": "css-specificity",
+    "lang": "css",
+    "tags": ["css", "cascade", "specificity", "selector"],
+    "title": "选择器权重与层叠",
+    "content": "同一条样式规则冲突时，浏览器按三件事决定谁生效：**来源与重要性**（!important 最高）、**选择器权重**、**书写顺序**（同权重时后写的赢）。权重的计算是四段计分：行内样式 > id 选择器 > 类/属性/伪类 > 元素/伪元素，比较时从左往右逐段比，不是简单加总。它从 CSS 诞生起就是这个机制，是「层叠样式表」这个名字里「层叠」二字的由来。新手最常见的困扰是「为什么我的样式不生效」——九成是权重不够，而不是写错了。所以要避免用 !important 去硬压，那会让后面的维护变成互相加码。",
+    "source": {
+      "label": "MDN · 层叠与继承",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/CSS/CSS_cascade/Cascade"
+    }
+  },
+  {
+    "id": "css-box-sizing",
+    "lang": "css",
+    "tags": ["css", "box-model", "box-sizing", "layout"],
+    "title": "盒模型与 box-sizing",
+    "content": "每个元素都是一个盒子，由内容、内边距(padding)、边框(border)、外边距(margin)四层组成。默认情况下 width 只算内容区（content-box），加上 padding 和 border 之后实际占位会比 width 大 —— 这就是「设了 width: 100% 再加 padding 就撑破了」的原因。box-sizing: border-box 让 width 把 padding 和 border 也算进去，实际占位就是 width，符合直觉。它原本是 IE 的老式盒模型行为，后来被 CSS 收编成标准属性（各浏览器 2012 年前后支持）。今天几乎所有项目都会写一条全局的 * { box-sizing: border-box }。",
+    "source": {
+      "label": "MDN · box-sizing",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/CSS/box-sizing"
+    }
   }
 ]
