@@ -14,12 +14,49 @@
 | 阶段 | 内容 | 状态 |
 |---|---|---|
 | **M0** | 贴代码 → 流式输出四段解析 | ✅ 已完成 |
-| M1 | 知识框架图 | ⬜ 未开始 |
-| M2 | RAG 技术溯源 + 引用来源卡片 | ⬜ 未开始 |
+| **M1** | 知识框架图（Vue Flow 渲染） | ✅ 已完成 |
+| **M2** | **知识库（RAG）：自有语料 + 向量检索 + 引用来源** | ✅ 已完成 |
 | M3 | 交互打磨：错误兜底、手机适配 | ⬜ 未开始 |
 | M4 | 伪视频播放器 | ⬜ 未开始 |
 | M5 | Agent 思考链面板 | ⬜ 未开始 |
 | M6 | 代码截图上传 → 识别 → 解析 | ⬜ 未开始 |
+
+### 知识库（M2）
+
+这是项目"不只是调 API"的关键部分。
+
+```
+用户代码 → 判断语言 → 检索我们自己的语料库 → 找到相关资料
+                                                    ↓
+                          大模型照着资料回答，并在句中标注 [1][2]
+                                                    ↓
+                          前端显示"引用来源卡片"，可点击查证原文
+```
+
+| | |
+|---|---|
+| **语料** | `server/rag/corpus.json` —— 人工整理的技术资料，每条带出处链接 |
+| **向量** | `server/rag/corpus.embeddings.json` —— 离线预计算，**必须提交进 git** |
+| **embedding 服务** | 智谱 `embedding-3`（1024 维），与生成回答的 DeepSeek 完全分开 |
+| **检索** | 内存暴力算余弦，不装向量数据库（语料只有几十条） |
+| **引用编号** | 服务端生成，通过响应头 `X-Rag-Sources` 传给前端，与正文 `[n]` 一一对应 |
+
+**改了语料之后必须重跑：**
+
+```bash
+npm run rag:build      # 重新生成向量
+```
+
+否则新语料不会有向量（程序会检测到并跳过它们，不会给出错误答案）。
+
+**校准检索阈值：**
+
+```bash
+node --env-file=.env scripts/rag-probe.mjs
+```
+
+**优雅降级**：检索不到 / embedding 服务挂了 / 语料缺失 / 遇到未收录的语言（如 C++）
+→ 自动退回纯模型回答，不报错、不白屏。
 
 ---
 
@@ -64,10 +101,23 @@ AI-Web/
 ├── app/
 │   ├── app.vue                    # 应用外壳
 │   ├── assets/css/main.css        # 全局样式（引入 Tailwind）
-│   └── pages/index.vue            # 主页面：输入框 + 流式输出
+│   ├── components/
+│   │   ├── GraphView.vue          # 知识框架图（Vue Flow + dagre）
+│   │   └── SourceList.vue         # 引用来源卡片
+│   └── pages/index.vue            # 主页面：输入框 + 流式输出 + 图 + 引用
 ├── server/
-│   ├── api/analyze.post.ts        # POST /api/analyze —— 调大模型、流转发
-│   └── utils/prompt.ts            # 提示词（本项目的核心资产）
+│   ├── api/analyze.post.ts        # POST /api/analyze —— 检索 + 调模型 + 流转发
+│   ├── utils/prompt.ts            # 提示词（本项目的核心资产）
+│   └── rag/                       # ★ 知识库
+│       ├── corpus.json            #   人工整理的语料（改这个）
+│       ├── corpus.embeddings.json #   预计算向量（脚本生成，要提交）
+│       ├── types.ts
+│       ├── corpus.ts              #   加载 + 校验 + 缓存
+│       ├── embed.ts               #   调智谱 embedding
+│       └── retrieve.ts            #   语言过滤 + 余弦 + top-k
+├── scripts/
+│   ├── build-embeddings.mjs       # npm run rag:build
+│   └── rag-probe.mjs              # 检索阈值校准探针
 ├── nuxt.config.ts
 ├── .env.example                   # 环境变量模板（可提交）
 └── .env                           # 真实密钥（已被 .gitignore 排除）
