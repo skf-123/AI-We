@@ -240,29 +240,44 @@ function clearAll() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#0b1020] text-slate-200">
+  <!--
+    布局说明（桌面端 lg 以上）：
+      整页可以正常滚动（右侧有整页滚动条），从上到下依次是：
+      顶栏 / 两栏主区 / 知识框架图。
+
+      两栏各自锁定高度（约一屏减去顶栏），内容在面板内部滚动 ——
+      所以右侧解释再长，撑高的也只是它自己的滚动区，不会把页面无限拉长。
+
+      知识框架图区域**始终渲染**，没数据时显示占位提示 ——
+      这样图出现时页面不会突然跳高，评委第一眼也能看到还有这个功能。
+
+      小屏（< lg）不锁高度，退回普通文档流，否则手机上会挤成一团。
+  -->
+  <div class="min-h-screen bg-[#f5f6f8] text-slate-800">
     <!-- 顶栏 -->
-    <header class="border-b border-white/10 px-6 py-4">
+    <header class="shrink-0 border-b border-slate-200 bg-white px-6 py-4">
       <div class="mx-auto flex max-w-[1400px] items-center justify-between">
         <div class="flex items-baseline gap-3">
-          <h1 class="text-lg font-semibold tracking-wide text-white">麦穗 · 代码理解助手</h1>
-          <span class="text-xs text-slate-500">WheatBend</span>
+          <h1 class="text-lg font-semibold tracking-wide text-slate-900">麦穗 · 代码理解助手</h1>
+          <span class="text-xs text-slate-400">WheatBend</span>
         </div>
-        <span class="hidden text-xs text-slate-500 sm:block">
+        <span class="hidden text-xs text-slate-400 sm:block">
           贴代码 · 不用提问 · 自动讲解
         </span>
       </div>
     </header>
 
-    <main class="mx-auto grid max-w-[1400px] gap-5 px-6 py-6 lg:grid-cols-2">
+    <main class="mx-auto grid w-full max-w-[1400px] gap-5 px-6 py-6 lg:grid-cols-2">
       <!-- 左：输入 -->
-      <section class="flex flex-col rounded-xl border border-white/10 bg-white/[0.03] p-4">
+      <section
+        class="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:h-[calc(100vh-200px)] lg:min-h-[420px] lg:overflow-hidden"
+      >
         <div class="mb-3 flex flex-wrap items-center gap-2">
-          <span class="text-sm text-slate-400">示例：</span>
+          <span class="text-sm text-slate-500">示例：</span>
           <button
             v-for="s in SAMPLES"
             :key="s.label"
-            class="rounded-md border border-white/10 px-2.5 py-1 text-xs text-slate-300 transition hover:border-emerald-400/50 hover:text-emerald-300"
+            class="rounded-md border border-slate-200 px-2.5 py-1 text-xs text-slate-600 transition hover:border-emerald-500 hover:text-emerald-600"
             @click="code = s.code"
           >
             {{ s.label }}
@@ -273,21 +288,21 @@ function clearAll() {
           v-model="code"
           spellcheck="false"
           placeholder="把你想看懂的代码粘贴到这里，然后点下面的按钮。&#10;不需要写任何提示词。"
-          class="font-mono-code min-h-[380px] flex-1 resize-y rounded-lg border border-white/10 bg-black/40 p-3 text-sm leading-relaxed text-slate-200 outline-none transition placeholder:text-slate-600 focus:border-emerald-400/50"
+          class="font-mono-code min-h-[280px] flex-1 resize-none rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-relaxed text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white lg:min-h-0"
         />
 
         <div class="mt-3 flex items-center justify-between">
-          <span class="text-xs text-slate-600">{{ code.length }} 字符</span>
+          <span class="text-xs text-slate-400">{{ code.length }} 字符</span>
           <div class="flex gap-2">
             <button
-              class="rounded-lg border border-white/10 px-3 py-2 text-sm text-slate-300 transition hover:bg-white/5"
+              class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
               @click="clearAll"
             >
               清空
             </button>
             <button
               v-if="!loading"
-              class="rounded-lg bg-emerald-500 px-5 py-2 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+              class="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
               :disabled="!code.trim()"
               @click="analyze"
             >
@@ -295,7 +310,7 @@ function clearAll() {
             </button>
             <button
               v-else
-              class="rounded-lg border border-rose-400/40 px-5 py-2 text-sm text-rose-300 transition hover:bg-rose-500/10"
+              class="rounded-lg border border-rose-300 px-5 py-2 text-sm text-rose-600 transition hover:bg-rose-50"
               @click="stop"
             >
               停止
@@ -305,36 +320,38 @@ function clearAll() {
       </section>
 
       <!-- 右：输出 -->
-      <section class="flex flex-col rounded-xl border border-white/10 bg-white/[0.03] p-4">
+      <section
+        class="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:h-[calc(100vh-200px)] lg:min-h-[420px] lg:overflow-hidden"
+      >
         <div class="mb-3 flex items-center gap-2">
-          <span class="text-sm text-slate-400">解析结果</span>
+          <span class="text-sm text-slate-500">解析结果</span>
           <span
             v-if="loading"
-            class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300"
+            class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700"
           >
-            <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+            <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
             正在解析
           </span>
           <span
             v-else-if="done && !errorMsg"
-            class="rounded-full bg-white/5 px-2 py-0.5 text-xs text-slate-400"
+            class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"
           >
             已完成
           </span>
         </div>
 
-        <div class="min-h-[420px] flex-1 overflow-y-auto pr-1">
+        <div class="min-h-[320px] flex-1 overflow-y-auto pr-1 lg:min-h-0">
           <!-- 出错 -->
           <div
             v-if="errorMsg"
-            class="rounded-lg border border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-200"
+            class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"
           >
             {{ errorMsg }}
           </div>
 
           <!-- 空状态 -->
           <div v-else-if="isEmpty" class="flex h-full items-center justify-center px-6 text-center">
-            <p class="text-sm leading-relaxed text-slate-600">
+            <p class="text-sm leading-relaxed text-slate-400">
               左边粘贴代码，点「开始解析」。<br />
               这里会依次出现：逐词逐句 → 局部关系 → 整段作用 → 技术溯源。
             </p>
@@ -345,46 +362,67 @@ function clearAll() {
             <article
               v-for="s in sections"
               :key="s.title"
-              class="rounded-lg border border-white/5 bg-black/20 p-3.5"
+              class="rounded-lg border border-slate-100 bg-slate-50 p-3.5"
             >
-              <h2 class="mb-2 text-sm font-semibold text-emerald-300">{{ s.title }}</h2>
-              <p class="whitespace-pre-wrap text-sm leading-7 text-slate-300">{{ s.body }}</p>
+              <h2 class="mb-2 text-sm font-semibold text-emerald-700">{{ s.title }}</h2>
+              <p class="whitespace-pre-wrap text-sm leading-7 text-slate-700">{{ s.body }}</p>
             </article>
 
             <!-- 知识库检索到的引用来源，紧跟在四段解释之后 -->
             <SourceList v-if="sources.length" :sources="sources" />
 
-            <span v-if="loading" class="inline-block h-4 w-2 animate-pulse bg-emerald-400" />
+            <span v-if="loading" class="inline-block h-4 w-2 animate-pulse bg-emerald-500" />
           </div>
         </div>
       </section>
     </main>
 
-    <!-- 知识框架图：等 AI 把 JSON 流完之后自动出现 -->
-    <section v-if="graphData" class="mx-auto max-w-[1400px] px-6 pb-2">
-      <div class="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+    <!--
+      知识框架图
+      这个区域**始终存在**（不用 v-if）：没数据时显示占位提示。
+      好处是图出现时页面不会突然跳高，用户一进来也知道这里会有东西。
+    -->
+    <section class="mx-auto w-full max-w-[1400px] px-6 pb-6">
+      <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <span class="text-sm text-slate-400">知识框架图</span>
+          <span class="text-sm text-slate-500">知识框架图</span>
           <div class="flex items-center gap-3 text-[11px] text-slate-500">
             <span class="inline-flex items-center gap-1.5">
-              <span class="h-2.5 w-2.5 rounded-sm bg-emerald-400" />代码
+              <span class="h-2.5 w-2.5 rounded-sm bg-emerald-500" />代码
             </span>
             <span class="inline-flex items-center gap-1.5">
-              <span class="h-2.5 w-2.5 rounded-sm bg-blue-400" />技术
+              <span class="h-2.5 w-2.5 rounded-sm bg-blue-500" />技术
             </span>
             <span class="inline-flex items-center gap-1.5">
-              <span class="h-2.5 w-2.5 rounded-sm bg-amber-400" />概念
+              <span class="h-2.5 w-2.5 rounded-sm bg-amber-500" />概念
             </span>
           </div>
-          <span class="text-[11px] text-slate-600">可拖拽节点 · 滚轮缩放</span>
+          <span class="text-[11px] text-slate-400">可拖拽节点 · 滚轮缩放</span>
         </div>
 
-        <GraphView :data="graphData" />
+        <div class="h-[400px]">
+          <GraphView v-if="graphData" :data="graphData" />
+
+          <div
+            v-else
+            class="flex h-full items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 px-6 text-center"
+          >
+            <p class="text-sm leading-relaxed text-slate-400">
+              解析完成后，这里会画出这段代码的知识框架图<br />
+              <span class="text-[13px]">
+                节点分三类：
+                <span class="text-emerald-600">代码</span>、
+                <span class="text-blue-600">技术</span>、
+                <span class="text-amber-600">概念</span>
+              </span>
+            </p>
+          </div>
+        </div>
       </div>
     </section>
 
-    <footer class="px-6 pb-6 text-center text-xs text-slate-600">
-      麦穗团队 · 传智杯 AI Web 开发挑战赛 · M0
+    <footer class="shrink-0 px-6 pb-6 text-center text-xs text-slate-400">
+      麦穗团队 · 传智杯 AI Web 开发挑战赛
     </footer>
   </div>
 </template>
