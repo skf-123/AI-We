@@ -73,24 +73,24 @@ export default defineEventHandler(async (event) => {
 
   // ---- 2. 取配置（只在服务端可见）----
   const config = useRuntimeConfig(event)
-  if (!config.deepseekApiKey) {
+  if (!config.llmApiKey) {
     throw createError({
       statusCode: 500,
-      statusMessage: '服务端未配置 DeepSeek API Key，请检查 .env 文件里的 NUXT_DEEPSEEK_API_KEY',
+      statusMessage: '服务端未配置大模型 API Key，请检查 .env 文件里的 NUXT_LLM_API_KEY',
     })
   }
 
   // ---- 3. 调用上游大模型 ----
   let upstream: Response
   try {
-    upstream = await fetch(`${config.deepseekBaseUrl}/chat/completions`, {
+    upstream = await fetch(`${config.llmBaseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.deepseekApiKey}`,
+        Authorization: `Bearer ${config.llmApiKey}`,
       },
       body: JSON.stringify({
-        model: config.deepseekModel,
+        model: config.llmModel,
         stream: true,
         temperature: 0.3, // 偏低：解释类任务要稳定、少发挥
         max_tokens: 8192,

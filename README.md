@@ -31,7 +31,7 @@
 | 语言 | TypeScript | |
 | 样式 | Tailwind CSS 4 | |
 | 数据校验 | Zod | 校验请求参数，后续用于校验 AI 的结构化输出 |
-| 大模型 | DeepSeek API（`deepseek-flash`） | 生成解释文字 |
+| 大模型 | 智谱 GLM（`glm-5.3-flash`） | 生成解释文字；走 OpenAI 兼容接口，换 provider 只改 `.env` |
 | 部署 | Vercel | 免费、不用备案、推送即上线 |
 
 > **为什么不做单独的 Python 后端？**
