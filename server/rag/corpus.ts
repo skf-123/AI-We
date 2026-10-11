@@ -96,3 +96,21 @@ export function loadCorpus(dimensions: number): LoadedEntry[] {
 export function resetCorpusCache() {
   cache = null
 }
+
+/** 按 id 建一次索引，供"点开引用卡片看原文"用 */
+let entryIndex: Map<string, CorpusEntry> | null = null
+
+/**
+ * 按 id 查一条语料（不需要向量，只读正文）。
+ *
+ * 用途：前端点开引用卡片时，通过 /api/source/:id 取这条语料的正文。
+ * 为什么不塞进响应头里：4 条中文语料 URL 编码后约 8.5 KB，
+ * 逼近 Node 默认的 16KB 头部上限，代理还可能卡得更低 —— 点开时再取更稳。
+ */
+export function findEntry(id: string): CorpusEntry | null {
+  if (entryIndex === null) {
+    const corpus = corpusJson as unknown as CorpusEntry[]
+    entryIndex = new Map(corpus.map((entry) => [entry.id, entry]))
+  }
+  return entryIndex.get(id) ?? null
+}
