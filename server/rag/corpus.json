@@ -207,5 +207,137 @@
       "label": "React 官方文档 · State：组件的记忆",
       "url": "https://zh-hans.react.dev/learn/state-a-components-memory"
     }
+  },
+  {
+    "id": "py-decorator",
+    "lang": "python",
+    "tags": ["decorator", "pep318", "function", "syntax"],
+    "title": "装饰器（@decorator）",
+    "content": "装饰器是「接收一个函数、返回一个新函数」的函数，用 @ 号写在被装饰的函数上面。它 2004 年随 PEP 318 进入 Python 2.4，但这个写法本身更早就存在了 —— 在此之前只能写成 func = decorator(func)，把函数名写两遍，容易漏改。@ 这个语法糖解决的正是这个问题：一眼能看出「这个函数被包了一层」。它最典型的两类用途是加日志、计时、缓存、权限检查这类「和业务逻辑无关的横切关注点」，让业务函数本身保持干净。写装饰器时通常要给内层函数加上 functools.wraps，否则被装饰函数的 __name__ 和文档字符串会被替换掉。",
+    "source": {
+      "label": "Python 文档 · 函数定义",
+      "url": "https://docs.python.org/zh-cn/3/reference/compound_stmts.html#function-definitions"
+    }
+  },
+  {
+    "id": "py-list-comprehension",
+    "lang": "python",
+    "tags": ["comprehension", "list", "syntax"],
+    "title": "列表推导式",
+    "content": "列表推导式用一个表达式把一个可迭代对象「加工」成新列表，写法是 [表达式 for 元素 in 可迭代对象 if 条件]，2000 年随 Python 2.0 引入。它解决的是「建一个空列表、写 for 循环、逐个 append」这套又长又啰嗦的样板代码。它本质上等价于 for 循环加 append，但把「我要什么」直接写在了一行里 —— 这也是 Python 一贯的风格取向：让代码读起来像自然语言的描述。执行速度通常也比手写 for 循环略快，因为循环在解释器内部完成。注意推导式里不要塞太复杂的逻辑，否则可读性会反过来变差。",
+    "source": {
+      "label": "Python 文档 · 数据结构",
+      "url": "https://docs.python.org/zh-cn/3/tutorial/datastructures.html#list-comprehensions"
+    }
+  },
+  {
+    "id": "py-generator-yield",
+    "lang": "python",
+    "tags": ["generator", "yield", "lazy", "iterator"],
+    "title": "生成器与 yield",
+    "content": "函数里只要出现 yield，它就不再是普通函数，而是一个生成器函数 —— 调用它不会立刻执行函数体，而是返回一个「可以一次吐一个值」的对象。每次对它取值，函数就执行到下一个 yield 处暂停，状态保留着下次继续。它 2001 年随 PEP 255 进入 Python 2.2。它要解决的是内存问题：如果要处理一千万行日志，用列表一次性读进来会撑爆内存，用生成器则可以边读边处理，同一时刻内存里只有一行。「惰性求值」是这个设计的核心 —— 值不是提前算好放在那里，而是被需要时才生成。",
+    "source": {
+      "label": "PEP 255 · Simple Generators",
+      "url": "https://peps.python.org/pep-0255/"
+    }
+  },
+  {
+    "id": "py-fstring",
+    "lang": "python",
+    "tags": ["fstring", "pep498", "string", "format"],
+    "title": "f-string（格式化字符串）",
+    "content": "f-string 是在字符串前面加个 f，然后用花括号直接嵌表达式：f\"{name} 耗时 {cost:.2f}s\"。它 2016 年随 PEP 498 进入 Python 3.6，是继 % 格式化和 str.format 之后的第三代字符串格式化写法。前两代的问题是把「模板」和「要填的值」分得很远 —— 用 format 写一句长文本时，得来回数第几个参数对应哪个花括号。f-string 让表达式直接待在它要出现的位置上，可读性提升很明显，而且因为是在编译期处理的，速度也更快。花括号里可以写任意表达式，还可以带格式说明符（比如 :.2f 保留两位小数）。",
+    "source": {
+      "label": "PEP 498 · Literal String Interpolation",
+      "url": "https://peps.python.org/pep-0498/"
+    }
+  },
+  {
+    "id": "py-with-statement",
+    "lang": "python",
+    "tags": ["with", "context-manager", "pep343", "resource"],
+    "title": "with 语句与上下文管理器",
+    "content": "with 用来保证「用完一定收拾干净」：with open('a.txt') as f: 读完之后，不管中间有没有抛异常，文件都会被关闭。它 2006 年随 PEP 343 进入 Python 2.5。在此之前，正确写法是 try/finally —— 把关闭资源的代码写在 finally 里，但每开一个资源就要多一层嵌套，写多了很容易忘掉某一次关闭，泄漏文件句柄或数据库连接。with 背后的机制叫「上下文管理器」：对象提供 __enter__ 和 __exit__ 两个方法，进入 with 块时调用前者，离开时（无论正常还是异常）一定调用后者。",
+    "source": {
+      "label": "PEP 343 · The \"with\" Statement",
+      "url": "https://peps.python.org/pep-0343/"
+    }
+  },
+  {
+    "id": "py-lambda-map-filter",
+    "lang": "python",
+    "tags": ["lambda", "map", "filter", "functional"],
+    "title": "lambda 与 map / filter",
+    "content": "lambda 用来写一个「没有名字的小函数」，语法是 lambda 参数: 返回值，只能写一个表达式。map 把函数逐个作用到序列的每个元素上，filter 用函数筛选元素，两者都返回迭代器。这三个东西来自 Python 早期对函数式编程风格的吸收（Python 从 1.x 就有 lambda）。不过 Python 官方风格指南 PEP 8 明确建议：能用列表推导式的地方就别用 map/filter 加 lambda —— 推导式通常更好读，而且在需要复杂条件时不会挤成一行。所以今天在 Python 里看到大量 map/filter，多半是从别的语言带过来的习惯。",
+    "source": {
+      "label": "PEP 8 · Python 代码风格指南",
+      "url": "https://peps.python.org/pep-0008/#programming-recommendations"
+    }
+  },
+  {
+    "id": "py-class-init-self",
+    "lang": "python",
+    "tags": ["class", "self", "oop", "init"],
+    "title": "类、__init__ 与 self",
+    "content": "Python 的类用 class 定义，__init__ 是「对象造好之后自动调用」的初始化方法，作用是给对象挂上初始属性。self 代表「当前这个对象本身」，必须写成方法的第一个参数 —— 这一点和其他语言不同：Java、C++ 里 this 是隐式存在的关键字，Python 则把它显式写出来。显式的好处是「obj.method() 其实是 Class.method(obj)」这件事一眼可见，不会让人误以为方法和对象是绑死的。代价是每个方法都要多写一个 self。注意 __init__ 只负责初始化，真正「创建对象」的是 __new__，只是绝大多数情况下不需要自己写它。",
+    "source": {
+      "label": "Python 文档 · 类",
+      "url": "https://docs.python.org/zh-cn/3/tutorial/classes.html"
+    }
+  },
+  {
+    "id": "py-exception-handling",
+    "lang": "python",
+    "tags": ["exception", "try", "except", "error"],
+    "title": "异常处理 try / except",
+    "content": "Python 用 try / except 捕获异常，except 可以指定只捕获某几类错误，finally 里的代码无论成败都会执行。Python 3 里取异常对象要写 except ValueError as e，早期写法 except ValueError, e 在 Python 3 已被移除（因为它和「一次捕获多个异常」的写法长得太像，容易看错）。设计上有一条重要原则：**只捕获你确实知道该怎么处理的异常**。写成裸的 except: 会把键盘中断、内存不足这类也不小心吞掉，让真正的 bug 藏起来，这是 Python 社区公认的坏味道。",
+    "source": {
+      "label": "Python 文档 · 错误和异常",
+      "url": "https://docs.python.org/zh-cn/3/tutorial/errors.html"
+    }
+  },
+  {
+    "id": "py-dict-set-comprehension",
+    "lang": "python",
+    "tags": ["comprehension", "dict", "set"],
+    "title": "字典与集合推导式",
+    "content": "推导式不只用于列表：{k: v for k, v in pairs} 生成字典，{x for x in items} 生成集合（自动去重）。它们 2010 年前后随 Python 2.7 / 3.0 一起进入语言。字典推导式最典型的用法是「把一个结构的键值对重新组装成另一个结构」，比如把两个列表 zip 起来做成映射表；集合推导式则常用于快速去重或求交并集。需要注意的是，推导式里的变量作用域是独立的 —— Python 3 里推导式有自己的作用域，不会像 Python 2 那样把循环变量泄漏到外层，这算是 3.x 的一个修复。",
+    "source": {
+      "label": "Python 文档 · 数据结构",
+      "url": "https://docs.python.org/zh-cn/3/tutorial/datastructures.html#dictionaries"
+    }
+  },
+  {
+    "id": "py-sql-injection",
+    "lang": "python",
+    "tags": ["security", "sql", "injection", "parameterized-query"],
+    "title": "SQL 拼接注入与参数化查询",
+    "content": "把用户输入用加号或 f-string 拼进 SQL 语句里，是非常典型的安全漏洞：如果用户输入的是 ' OR 1=1 -- ，拼出来的语句就变成了永远为真的条件，能绕过登录、甚至拖走整张表。这不是 Python 独有的问题，但 Python 里特别容易出现，因为字符串拼接写起来太顺手了。正确做法是**参数化查询**：把 SQL 写成带占位符的形式（SQLite 用 ?，MySQL 驱动用 %s），把用户输入作为第二个参数单独传进去。关键点在于「用户输入永远不被当成 SQL 语法解析，只当成数据」—— 这是数据库驱动层面的保护，不是靠自己去转义引号。",
+    "source": {
+      "label": "OWASP · SQL 注入",
+      "url": "https://owasp.org/www-community/attacks/SQL_Injection"
+    }
+  },
+  {
+    "id": "py-gil",
+    "lang": "python",
+    "tags": ["gil", "concurrency", "thread", "performance"],
+    "title": "GIL（全局解释器锁）",
+    "content": "GIL 是 CPython 解释器里的一把全局锁：同一时刻只允许一个线程执行 Python 字节码。它是为了让内存管理（引用计数）的实现变简单而引入的，从 Python 诞生之初就存在。它带来的实际影响是：**CPU 密集型的任务用多线程并不会变快**，因为线程在抢同一把锁，只能轮流跑。所以 Python 里做并行计算的通行做法是用多进程（multiprocessing）绕开 GIL。而 I/O 密集型任务（网络请求、读写文件）不受影响 —— 等 I/O 的时候线程会主动释放锁，多线程照常能提速。",
+    "source": {
+      "label": "Python 文档 · 术语表 GIL",
+      "url": "https://docs.python.org/zh-cn/3/glossary.html#term-global-interpreter-lock"
+    }
+  },
+  {
+    "id": "py-type-hints",
+    "lang": "python",
+    "tags": ["typing", "pep484", "annotation"],
+    "title": "类型注解（Type Hints）",
+    "content": "类型注解是在变量、参数、返回值后面标注类型的写法，比如 def add(a: int, b: int) -> int:。它 2014 年随 PEP 484 进入 Python 3.5。它和其他语言最大的区别是：**Python 的类型注解在运行时完全不检查**，解释器会直接忽略它们。它的价值在于两处：一是给人看，让函数签名自解释；二是给工具看，类型检查器（mypy、pyright）和 IDE 能靠它提前发现类型错误、提供补全。所以 Python 的官方定位始终是「渐进式类型」—— 你可以只给关键部分加注解，不必全写上，也不会因为漏写而报错。",
+    "source": {
+      "label": "PEP 484 · Type Hints",
+      "url": "https://peps.python.org/pep-0484/"
+    }
   }
 ]

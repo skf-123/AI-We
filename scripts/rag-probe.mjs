@@ -108,6 +108,46 @@ function Counter() {
 }
 const { name, age } = user;`,
   },
+  {
+    label: 'Python 装饰器（页面示例 2）',
+    expect: ['py-decorator'],
+    code: `import time
+from functools import wraps
+
+def timer(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        cost = time.perf_counter() - start
+        print(f"{func.__name__} 耗时 {cost:.4f}s")
+        return result
+    return wrapper
+
+@timer
+def slow_sum(n):
+    return sum(i * i for i in range(n))
+
+slow_sum(1_000_000)`,
+  },
+  {
+    label: 'Python 有安全隐患（页面示例 3）',
+    expect: ['py-sql-injection'],
+    code: `def find_user(username):
+    sql = "SELECT * FROM users WHERE name = '" + username + "'"
+    cursor.execute(sql)
+    return cursor.fetchone()`,
+  },
+  {
+    label: 'Python 列表推导与生成器',
+    expect: ['py-list-comprehension', 'py-generator-yield'],
+    code: `def load_lines(path):
+    with open(path) as f:
+        for line in f:
+            yield line.strip()
+
+squares = [x * x for x in range(10) if x % 2 == 0]`,
+  },
 ]
 
 const SHOULD_MISS = [
