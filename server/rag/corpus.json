@@ -460,5 +460,181 @@
       "label": "MDN · box-sizing",
       "url": "https://developer.mozilla.org/zh-CN/docs/Web/CSS/box-sizing"
     }
+  },
+  {
+    "id": "java-generics",
+    "lang": "java",
+    "tags": ["java", "generics", "type-erasure", "java5"],
+    "title": "泛型与类型擦除",
+    "content": "泛型让集合在编译期就锁定元素类型：List<String> 里只能放字符串，取出来也不用强转。它 2004 年随 Java 5 引入。在此之前，集合里存的全是 Object，取出来必须手写强制类型转换，一旦放错类型只能在运行时抛 ClassCastException —— 泛型把这类错误提前到了编译期。Java 泛型有一个别的语言没有的特点：**类型擦除**。编译之后 String 的类型信息就被抹掉了，运行时 List<String> 和 List<Integer> 是同一个类。这样做是为了兼容 Java 5 之前的老代码，代价是运行时拿不到泛型类型，所以不能写 new T[]，也不能对泛型做重载。",
+    "source": {
+      "label": "Java 官方 · 泛型",
+      "url": "https://dev.java/learn/generics/"
+    }
+  },
+  {
+    "id": "java-stream",
+    "lang": "java",
+    "tags": ["java", "stream", "lambda", "java8", "functional"],
+    "title": "Stream API",
+    "content": "Stream 用链式调用的方式处理集合：list.stream().filter(x -> x > 0).map(x -> x * 2).collect(toList())。它 2014 年随 Java 8 引入，和 lambda 表达式是同一批。在此之前，对集合做筛选和变换只能写 for 循环加临时变量，代码里「遍历」和「我要做什么」混在一起。Stream 把这两件事拆开，写法上很接近 SQL 的 SELECT ... WHERE。它和集合有个重要区别：Stream 本身不存储数据，只是一段「流水线描述」，而且**只能消费一次** —— 遍历过就失效了，不能回头重来。另一个特点是它默认按顺序处理，要并行加 .parallel() 即可。",
+    "source": {
+      "label": "Java 官方教程 · 聚合操作（Stream）",
+      "url": "https://docs.oracle.com/javase/tutorial/collections/streams/"
+    }
+  },
+  {
+    "id": "java-annotation",
+    "lang": "java",
+    "tags": ["java", "annotation", "java5", "metadata"],
+    "title": "注解（Annotation）",
+    "content": "注解是用 @ 开头的元数据标记，写不写它不影响代码本身能不能跑，但框架可以读取它来决定怎么处理你的代码。它 2004 年随 Java 5 引入（和泛型同一批）。它的动机是取代早期框架那种靠 XML 配置、或者靠命名约定（比如方法名必须以 set 开头）来识别意图的做法 —— 那些方式的问题是「代码在这里，配置在很远的地方」，改一个方法要同时改两个文件。注解把说明贴在代码旁边。Spring 的 @Autowired、@RestController，JUnit 的 @Test 都是这个机制。注解本身不做事，做事的是**读取注解的框架**。",
+    "source": {
+      "label": "Java 官方 · 注解",
+      "url": "https://dev.java/learn/annotations/"
+    }
+  },
+  {
+    "id": "java-jvm",
+    "lang": "java",
+    "tags": ["java", "jvm", "bytecode", "portability"],
+    "title": "JVM 与字节码",
+    "content": "Java 源代码编译后不是机器码，而是一种叫字节码的中间格式，由 JVM（Java 虚拟机）来执行。这是 Java 从 1995 年诞生起最核心的设计：「一次编写，到处运行」—— 只要目标平台有 JVM，同一份字节码就能跑，不必为每个操作系统重新编译。它解决的痛点是 C/C++ 那套「为每个平台分别编译」的麻烦。代价是多了一层抽象，早期 JVM 解释执行字节码，性能明显不如 C++。后来引入 JIT（即时编译）把热点代码编译成机器码，性能差距大幅缩小。今天 Kotlin、Scala、Groovy 也都是编译成 JVM 字节码来跑的。",
+    "source": {
+      "label": "Oracle · Java 虚拟机规范",
+      "url": "https://docs.oracle.com/javase/specs/jvms/se21/html/index.html"
+    }
+  },
+  {
+    "id": "java-checked-exception",
+    "lang": "java",
+    "tags": ["java", "exception", "checked", "error-handling"],
+    "title": "受检异常与非受检异常",
+    "content": "Java 把异常分成两类：继承 Exception 的**受检异常**（checked）和继承 RuntimeException 的**非受检异常**（unchecked）。区别在于编译器管不管：如果一个方法可能抛出受检异常，你要么 try/catch 处理掉，要么在方法签名上用 throws 声明出去，否则编译不通过。这是 Java 独有的设计，C++、C#、Python 都没有这种强制。它的出发点是好的：强迫调用者面对「这个操作可能失败」这个事实（比如读文件、连数据库）。但实践中争议很大 —— 很多受检异常没法在当场处理（比如网络断开），结果代码里塞满了只是原样往上抛的 throws，或者干脆 catch 了什么都不做，反而掩盖了问题。",
+    "source": {
+      "label": "Java 官方 · 异常",
+      "url": "https://dev.java/learn/exceptions/"
+    }
+  },
+  {
+    "id": "java-interface-abstract",
+    "lang": "java",
+    "tags": ["java", "interface", "abstract", "oop"],
+    "title": "接口与抽象类",
+    "content": "接口（interface）声明「能做什么」，抽象类（abstract class）可以同时声明「能做什么」和「已经怎么做的部分」。Java 只允许单继承类、但可以实现多个接口，所以「想复用一份实现」和「想同时具备多种能力」这两件事被拆开了。这个设计从 Java 诞生起就是如此（当时 C++ 的多重继承因为菱形继承问题被广泛批评）。Java 8（2014）给接口加了 default 方法，接口也能带实现了，两者的界限因此模糊了一些 —— 但核心区别没变：抽象类表达「是什么」（is-a），接口表达「能做什么」（can-do），而且一个类只能继承一个父类。",
+    "source": {
+      "label": "Java 官方 · 接口",
+      "url": "https://dev.java/learn/interfaces/"
+    }
+  },
+  {
+    "id": "java-autoboxing",
+    "lang": "java",
+    "tags": ["java", "autoboxing", "wrapper", "java5", "pitfall"],
+    "title": "自动装箱与拆箱",
+    "content": "Java 里 int 是基本类型，Integer 是对象。自动装箱让你能直接把 int 赋给 Integer（编译器替你调 Integer.valueOf），拆箱反过来。它 2004 年随 Java 5 引入，动机是让集合用起来方便些 —— 泛型只能装对象，不能装 int，没有自动装箱就得写一堆 new Integer(5)。但它埋了一个著名的坑：**Integer 的缓存**。valueOf 会缓存 -128 到 127 之间的对象，所以两个值为 100 的 Integer 用 == 比较是 true，但值为 1000 的两个 Integer 用 == 比较是 false —— 因为超出缓存范围就会各自 new 一个新对象。所以包装类型比较永远要用 equals，不能用 ==。",
+    "source": {
+      "label": "Oracle · 自动装箱",
+      "url": "https://docs.oracle.com/javase/tutorial/java/data/autoboxing.html"
+    }
+  },
+  {
+    "id": "java-equals-hashcode",
+    "lang": "java",
+    "tags": ["java", "equals", "hashcode", "contract", "collection"],
+    "title": "equals 与 hashCode 的契约",
+    "content": "Java 规定：如果两个对象 equals 返回 true，它们的 hashCode 必须相同。这条约定从 Object 类就存在。为什么这么定？因为 HashMap、HashSet 这类基于哈希的集合是「先用 hashCode 找桶、再用 equals 在桶里比对」。如果你重写了 equals 却没重写 hashCode，两个「相等」的对象可能算出不同的哈希值，被放进不同的桶里 —— 结果就是：你把一个对象塞进 HashSet，再用一个相等的对象去 contains，返回 false。集合的行为就悄悄错了。所以规则是：**重写 equals 就必须同时重写 hashCode**，而且要用同一批字段。",
+    "source": {
+      "label": "Oracle · Object 类 API",
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html"
+    }
+  },
+  {
+    "id": "sql-join",
+    "lang": "sql",
+    "tags": ["sql", "join", "query", "sql92"],
+    "title": "JOIN 连接查询",
+    "content": "JOIN 把多张表的行按关联条件拼到一起。INNER JOIN 只保留两边都匹配上的行；LEFT JOIN 保留左表全部、右表没匹配上的填 NULL；RIGHT JOIN 反过来；FULL JOIN 两边都保留。这套显式 JOIN 语法是 SQL-92 标准确立的。在那之前，关联查询只能写成 FROM a, b WHERE a.id = b.a_id —— 把「连接条件」和「筛选条件」混在同一个 WHERE 里，表一多，就分不清哪句是连接、哪句是过滤，漏写一句连接条件还会变成笛卡尔积（行数相乘），在大表上足以把数据库拖垮。显式 JOIN 把连接条件和过滤条件分开了。",
+    "source": {
+      "label": "PostgreSQL 文档 · 表表达式",
+      "url": "https://www.postgresql.org/docs/current/queries-table-expressions.html"
+    }
+  },
+  {
+    "id": "sql-group-by",
+    "lang": "sql",
+    "tags": ["sql", "group-by", "aggregate", "having"],
+    "title": "GROUP BY 与聚合函数",
+    "content": "GROUP BY 把行按某几列的值分组，然后对每组用聚合函数（COUNT / SUM / AVG / MAX / MIN）算出汇总值。它和 WHERE 的分工是：WHERE 在分组**之前**过滤单行，HAVING 在分组**之后**过滤组。这个顺序决定了 WHERE 里不能写聚合函数 —— 因为那时还没分组，COUNT(*) 无从算起。GROUP BY 从 SQL-92 起就是标准的一部分。它解决的问题是「把明细行汇总成统计结果」，背后的思想是集合运算而不是逐行处理，这也正是 SQL 和普通编程语言最不一样的地方。",
+    "source": {
+      "label": "PostgreSQL 文档 · 聚合函数",
+      "url": "https://www.postgresql.org/docs/current/functions-aggregate.html"
+    }
+  },
+  {
+    "id": "sql-subquery",
+    "lang": "sql",
+    "tags": ["sql", "subquery", "nested", "query"],
+    "title": "子查询",
+    "content": "子查询是嵌在另一条 SQL 里的 SELECT，常见位置有三个：写在 WHERE 里做条件（IN、EXISTS、比较运算）、写在 FROM 里当成一张临时表、写在 SELECT 里算一个标量值。它的价值是让「分两步想」的问题能一次表达出来 —— 比如「找出订单总额超过平均值的客户」，先算出平均值（子查询），再用它筛客户（外层查询）。要注意的是性能：早期数据库对相关子查询（内层引用了外层的列）会逐行执行一次，在大表上很慢；现代优化器大多能把它们改写成 JOIN，所以可读性优先即可，真有性能问题再拿 EXPLAIN 看执行计划。",
+    "source": {
+      "label": "PostgreSQL 文档 · 子查询表达式",
+      "url": "https://www.postgresql.org/docs/current/functions-subquery.html"
+    }
+  },
+  {
+    "id": "sql-index",
+    "lang": "sql",
+    "tags": ["sql", "index", "b-tree", "performance"],
+    "title": "索引",
+    "content": "索引是数据库为某几列额外维护的一份「排好序的查找结构」，让查询不必逐行扫描整张表。最常见的实现是 B+ 树，这个思路可以追溯到 1970 年代 IBM 的 System R 项目。代价是写入变慢、占用额外空间：每次 INSERT / UPDATE / DELETE 都要同步更新所有相关索引。所以索引不是越多越好。另外有一个重要事实：**在列上套函数或运算会让索引用不上** —— 比如 WHERE YEAR(created_at) = 2026 通常无法使用 created_at 上的索引，因为索引是按原始值排的。要改成范围查询 WHERE created_at >= '2026-01-01' AND created_at < '2027-01-01'。",
+    "source": {
+      "label": "PostgreSQL 文档 · 索引",
+      "url": "https://www.postgresql.org/docs/current/indexes.html"
+    }
+  },
+  {
+    "id": "sql-transaction",
+    "lang": "sql",
+    "tags": ["sql", "transaction", "acid", "concurrency"],
+    "title": "事务与 ACID",
+    "content": "事务把一串操作打包成一个「要么全成、要么全不成」的整体，用 BEGIN 开始、COMMIT 提交、ROLLBACK 回滚。ACID 四个字母分别指：原子性（不可拆分）、一致性（从一个有效状态到另一个有效状态）、隔离性（并发事务互不干扰）、持久性（提交后即使断电也不丢）。ACID 这个提法是 1983 年由 Andreas Reuter 和 Theo Härder 归纳出来的。它最经典的例子是转账：扣钱和加钱必须在一个事务里，否则中途失败就会凭空少一笔钱。隔离性是有代价的 —— 隔离级别越高并发越差，所以大多数数据库默认用「读已提交」而不是最严格的「可串行化」。",
+    "source": {
+      "label": "PostgreSQL 文档 · 事务",
+      "url": "https://www.postgresql.org/docs/current/tutorial-transactions.html"
+    }
+  },
+  {
+    "id": "sql-prepared-statement",
+    "lang": "sql",
+    "tags": ["sql", "prepared-statement", "parameterized", "security"],
+    "title": "预处理语句（参数化查询）",
+    "content": "预处理语句是把 SQL 的「结构」和「数据」分开提交：先发一条带占位符的语句模板给数据库解析并生成执行计划，再把具体的值单独传进去。它有两个好处。性能上，同一条语句执行多次时，解析和计划只需做一次。安全上才是关键：因为语句结构在传值之前就已经确定，用户输入**永远只被当成数据**，不可能改变语句的语法 —— 这就是防 SQL 注入的根本机制。它和「自己写转义函数处理引号」有本质区别：转义是黑名单思路（总有绕过办法），而参数化是让注入无处下手。",
+    "source": {
+      "label": "PostgreSQL 文档 · PREPARE",
+      "url": "https://www.postgresql.org/docs/current/sql-prepare.html"
+    }
+  },
+  {
+    "id": "sql-null",
+    "lang": "sql",
+    "tags": ["sql", "null", "three-valued-logic", "pitfall"],
+    "title": "NULL 与三值逻辑",
+    "content": "SQL 里的 NULL 表示「未知」，不是「空字符串」也不是「0」。它带来一套三值逻辑：任何和 NULL 的比较结果都是「未知」，而不是 true 或 false。所以 WHERE age = NULL 永远筛不出任何行，正确写法是 WHERE age IS NULL。同理，COUNT(*) 统计所有行，而 COUNT(某列) 会跳过该列为 NULL 的行 —— 这两个结果经常不一样，是很常见的 bug 来源。另一个容易踩的坑是 NOT IN 遇到 NULL：如果子查询结果里含 NULL，NOT IN 会返回空集，因为「不等于某未知值」仍然是未知。",
+    "source": {
+      "label": "PostgreSQL 文档 · 比较函数",
+      "url": "https://www.postgresql.org/docs/current/functions-comparison.html"
+    }
+  },
+  {
+    "id": "sql-constraints",
+    "lang": "sql",
+    "tags": ["sql", "constraint", "primary-key", "foreign-key", "integrity"],
+    "title": "主键、外键与约束",
+    "content": "约束是写在表定义上的规则，由数据库自己强制执行，包括：主键（唯一且非空）、外键（值必须存在于另一张表的主键中）、唯一、非空、检查约束（CHECK）。它们解决的问题是**数据完整性不能只靠应用层保证**：如果只有代码在检查，那么批处理脚本、后台运维、另一个应用、甚至手工执行的 SQL 都能绕过去，脏数据一旦落库就很难清理。把规则下沉到数据库，是最后一道防线。外键还有「级联删除/更新」的选项（ON DELETE CASCADE），但生产环境里要慎用 —— 一次误删可能连锁删掉大量关联数据。",
+    "source": {
+      "label": "PostgreSQL 文档 · 约束",
+      "url": "https://www.postgresql.org/docs/current/ddl-constraints.html"
+    }
   }
 ]
