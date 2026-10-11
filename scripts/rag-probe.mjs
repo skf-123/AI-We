@@ -32,14 +32,24 @@ const LANG_BUCKET = {
 }
 
 function detectBucket(code) {
+  // 我们没收录的语言
   if (/(^|\n)\s*#include\s*[<"]/.test(code) || /\bstd::/.test(code) || /\bprintf\s*\(/.test(code)) return 'none'
   if (/(^|\n)\s*using\s+namespace\s+std\b/.test(code)) return 'none'
+  if (/(^|\n)\s*package\s+\w+/.test(code) && /\bfunc\s+\w*\s*\(/.test(code)) return 'none'
+  if (/\bfn\s+\w+\s*\(/.test(code) && /(\blet\s+mut\b|println!|use\s+std::|\bimpl\b)/.test(code)) return 'none'
+
   if (/\bpublic\s+(class|interface|enum)\b/.test(code) || /\bSystem\.(out|err)\.print/.test(code) ||
       /(^|\n)\s*import\s+java\./.test(code) || /@(Override|Autowired|RestController|Service)\b/.test(code)) return 'java'
-  if (/(^|\n)\s*def\s+\w+\s*\([^)]*\)\s*:/.test(code) || /(^|\n)\s*(import|from)\s+\w+/.test(code) ||
+
+  // import 规则要收紧，否则会把 JS 的 `import React from 'react'` 误判成 Python
+  if (/(^|\n)\s*def\s+\w+\s*\([^)]*\)\s*:/.test(code) ||
+      /(^|\n)\s*import\s+\w+(\s*,\s*\w+)*\s*$/m.test(code) ||
+      /(^|\n)\s*from\s+[\w.]+\s+import\b/.test(code) ||
       /\b(elif|self\.|__init__)\b/.test(code)) return 'python'
+
   if (/\b(SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM|CREATE\s+TABLE)\b/i.test(code) &&
       /\b(FROM|WHERE|VALUES|SET|INTO)\b/i.test(code)) return 'sql'
+
   if (/\b(import|export)\b/.test(code) || /\b(const|let|var|function)\s/.test(code) || /=>/.test(code) ||
       /<\/?[A-Za-z][\w-]*/.test(code) || /\b(useState|useEffect|ref|reactive|computed)\s*\(/.test(code) ||
       /[.#][\w-]+\s*\{/.test(code)) return 'frontend'
@@ -148,6 +158,51 @@ slow_sum(1_000_000)`,
 
 squares = [x * x for x in range(10) if x % 2 == 0]`,
   },
+  {
+    label: 'Vue 组合式 API',
+    expect: ['vue-ref', 'vue-computed'],
+    code: `import { ref, computed, watch } from 'vue'
+
+const count = ref(0)
+const doubled = computed(() => count.value * 2)
+watch(count, (val) => console.log('变了', val))`,
+  },
+  {
+    label: 'CSS Flex 布局',
+    expect: ['css-flexbox'],
+    code: `.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-sizing: border-box;
+}`,
+  },
+  {
+    label: 'Java Stream 与泛型',
+    expect: ['java-stream', 'java-generics'],
+    code: `import java.util.List;
+import java.util.stream.Collectors;
+
+public class Demo {
+    public static void main(String[] args) {
+        List<Integer> nums = List.of(1, 2, 3, 4);
+        List<Integer> even = nums.stream()
+            .filter(n -> n % 2 == 0)
+            .collect(Collectors.toList());
+        System.out.println(even);
+    }
+}`,
+  },
+  {
+    label: 'SQL 连接与分组',
+    expect: ['sql-join', 'sql-group-by'],
+    code: `SELECT c.name, COUNT(o.id) AS order_count
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.id
+WHERE o.created_at >= '2026-01-01'
+GROUP BY c.name
+HAVING COUNT(o.id) > 3;`,
+  },
 ]
 
 const SHOULD_MISS = [
@@ -159,11 +214,28 @@ template <typename T> T sum(const std::vector<T>& v){ T t{}; for(auto& x:v) t+=x
 int main(){ std::cout << sum(v) << std::endl; }`,
   },
   {
-    label: 'Java（识别为 java，但当前语料没有 java 条目 → 应放弃）',
-    code: `public class Demo {
-  public static void main(String[] args) {
-    System.out.println("hello");
-  }
+    label: 'Go（识别为未收录语言 → 应直接放弃检索）',
+    code: `package main
+
+import "fmt"
+
+func main() {
+    nums := []int{1, 2, 3}
+    total := 0
+    for _, n := range nums {
+        total += n
+    }
+    fmt.Println(total)
+}`,
+  },
+  {
+    label: 'Rust（识别为未收录语言 → 应直接放弃检索）',
+    code: `use std::collections::HashMap;
+
+fn main() {
+    let mut scores: HashMap<&str, i32> = HashMap::new();
+    scores.insert("blue", 10);
+    println!("{:?}", scores);
 }`,
   },
 ]

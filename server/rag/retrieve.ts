@@ -39,11 +39,23 @@ type DetectedBucket = Bucket | 'none' | 'unknown'
  * 顺序有讲究：越有辨识度的特征放越前面。
  */
 export function detectBucket(code: string): DetectedBucket {
-  // C / C++ —— 我们没收录，识别出来是为了能干净地放弃检索
+  // ---- 我们没收录的语言：识别出来是为了能干净地放弃检索，而不是硬凑 ----
+
+  // C / C++
   if (/(^|\n)\s*#include\s*[<"]/.test(code) || /\bstd::/.test(code) || /\bprintf\s*\(/.test(code)) {
     return 'none'
   }
   if (/(^|\n)\s*using\s+namespace\s+std\b/.test(code)) {
+    return 'none'
+  }
+
+  // Go：package 声明 + func 定义，这个组合足够特异
+  if (/(^|\n)\s*package\s+\w+/.test(code) && /\bfunc\s+\w*\s*\(/.test(code)) {
+    return 'none'
+  }
+
+  // Rust：fn 定义 + 这几个 Rust 独有的写法
+  if (/\bfn\s+\w+\s*\(/.test(code) && /(\blet\s+mut\b|println!|use\s+std::|\bimpl\b)/.test(code)) {
     return 'none'
   }
 
@@ -58,11 +70,16 @@ export function detectBucket(code: string): DetectedBucket {
   }
 
   // Python
+  //
+  // ⚠️ import 这条规则必须写得紧一点。原来写的是 /(import|from)\s+\w+/，
+  //    会把 JS 的默认导入 `import React from 'react'` 也判成 Python ——
+  //    必须要求「import 后面直接到行尾」，或者「行首的 from x import」这两种 Python 独有形。
   if (
     /(^|\n)\s*def\s+\w+\s*\([^)]*\)\s*:/.test(code) ||
-    /(^|\n)\s*(import|from)\s+\w+/.test(code) ||
+    /(^|\n)\s*import\s+\w+(\s*,\s*\w+)*\s*$/m.test(code) ||
+    /(^|\n)\s*from\s+[\w.]+\s+import\b/.test(code) ||
     /\b(elif|self\.|__init__)\b/.test(code) ||
-    /(^|\n)\s*@\w+\s*$/m.test(code) && /\bdef\b/.test(code)
+    (/(^|\n)\s*@\w+\s*$/m.test(code) && /\bdef\b/.test(code))
   ) {
     return 'python'
   }

@@ -176,7 +176,7 @@ npm run dev
 | `NUXT_EMBEDDING_DIMENSIONS` | 可选 | `1024` | ⚠️ 改这个必须重跑 `npm run rag:build`，否则维度对不上 |
 | `NUXT_RAG_ENABLED` | 可选 | `true` | 设为 `false` 可关闭知识库，用于对比演示"有 RAG / 没 RAG" |
 | `NUXT_RAG_TOP_K` | 可选 | `4` | 每次检索取回几条资料 |
-| `NUXT_RAG_MIN_SCORE` | 可选 | `0.47` | 相似度低于此值不采用。**0.47 是实测校准出来的**，见 `scripts/rag-probe.mjs` |
+| `NUXT_RAG_MIN_SCORE` | 可选 | `0.38` | 相似度低于此值不采用。**0.38 是实测校准出来的**，见 `scripts/rag-probe.mjs` |
 
 > ⚠️ **LLM 和 Embedding 是两家不同的服务，两组 key 不能互换。**
 > 两家的向量空间不通用，拿错 key 只会得到 404 或维度错乱。
