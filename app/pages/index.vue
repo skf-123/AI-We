@@ -7,6 +7,16 @@
  * 后面每一项都是在这条路上加挂件，而不是另起一条路。
  */
 
+/**
+ * 代码长度上限。
+ * ⚠️ 必须与 server/api/analyze.post.ts 里 zod 的 max(20000) 保持一致，
+ *    改了一边要同步改另一边 —— 前端只是提前提醒，真正把关的是服务端。
+ */
+const CODE_MAX = 20000
+
+/** 超过这个长度就开始醒目提醒（还没到上限） */
+const CODE_WARN_AT = 18000
+
 /** 知识库检索到的引用来源（服务端通过响应头 X-Rag-Sources 传来） */
 interface RagSource {
   id: string
@@ -287,12 +297,19 @@ function clearAll() {
         <textarea
           v-model="code"
           spellcheck="false"
+          :maxlength="CODE_MAX"
           placeholder="把你想看懂的代码粘贴到这里，然后点下面的按钮。&#10;不需要写任何提示词。"
           class="font-mono-code min-h-[280px] flex-1 resize-none rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-relaxed text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white lg:min-h-0"
         />
 
         <div class="mt-3 flex items-center justify-between">
-          <span class="text-xs text-slate-400">{{ code.length }} 字符</span>
+          <span
+            class="text-xs tabular-nums transition-colors"
+            :class="code.length >= CODE_WARN_AT ? 'font-medium text-amber-600' : 'text-slate-400'"
+          >
+            {{ code.length }} / {{ CODE_MAX }}
+            <template v-if="code.length >= CODE_WARN_AT">· 接近上限，建议只贴关键片段</template>
+          </span>
           <div class="flex gap-2">
             <button
               class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
