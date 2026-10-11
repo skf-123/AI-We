@@ -7,11 +7,21 @@
  * 后面每一项都是在这条路上加挂件，而不是另起一条路。
  */
 
+/** 知识库检索到的引用来源（服务端通过响应头 X-Rag-Sources 传来） */
+interface RagSource {
+  id: string
+  title: string
+  label: string
+  url: string
+  score: number
+}
+
 const code = ref('')
 const output = ref('')
 const errorMsg = ref('')
 const loading = ref(false)
 const done = ref(false)
+const sources = ref<RagSource[]>([])
 
 let controller: AbortController | null = null
 
@@ -154,6 +164,7 @@ async function analyze() {
 
   output.value = ''
   errorMsg.value = ''
+  sources.value = []
   loading.value = true
   done.value = false
 
@@ -178,6 +189,17 @@ async function analyze() {
       }
       errorMsg.value = msg
       return
+    }
+
+    // 引用来源走响应头，读 body 之前先取出来 ——
+    // 这样卡片在打字机刚开始输出时就能显示，不用等全文流完
+    const rawSources = res.headers.get('X-Rag-Sources')
+    if (rawSources) {
+      try {
+        sources.value = JSON.parse(decodeURIComponent(rawSources))
+      } catch {
+        sources.value = []
+      }
     }
 
     // 逐块读取，读一块、显示一块 —— 这就是打字机效果的来源
@@ -328,6 +350,9 @@ function clearAll() {
               <h2 class="mb-2 text-sm font-semibold text-emerald-300">{{ s.title }}</h2>
               <p class="whitespace-pre-wrap text-sm leading-7 text-slate-300">{{ s.body }}</p>
             </article>
+
+            <!-- 知识库检索到的引用来源，紧跟在四段解释之后 -->
+            <SourceList v-if="sources.length" :sources="sources" />
 
             <span v-if="loading" class="inline-block h-4 w-2 animate-pulse bg-emerald-400" />
           </div>
