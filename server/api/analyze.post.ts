@@ -1,5 +1,7 @@
 import { z } from 'zod'
-import { SYSTEM_PROMPT, buildUserPrompt } from '../utils/prompt'
+import { SYSTEM_PROMPT, RAG_INSTRUCTION, buildUserPrompt } from '../utils/prompt'
+import { retrieveDocs } from '../rag/retrieve'
+import type { EmbedConfig, RagConfig, RagSource } from '../rag/types'
 
 /**
  * POST /api/analyze
@@ -80,7 +82,36 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // ---- 3. 调用上游大模型 ----
+  // ---- 3. 知识库检索（RAG）----
+  // 检索在流开始之前完成，所以「检索到哪几条」此刻就是确定已知的，
+  // 稍后直接放进响应头，不需要让大模型再复述一遍（那样会引入幻觉和截断）。
+  const ragConfig: RagConfig = {
+    enabled: config.ragEnabled,
+    topK: config.ragTopK,
+    minScore: config.ragMinScore,
+  }
+  const embedConfig: EmbedConfig = {
+    apiKey: config.embeddingApiKey,
+    baseUrl: config.embeddingBaseUrl,
+    model: config.embeddingModel,
+    dimensions: config.embeddingDimensions,
+  }
+
+  // retrieveDocs 内部已把所有异常降级成空数组，这里再兜一层，确保永不影响主流程
+  const docs = await retrieveDocs(parsed.data.code, ragConfig, embedConfig).catch(() => [])
+
+  const sources: RagSource[] = docs.map((doc) => ({
+    id: doc.id,
+    title: doc.title,
+    label: doc.source.label,
+    url: doc.source.url,
+    score: Number(doc.score.toFixed(4)),
+  }))
+
+  // 只有检索到资料时才追加使用规则；没有资料时系统提示词与改造前逐字一致
+  const systemPrompt = docs.length > 0 ? SYSTEM_PROMPT + RAG_INSTRUCTION : SYSTEM_PROMPT
+
+  // ---- 4. 调用上游大模型 ----
   let upstream: Response
   try {
     upstream = await fetch(`${config.llmBaseUrl}/chat/completions`, {
@@ -95,8 +126,8 @@ export default defineEventHandler(async (event) => {
         temperature: 0.3, // 偏低：解释类任务要稳定、少发挥
         max_tokens: 8192,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: buildUserPrompt(parsed.data.code) },
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: buildUserPrompt(parsed.data.code, docs) },
         ],
       }),
     })
@@ -115,13 +146,24 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // ---- 4. 把文本流交给浏览器 ----
-  return new Response(toTextStream(upstream.body) as unknown as ReadableStream, {
-    headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'no-cache, no-transform',
-      // 关掉 Nginx 之类的缓冲，否则流式会被攒成一坨再吐出来
-      'X-Accel-Buffering': 'no',
-    },
-  })
+  // ---- 5. 把文本流交给浏览器 ----
+  //
+  // 引用来源走响应头而不是塞进正文流，原因：
+  //   1. 来源是服务端已经确定的事实，不该交给生成模型去复述
+  //   2. 走响应头的话，前端在收到响应的那一刻就能渲染出卡片，
+  //      不用等全文流完 —— 打字机刚启动就能看到「已检索到 N 条参考资料」
+  //   3. 完全不污染正文流，也不需要处理「标记被切成两半」这类问题
+  const headers: Record<string, string> = {
+    'Content-Type': 'text/plain; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    // 关掉 Nginx 之类的缓冲，否则流式会被攒成一坨再吐出来
+    'X-Accel-Buffering': 'no',
+  }
+
+  if (sources.length > 0) {
+    // encodeURIComponent 是为了让中文标题/出处也能安全放进 HTTP 头（头只允许 ASCII）
+    headers['X-Rag-Sources'] = encodeURIComponent(JSON.stringify(sources))
+  }
+
+  return new Response(toTextStream(upstream.body) as unknown as ReadableStream, { headers })
 })
