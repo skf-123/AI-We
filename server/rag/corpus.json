@@ -204,8 +204,8 @@
     "title": "State 与 Props 的区别",
     "content": "State 和 Props 都是 React 组件里的数据，区别在于「谁说了算」。Props 由父组件传进来，组件自己不能改，相当于函数的入参；State 由组件内部自己持有和维护，通过 setXxx 更新，更新后会触发重新渲染。判断一个数据该放哪，可以问两个问题：它会不会随用户操作变化？变化后界面要不要跟着变？答案是「会 / 要」就多半是 state。还有一条重要原则叫「状态提升」——当两个兄弟组件需要共享同一份数据时，把这个 state 提到它们共同的父组件里，再通过 props 分发下去，而不是各自存一份。",
     "source": {
-      "label": "React 官方文档 · State：组件的记忆",
-      "url": "https://zh-hans.react.dev/learn/state-a-components-memory"
+      "label": "React 官方文档 · 在组件间共享 State",
+      "url": "https://zh-hans.react.dev/learn/sharing-state-between-components"
     }
   },
   {
