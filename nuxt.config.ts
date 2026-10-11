@@ -49,10 +49,12 @@ export default defineNuxtConfig({
     // ---------- 知识库检索行为 ----------
     // ragMinScore 是实测校准出来的，不是拍脑袋定的：
     // 跑 `node --env-file=.env scripts/rag-probe.mjs` 可以看到
-    // 「期望命中项」的最低分在 0.55 附近，取 0.50 留了一点余量。
-    // 扩充语料后建议重跑一次探针重新校准。
+    // 「期望命中项」的最低分在 0.53 附近，取 0.47 留了余量 ——
+    // 宁可多出一条不相关的卡片（模型会选择不引用它），
+    // 也不要让该出现的资料被阈值挡掉。
+    // 语料规模变了就重跑一次探针重新校准。
     ragEnabled: true,
     ragTopK: 4,
-    ragMinScore: 0.5,
+    ragMinScore: 0.47,
   },
 })
