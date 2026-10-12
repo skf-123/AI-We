@@ -1,0 +1,14 @@
+# 构建产物
+.output
+.nuxt
+node_modules
+
+# 锁文件由 npm 自己维护格式
+package-lock.json
+
+# 数据文件：语料与预计算向量，不是代码，重排会产生巨量 diff
+server/rag/corpus.json
+server/rag/corpus.embeddings.json
+
+# 文档：中文手写、表格密集，Prettier 重排会产生大量与代码规范无关的 diff
+*.md

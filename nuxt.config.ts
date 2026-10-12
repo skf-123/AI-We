@@ -6,6 +6,10 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  // 代码规范：@nuxt/eslint 会在 `nuxt prepare` 时生成 .nuxt/eslint.config.mjs，
+  // 我们的 eslint.config.mjs 以它为基线（否则 Nuxt 自动导入的 ref/defineProps 会被报成未定义）
+  modules: ['@nuxt/eslint'],
+
   vite: {
     plugins: [tailwindcss()],
   },
