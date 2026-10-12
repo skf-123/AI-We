@@ -36,6 +36,9 @@ const sources = ref<RagSource[]>([])
 /** 结果区。小屏上点完「开始解析」要滚到它，见 analyze() */
 const resultRef = ref<HTMLElement | null>(null)
 
+/** 输出面板的滚动容器（流式时自动跟到底部，见 scrollOutputToBottom） */
+const outputBoxRef = ref<HTMLElement | null>(null)
+
 let controller: AbortController | null = null
 
 /** 四个文字小标题，必须与 server/utils/prompt.ts 里的约定一致 */
@@ -172,6 +175,36 @@ const SAMPLES: { label: string; code: string }[] = [
   },
 ]
 
+/**
+ * 是否跟随最新内容自动滚到底部。
+ * 用户手动往上滚之后就置 false，不再把人家拉回来 —— 否则想回看前文会被反复拽走。
+ */
+let followTail = true
+
+/** 用户滚动输出面板时，用「离底部还有多远」判断要不要继续跟随 */
+function onOutputScroll() {
+  const box = outputBoxRef.value
+  if (!box) return
+  followTail = box.scrollHeight - box.scrollTop - box.clientHeight < 40
+}
+
+/**
+ * 把输出面板滚到底部。
+ *
+ * 面板是「锁定一屏、内部滚动」的设计：一次解析的正文会长到四千多像素，
+ * 而面板只有六百多像素高。不主动跟随的话，内容全堆在下方看不见 ——
+ * 打字机效果从第二屏起就完全失效了（实测 scrollTop 全程停在 0）。
+ *
+ * 必须 await nextTick()：刚写进 output.value，DOM 还没更新，
+ * 这时候读 scrollHeight 拿到的是旧值。
+ */
+async function scrollOutputToBottom() {
+  if (!followTail) return
+  await nextTick()
+  const box = outputBoxRef.value
+  if (box) box.scrollTop = box.scrollHeight
+}
+
 async function analyze() {
   if (loading.value || !code.value.trim()) return
 
@@ -180,6 +213,7 @@ async function analyze() {
   sources.value = []
   loading.value = true
   done.value = false
+  followTail = true // 新一轮解析，重新开始跟随
 
   controller = new AbortController()
 
@@ -231,6 +265,7 @@ async function analyze() {
       const { done: finished, value } = await reader.read()
       if (finished) break
       output.value += decoder.decode(value, { stream: true })
+      await scrollOutputToBottom()
     }
 
     done.value = true
@@ -371,7 +406,11 @@ function clearAll() {
           </span>
         </div>
 
-        <div class="min-h-[240px] flex-1 overflow-y-auto pr-1 sm:min-h-[320px] lg:min-h-0">
+        <div
+          ref="outputBoxRef"
+          class="min-h-[240px] flex-1 overflow-y-auto overscroll-contain pr-1 sm:min-h-[320px] lg:min-h-0"
+          @scroll.passive="onOutputScroll"
+        >
           <!-- 出错 -->
           <div
             v-if="errorMsg"
@@ -396,9 +435,7 @@ function clearAll() {
               class="rounded-lg border border-slate-100 bg-slate-50 p-3.5"
             >
               <h2 class="mb-2 text-sm font-semibold text-emerald-700">{{ s.title }}</h2>
-              <p class="break-words whitespace-pre-wrap text-sm leading-7 text-slate-700">
-                {{ s.body }}
-              </p>
+              <MarkdownBlock :text="s.body" />
             </article>
 
             <!-- 知识库检索到的引用来源，紧跟在四段解释之后 -->

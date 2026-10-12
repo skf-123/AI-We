@@ -101,7 +101,7 @@ function contentOf(id: string) {
               class="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-slate-500"
             >
               <span>{{ item.label }}</span>
-              <span class="text-slate-400">匹配度 {{ item.score.toFixed(3) }}</span>
+              <span class="text-slate-400">相似度 {{ (item.score * 100).toFixed(1) }}%</span>
             </span>
           </span>
 

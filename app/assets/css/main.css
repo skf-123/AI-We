@@ -13,6 +13,143 @@ body {
 }
 
 /* ------------------------------------------------------------------
+ * 模型输出的 Markdown 渲染区（app/components/MarkdownBlock.vue）
+ *
+ * 提示词要求模型输出 `## 小标题` / `- 列表` / 代码块 / `**强调**`。
+ * 渲染前这些标记是原样显示给用户的（一个讲代码的产品，第一眼看到
+ * 一堆源码符号），所以这里把渲染后的结果排版还原成人读的样子。
+ * ------------------------------------------------------------------ */
+.md-body {
+  overflow-wrap: break-word;
+  font-size: 0.875rem;
+  line-height: 1.75;
+  color: #334155;
+}
+
+/* 段落与行内元素 */
+.md-body p {
+  margin: 0 0 0.625rem;
+}
+.md-body p:last-child {
+  margin-bottom: 0;
+}
+.md-body strong {
+  font-weight: 600;
+  color: #1e293b;
+}
+.md-body em {
+  font-style: italic;
+}
+
+/* 列表：模型输出的清单全靠这个才像清单 */
+.md-body ul,
+.md-body ol {
+  margin: 0.25rem 0 0.625rem;
+  padding-left: 1.25rem;
+}
+.md-body ul {
+  list-style: disc;
+}
+.md-body ol {
+  list-style: decimal;
+}
+.md-body li {
+  margin: 0.125rem 0;
+}
+.md-body li::marker {
+  color: #94a3b8;
+}
+.md-body li > ul,
+.md-body li > ol {
+  margin-bottom: 0;
+}
+
+/* 行内代码：与正文区分开 */
+.md-body code {
+  font-family:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.8125rem;
+  padding: 0.0625rem 0.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.25rem;
+  background: #f1f5f9;
+  color: #0f766e;
+}
+
+/* 代码块：整块灰底 + 横向滚动（长行不撑破面板） */
+.md-body pre {
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+  overflow-x: auto;
+}
+.md-body pre code {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #334155;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+/* 标题（模型常用 ## / ### 当小标题） */
+.md-body h1,
+.md-body h2,
+.md-body h3,
+.md-body h4 {
+  margin: 0.75rem 0 0.375rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+.md-body h1:first-child,
+.md-body h2:first-child,
+.md-body h3:first-child {
+  margin-top: 0;
+}
+.md-body h2 {
+  font-size: 0.9375rem;
+}
+.md-body h3,
+.md-body h4 {
+  font-size: 0.875rem;
+}
+
+/* 其余零散元素 */
+.md-body a {
+  color: #0284c7;
+  text-decoration: underline;
+}
+.md-body blockquote {
+  margin: 0.5rem 0;
+  padding-left: 0.75rem;
+  border-left: 3px solid #e2e8f0;
+  color: #64748b;
+}
+.md-body hr {
+  margin: 0.75rem 0;
+  border: none;
+  border-top: 1px solid #e2e8f0;
+}
+.md-body table {
+  width: 100%;
+  margin: 0.5rem 0;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+.md-body th,
+.md-body td {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #e2e8f0;
+  text-align: left;
+}
+.md-body th {
+  background: #f8fafc;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------
  * Vue Flow 的浅色覆盖
  *
  * Vue Flow 自带的 theme-default.css 是给深色背景设计的
