@@ -200,6 +200,7 @@ npm run dev
 AI-Web/
 ├── app/                           # 前端（Nuxt 4 约定：源码在 app/ 下）
 │   ├── app.vue                    # 应用外壳
+│   ├── error.vue                  # 全局错误页（接口挂了/页面出错时接管）
 │   ├── assets/css/main.css        # 全局样式 + Vue Flow 浅色覆盖
 │   ├── components/
 │   │   ├── GraphView.vue          # 知识框架图（Vue Flow + dagre）

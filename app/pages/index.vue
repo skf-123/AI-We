@@ -265,7 +265,7 @@ function clearAll() {
         小屏（< lg）不锁高度，退回普通文档流，否则手机上会挤成一团。
     -->
     <!-- 顶栏 -->
-    <header class="shrink-0 border-b border-slate-200 bg-white px-6 py-4">
+    <header class="shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-6 sm:py-4">
       <div class="mx-auto flex max-w-[1400px] items-center justify-between">
         <div class="flex items-baseline gap-3">
           <h1 class="text-lg font-semibold tracking-wide text-slate-900">麦穗 · 代码理解助手</h1>
@@ -275,7 +275,9 @@ function clearAll() {
       </div>
     </header>
 
-    <main class="mx-auto grid w-full max-w-[1400px] gap-5 px-6 py-6 lg:grid-cols-2">
+    <main
+      class="mx-auto grid w-full max-w-[1400px] gap-4 px-4 py-4 sm:gap-5 sm:px-6 sm:py-6 lg:grid-cols-2"
+    >
       <!-- 左：输入 -->
       <section
         class="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:h-[calc(100vh-200px)] lg:min-h-[420px] lg:overflow-hidden"
@@ -297,10 +299,10 @@ function clearAll() {
           spellcheck="false"
           :maxlength="CODE_MAX"
           placeholder="把你想看懂的代码粘贴到这里，然后点下面的按钮。&#10;不需要写任何提示词。"
-          class="font-mono-code min-h-[280px] flex-1 resize-none rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-relaxed text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white lg:min-h-0"
+          class="font-mono-code min-h-[200px] flex-1 resize-none rounded-lg border border-slate-200 bg-slate-50 p-3 text-base leading-relaxed text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white sm:min-h-[280px] sm:text-sm lg:min-h-0"
         />
 
-        <div class="mt-3 flex items-center justify-between">
+        <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
           <span
             class="text-xs tabular-nums transition-colors"
             :class="code.length >= CODE_WARN_AT ? 'font-medium text-amber-600' : 'text-slate-400'"
@@ -310,14 +312,14 @@ function clearAll() {
           </span>
           <div class="flex gap-2">
             <button
-              class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+              class="rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-600 transition hover:bg-slate-50"
               @click="clearAll"
             >
               清空
             </button>
             <button
               v-if="!loading"
-              class="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+              class="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
               :disabled="!code.trim()"
               @click="analyze"
             >
@@ -325,7 +327,7 @@ function clearAll() {
             </button>
             <button
               v-else
-              class="rounded-lg border border-rose-300 px-5 py-2 text-sm text-rose-600 transition hover:bg-rose-50"
+              class="rounded-lg border border-rose-300 px-5 py-2.5 text-sm text-rose-600 transition hover:bg-rose-50"
               @click="stop"
             >
               停止
@@ -355,7 +357,7 @@ function clearAll() {
           </span>
         </div>
 
-        <div class="min-h-[320px] flex-1 overflow-y-auto pr-1 lg:min-h-0">
+        <div class="min-h-[240px] flex-1 overflow-y-auto pr-1 sm:min-h-[320px] lg:min-h-0">
           <!-- 出错 -->
           <div
             v-if="errorMsg"
@@ -397,7 +399,7 @@ function clearAll() {
       这个区域**始终存在**（不用 v-if）：没数据时显示占位提示。
       好处是图出现时页面不会突然跳高，用户一进来也知道这里会有东西。
     -->
-    <section class="mx-auto w-full max-w-[1400px] px-6 pb-6">
+    <section class="mx-auto w-full max-w-[1400px] px-4 pb-4 sm:px-6 sm:pb-6">
       <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           <span class="text-sm text-slate-500">知识框架图</span>
@@ -415,7 +417,7 @@ function clearAll() {
           <span class="text-[11px] text-slate-400">可拖拽节点 · 滚轮缩放</span>
         </div>
 
-        <div class="h-[400px]">
+        <div class="h-[300px] sm:h-[400px]">
           <GraphView v-if="graphData" :data="graphData" />
 
           <div
@@ -436,7 +438,7 @@ function clearAll() {
       </div>
     </section>
 
-    <footer class="shrink-0 px-6 pb-6 text-center text-xs text-slate-400">
+    <footer class="shrink-0 px-4 pb-4 text-center text-xs text-slate-400 sm:px-6 sm:pb-6">
       麦穗团队 · 传智杯 AI Web 开发挑战赛
     </footer>
   </div>
