@@ -33,6 +33,9 @@ const loading = ref(false)
 const done = ref(false)
 const sources = ref<RagSource[]>([])
 
+/** 结果区。小屏上点完「开始解析」要滚到它，见 analyze() */
+const resultRef = ref<HTMLElement | null>(null)
+
 let controller: AbortController | null = null
 
 /** 四个文字小标题，必须与 server/utils/prompt.ts 里的约定一致 */
@@ -180,6 +183,14 @@ async function analyze() {
 
   controller = new AbortController()
 
+  // 小屏是上下堆叠布局：输入区在上、结果区在下，点完按钮结果还在屏幕外，
+  // 用户会以为"点了没反应"。桌面端是左右两栏、结果就在旁边，不需要滚。
+  if (window.matchMedia('(max-width: 1023px)').matches) {
+    nextTick(() => {
+      resultRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
+
   try {
     const res = await fetch('/api/analyze', {
       method: 'POST',
@@ -250,7 +261,7 @@ function clearAll() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#f5f6f8] text-slate-800">
+  <div class="min-h-dvh bg-[#f5f6f8] text-slate-800">
     <!--
       布局说明（桌面端 lg 以上）：
         整页可以正常滚动（右侧有整页滚动条），从上到下依次是：
@@ -267,8 +278,10 @@ function clearAll() {
     <!-- 顶栏 -->
     <header class="shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-6 sm:py-4">
       <div class="mx-auto flex max-w-[1400px] items-center justify-between">
-        <div class="flex items-baseline gap-3">
-          <h1 class="text-lg font-semibold tracking-wide text-slate-900">麦穗 · 代码理解助手</h1>
+        <div class="flex min-w-0 items-baseline gap-3">
+          <h1 class="truncate text-lg font-semibold tracking-wide text-slate-900">
+            麦穗 · 代码理解助手
+          </h1>
           <span class="text-xs text-slate-400">WheatBend</span>
         </div>
         <span class="hidden text-xs text-slate-400 sm:block"> 贴代码 · 不用提问 · 自动讲解 </span>
@@ -280,7 +293,7 @@ function clearAll() {
     >
       <!-- 左：输入 -->
       <section
-        class="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:h-[calc(100vh-200px)] lg:min-h-[420px] lg:overflow-hidden"
+        class="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:h-[calc(100vh-200px)] lg:min-h-[420px] lg:overflow-hidden"
       >
         <div class="mb-3 flex flex-wrap items-center gap-2">
           <span class="text-sm text-slate-500">示例：</span>
@@ -338,7 +351,8 @@ function clearAll() {
 
       <!-- 右：输出 -->
       <section
-        class="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:h-[calc(100vh-200px)] lg:min-h-[420px] lg:overflow-hidden"
+        ref="resultRef"
+        class="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:h-[calc(100vh-200px)] lg:min-h-[420px] lg:overflow-hidden"
       >
         <div class="mb-3 flex items-center gap-2">
           <span class="text-sm text-slate-500">解析结果</span>
@@ -382,7 +396,9 @@ function clearAll() {
               class="rounded-lg border border-slate-100 bg-slate-50 p-3.5"
             >
               <h2 class="mb-2 text-sm font-semibold text-emerald-700">{{ s.title }}</h2>
-              <p class="whitespace-pre-wrap text-sm leading-7 text-slate-700">{{ s.body }}</p>
+              <p class="break-words whitespace-pre-wrap text-sm leading-7 text-slate-700">
+                {{ s.body }}
+              </p>
             </article>
 
             <!-- 知识库检索到的引用来源，紧跟在四段解释之后 -->
@@ -414,7 +430,7 @@ function clearAll() {
               <span class="h-2.5 w-2.5 rounded-sm bg-amber-500" />概念
             </span>
           </div>
-          <span class="text-[11px] text-slate-400">可拖拽节点 · 滚轮缩放</span>
+          <span class="text-[11px] text-slate-400">可拖拽节点 · 滚轮 / 双指缩放</span>
         </div>
 
         <div class="h-[300px] sm:h-[400px]">

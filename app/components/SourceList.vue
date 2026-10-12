@@ -127,7 +127,7 @@ function contentOf(id: string) {
 
           <p
             v-else-if="contentOf(item.id)"
-            class="whitespace-pre-wrap text-[12.5px] leading-6 text-slate-600"
+            class="break-words whitespace-pre-wrap text-[12.5px] leading-6 text-slate-600"
           >
             {{ contentOf(item.id) }}
           </p>

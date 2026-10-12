@@ -36,3 +36,32 @@ body {
 .vue-flow__edge-textbg {
   fill: #ffffff !important;
 }
+
+/* ------------------------------------------------------------------
+ * 触屏（小屏，< lg）
+ *
+ * 要解决的问题：图区会「吃掉」页面的纵向滚动。
+ *
+ * Vue Flow 默认单指拖动 = 平移画布（panOnDrag），而它内部的 d3-zoom
+ * 会在画布的 touchmove 里 preventDefault。结果是：用户在长页面上想往下滑，
+ * 拇指一落在图上，页面就纹丝不动、图却被拖走了 —— 看着像页面卡死。
+ *
+ * touch-action: pan-y = 把「纵向滑动」交还给浏览器（滚页），
+ * 其余的（横向滑动、双指缩放）仍然交给 Vue Flow。
+ * 所以拖拽和缩放这两个功能一个都没丢 —— 只是纵向平移改用双指。
+ *
+ * ⚠️ 节点不在这里覆盖：节点保留 d3-drag 设的 touch-action: none，
+ *    这样「拖动节点」在手机上照样能用。
+ * ------------------------------------------------------------------ */
+@media (max-width: 1023px) {
+  .vue-flow__pane {
+    touch-action: pan-y;
+  }
+
+  /* Vue Flow 自带的缩放/适配按钮只有 26×26（16px + 5px padding），
+     手机上点不准。放大到 32px，接近移动端建议的触控尺寸。 */
+  .vue-flow__controls-button {
+    width: 32px !important;
+    height: 32px !important;
+  }
+}

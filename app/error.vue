@@ -33,7 +33,7 @@ function goHome() {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-[#f5f6f8] px-6 py-12">
+  <div class="flex min-h-dvh items-center justify-center bg-[#f5f6f8] px-6 py-12">
     <div class="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
       <p class="font-mono-code text-4xl font-semibold text-slate-300 sm:text-5xl">
         {{ error?.statusCode || '出错了' }}

@@ -220,7 +220,8 @@ AI-Web/
 │   ├── build-embeddings.mjs       # npm run rag:build
 │   └── rag-probe.mjs              # 检索阈值校准探针
 ├── docs/                          # 设计文档
-│   └── 知识库设计说明.md           #   为什么语料是"手写卡片"而不是下载文档
+│   ├── 知识库设计说明.md           #   为什么语料是"手写卡片"而不是下载文档
+│   └── 响应式与浏览器兼容说明.md     #   支持的视口范围、布局陷阱（min-w-0）、浏览器要求
 ├── nuxt.config.ts                 # 框架配置 + 服务端私有配置
 ├── package.json                   # 依赖清单
 ├── .npmrc                         # 固定使用官方 npm 源（原因见下）
