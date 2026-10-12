@@ -39,6 +39,9 @@ const resultRef = ref<HTMLElement | null>(null)
 /** 输出面板的滚动容器（流式时自动跟到底部，见 scrollOutputToBottom） */
 const outputBoxRef = ref<HTMLElement | null>(null)
 
+/** 知识框架图所在区域（输出末尾那个「查看 ↓」要滚到它） */
+const graphRef = ref<HTMLElement | null>(null)
+
 let controller: AbortController | null = null
 
 /** 四个文字小标题，必须与 server/utils/prompt.ts 里的约定一致 */
@@ -203,6 +206,23 @@ async function scrollOutputToBottom() {
   await nextTick()
   const box = outputBoxRef.value
   if (box) box.scrollTop = box.scrollHeight
+}
+
+/**
+ * 滚到知识框架图。
+ *
+ * 为什么需要这个入口：图渲染在页面下方，而正文有四千多像素 ——
+ * 用户看完正文并不知道下面还有东西（实测：桌面要滚 439px 才看得到，
+ * 手机要滚 5517px）。
+ *
+ * 入口的位置是这件事的关键：面板此刻**已经自动跟到正文末尾**，
+ * 用户的视线正好在那里，所以把入口放在正文末尾最有效。
+ *
+ * 用 scrollIntoView 而不是动面板的 scrollTop：图区在面板**外面**，
+ * 要滚的是整个页面。
+ */
+function scrollToGraph() {
+  graphRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 async function analyze() {
@@ -441,6 +461,26 @@ function clearAll() {
             <!-- 知识库检索到的引用来源，紧跟在四段解释之后 -->
             <SourceList v-if="sources.length" :sources="sources" />
 
+            <!--
+              知识框架图的入口。
+
+              图必须等四段正文全部生成完才可能出现，而正文有四千多像素 ——
+              用户读完正文不会知道下面还有东西。面板此刻已经自动跟到正文末尾，
+              视线正好落在这里，所以入口放这儿而不是页面顶部或右下角。
+
+              条件用 graphData：模型吐的 JSON 没解析成功时图不会渲染，
+              这时候不该提示「已生成」。
+            -->
+            <button
+              v-if="!loading && graphData"
+              type="button"
+              class="flex w-full items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm font-medium text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
+              @click="scrollToGraph"
+            >
+              <span>知识框架图已生成</span>
+              <span class="text-xs text-emerald-600">查看 ↓</span>
+            </button>
+
             <span v-if="loading" class="inline-block h-4 w-2 animate-pulse bg-emerald-500" />
           </div>
         </div>
@@ -452,7 +492,7 @@ function clearAll() {
       这个区域**始终存在**（不用 v-if）：没数据时显示占位提示。
       好处是图出现时页面不会突然跳高，用户一进来也知道这里会有东西。
     -->
-    <section class="mx-auto w-full max-w-[1400px] px-4 pb-4 sm:px-6 sm:pb-6">
+    <section ref="graphRef" class="mx-auto w-full max-w-[1400px] px-4 pb-4 sm:px-6 sm:pb-6">
       <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           <span class="text-sm text-slate-500">知识框架图</span>
