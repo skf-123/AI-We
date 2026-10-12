@@ -23,7 +23,9 @@ const CORPUS_PATH = join(ROOT, 'server/rag/corpus.json')
 const OUT_PATH = join(ROOT, 'server/rag/corpus.embeddings.json')
 
 const API_KEY = process.env.NUXT_EMBEDDING_API_KEY
-const BASE_URL = (process.env.NUXT_EMBEDDING_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4').replace(/\/$/, '')
+const BASE_URL = (
+  process.env.NUXT_EMBEDDING_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4'
+).replace(/\/$/, '')
 const MODEL = process.env.NUXT_EMBEDDING_MODEL || 'embedding-3'
 const DIMENSIONS = Number(process.env.NUXT_EMBEDDING_DIMENSIONS || 1024)
 
@@ -60,7 +62,9 @@ async function embedBatch(texts, offset) {
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '')
-    throw new Error(`第 ${offset + 1} 条起的一批请求失败（HTTP ${res.status}）：${detail.slice(0, 300)}`)
+    throw new Error(
+      `第 ${offset + 1} 条起的一批请求失败（HTTP ${res.status}）：${detail.slice(0, 300)}`,
+    )
   }
 
   const json = await res.json()

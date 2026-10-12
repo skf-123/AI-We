@@ -11,14 +11,7 @@
 
 /** 语料覆盖的语言 / 技术 */
 export type CorpusLang =
-  | 'javascript'
-  | 'typescript'
-  | 'react'
-  | 'vue'
-  | 'css'
-  | 'python'
-  | 'java'
-  | 'sql'
+  'javascript' | 'typescript' | 'react' | 'vue' | 'css' | 'python' | 'java' | 'sql'
 
 /** 一条语料 —— 这是知识库的最小单元，一条讲清一个概念 */
 export interface CorpusEntry {

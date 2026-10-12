@@ -22,7 +22,7 @@ interface RagSource {
   score: number
 }
 
-const props = defineProps<{ sources: RagSource[] }>()
+defineProps<{ sources: RagSource[] }>()
 
 /** 哪些条目是展开的（存下标，允许同时展开多条） */
 const expanded = ref<Set<number>>(new Set())
@@ -97,7 +97,9 @@ function contentOf(id: string) {
 
           <span class="min-w-0 flex-1">
             <span class="block text-[13px] font-medium text-slate-800">{{ item.title }}</span>
-            <span class="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-slate-500">
+            <span
+              class="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-slate-500"
+            >
               <span>{{ item.label }}</span>
               <span class="text-slate-400">匹配度 {{ item.score.toFixed(3) }}</span>
             </span>

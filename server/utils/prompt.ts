@@ -150,7 +150,10 @@ ${code}
   if (docs.length === 0) return base
 
   const references = docs
-    .map((doc, i) => `[${i + 1}] ${doc.title}\n${doc.content}\n出处：${doc.source.label} — ${doc.source.url}`)
+    .map(
+      (doc, i) =>
+        `[${i + 1}] ${doc.title}\n${doc.content}\n出处：${doc.source.label} — ${doc.source.url}`,
+    )
     .join('\n\n')
 
   return `${base}

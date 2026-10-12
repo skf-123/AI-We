@@ -20,43 +20,68 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
 
 const API_KEY = process.env.NUXT_EMBEDDING_API_KEY
-const BASE_URL = (process.env.NUXT_EMBEDDING_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4').replace(/\/$/, '')
+const BASE_URL = (
+  process.env.NUXT_EMBEDDING_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4'
+).replace(/\/$/, '')
 const MODEL = process.env.NUXT_EMBEDDING_MODEL || 'embedding-3'
 const DIMENSIONS = Number(process.env.NUXT_EMBEDDING_DIMENSIONS || 1024)
 
 // ---------- 与 retrieve.ts 保持一致的部分 ----------
 
 const LANG_BUCKET = {
-  javascript: 'frontend', typescript: 'frontend', react: 'frontend', vue: 'frontend', css: 'frontend',
-  python: 'python', java: 'java', sql: 'sql',
+  javascript: 'frontend',
+  typescript: 'frontend',
+  react: 'frontend',
+  vue: 'frontend',
+  css: 'frontend',
+  python: 'python',
+  java: 'java',
+  sql: 'sql',
 }
 
 function detectBucket(code) {
   // 我们没收录的语言
-  if (/(^|\n)\s*#include\s*[<"]/.test(code) || /\bstd::/.test(code) || /\bprintf\s*\(/.test(code)) return 'none'
+  if (/(^|\n)\s*#include\s*[<"]/.test(code) || /\bstd::/.test(code) || /\bprintf\s*\(/.test(code))
+    return 'none'
   if (/(^|\n)\s*using\s+namespace\s+std\b/.test(code)) return 'none'
   if (/(^|\n)\s*package\s+\w+/.test(code) && /\bfunc\s+\w*\s*\(/.test(code)) return 'none'
-  if (/\bfn\s+\w+\s*\(/.test(code) && /(\blet\s+mut\b|println!|use\s+std::|\bimpl\b)/.test(code)) return 'none'
+  if (/\bfn\s+\w+\s*\(/.test(code) && /(\blet\s+mut\b|println!|use\s+std::|\bimpl\b)/.test(code))
+    return 'none'
 
-  if (/\bpublic\s+(class|interface|enum)\b/.test(code) || /\bSystem\.(out|err)\.print/.test(code) ||
-      /(^|\n)\s*import\s+java\./.test(code) || /@(Override|Autowired|RestController|Service)\b/.test(code)) return 'java'
+  if (
+    /\bpublic\s+(class|interface|enum)\b/.test(code) ||
+    /\bSystem\.(out|err)\.print/.test(code) ||
+    /(^|\n)\s*import\s+java\./.test(code) ||
+    /@(Override|Autowired|RestController|Service)\b/.test(code)
+  )
+    return 'java'
 
   // import 规则要收紧，否则会把 JS 的 `import React from 'react'` 误判成 Python
-  if (/(^|\n)\s*def\s+\w+\s*\([^)]*\)\s*:/.test(code) ||
-      /(^|\n)\s*import\s+\w+(\s*,\s*\w+)*\s*$/m.test(code) ||
-      /(^|\n)\s*from\s+[\w.]+\s+import\b/.test(code) ||
-      /\b(elif|self\.|__init__)\b/.test(code)) return 'python'
+  if (
+    /(^|\n)\s*def\s+\w+\s*\([^)]*\)\s*:/.test(code) ||
+    /(^|\n)\s*import\s+\w+(\s*,\s*\w+)*\s*$/m.test(code) ||
+    /(^|\n)\s*from\s+[\w.]+\s+import\b/.test(code) ||
+    /\b(elif|self\.|__init__)\b/.test(code)
+  )
+    return 'python'
 
-  if (/\b(SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM|CREATE\s+TABLE)\b/i.test(code) &&
-      /\b(FROM|WHERE|VALUES|SET|INTO)\b/i.test(code)) return 'sql'
+  if (
+    /\b(SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM|CREATE\s+TABLE)\b/i.test(code) &&
+    /\b(FROM|WHERE|VALUES|SET|INTO)\b/i.test(code)
+  )
+    return 'sql'
 
-  if (/\b(import|export)\b/.test(code) || /\b(const|let|var|function)\s/.test(code) || /=>/.test(code) ||
-      /<\/?[A-Za-z][\w-]*/.test(code) || /\b(useState|useEffect|ref|reactive|computed)\s*\(/.test(code) ||
-      /[.#][\w-]+\s*\{/.test(code)) return 'frontend'
+  if (
+    /\b(import|export)\b/.test(code) ||
+    /\b(const|let|var|function)\s/.test(code) ||
+    /=>/.test(code) ||
+    /<\/?[A-Za-z][\w-]*/.test(code) ||
+    /\b(useState|useEffect|ref|reactive|computed)\s*\(/.test(code) ||
+    /[.#][\w-]+\s*\{/.test(code)
+  )
+    return 'frontend'
   return 'unknown'
 }
-
-const QUERY_NOISE = new Set()
 
 function buildQuery(code) {
   const head = code.slice(0, 1500)
@@ -68,8 +93,14 @@ function buildQuery(code) {
 }
 
 function cosine(a, b) {
-  let dot = 0, na = 0, nb = 0
-  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i] }
+  let dot = 0,
+    na = 0,
+    nb = 0
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i]
+    na += a[i] * a[i]
+    nb += b[i] * b[i]
+  }
   if (na === 0 || nb === 0) return 0
   return dot / (Math.sqrt(na) * Math.sqrt(nb))
 }
@@ -254,10 +285,15 @@ async function embed(text) {
 }
 
 async function main() {
-  if (!API_KEY) { console.error('❌ 缺少 NUXT_EMBEDDING_API_KEY'); process.exit(1) }
+  if (!API_KEY) {
+    console.error('❌ 缺少 NUXT_EMBEDDING_API_KEY')
+    process.exit(1)
+  }
 
   const corpus = JSON.parse(readFileSync(join(ROOT, 'server/rag/corpus.json'), 'utf8'))
-  const embeddings = JSON.parse(readFileSync(join(ROOT, 'server/rag/corpus.embeddings.json'), 'utf8'))
+  const embeddings = JSON.parse(
+    readFileSync(join(ROOT, 'server/rag/corpus.embeddings.json'), 'utf8'),
+  )
   const byId = new Map(embeddings.items.map((i) => [i.id, i]))
 
   console.log(`语料 ${corpus.length} 条，向量 ${embeddings.items.length} 条\n`)
@@ -297,11 +333,12 @@ async function main() {
   for (const s of SHOULD_MISS) {
     const detected = detectBucket(s.code)
     const candidates = corpus.filter((e) => LANG_BUCKET[e.lang] === detected)
-    const conclusion = detected === 'none'
-      ? '识别为未收录语言 → 直接放弃检索 ✅'
-      : candidates.length === 0
-        ? `语言=${detected} 但无候选语料 → 放弃检索 ✅`
-        : `语言=${detected} 候选=${candidates.length} → 会走向量检索 ⚠️`
+    const conclusion =
+      detected === 'none'
+        ? '识别为未收录语言 → 直接放弃检索 ✅'
+        : candidates.length === 0
+          ? `语言=${detected} 但无候选语料 → 放弃检索 ✅`
+          : `语言=${detected} 候选=${candidates.length} → 会走向量检索 ⚠️`
     console.log(`\n【${s.label}】\n   ${conclusion}`)
   }
 
@@ -316,4 +353,7 @@ async function main() {
   }
 }
 
-main().catch((err) => { console.error('❌ 探测失败：', err.message); process.exit(1) })
+main().catch((err) => {
+  console.error('❌ 探测失败：', err.message)
+  process.exit(1)
+})

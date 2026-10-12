@@ -48,11 +48,15 @@ export async function embedTexts(
   const vectors = json?.data?.map((d) => d.embedding)
 
   if (!Array.isArray(vectors) || vectors.length !== texts.length) {
-    throw new Error(`embedding 返回的向量数量对不上：请求 ${texts.length}，返回 ${vectors?.length ?? '非数组'}`)
+    throw new Error(
+      `embedding 返回的向量数量对不上：请求 ${texts.length}，返回 ${vectors?.length ?? '非数组'}`,
+    )
   }
   for (const v of vectors) {
     if (!Array.isArray(v) || v.length !== cfg.dimensions) {
-      throw new Error(`embedding 返回的向量维度异常：期望 ${cfg.dimensions}，实际 ${v?.length ?? '非数组'}`)
+      throw new Error(
+        `embedding 返回的向量维度异常：期望 ${cfg.dimensions}，实际 ${v?.length ?? '非数组'}`,
+      )
     }
   }
 

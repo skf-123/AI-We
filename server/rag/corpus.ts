@@ -84,7 +84,9 @@ export function loadCorpus(dimensions: number): LoadedEntry[] {
   }
 
   if (stale > 0) {
-    console.warn(`[rag] 有 ${stale} 条语料的向量缺失或已失效，已跳过。改了语料请重跑 npm run rag:build`)
+    console.warn(
+      `[rag] 有 ${stale} 条语料的向量缺失或已失效，已跳过。改了语料请重跑 npm run rag:build`,
+    )
   }
 
   console.log(`[rag] 知识库就绪：${loaded.length} 条可用（语料共 ${corpus.length} 条）`)

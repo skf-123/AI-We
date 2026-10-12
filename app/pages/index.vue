@@ -250,20 +250,20 @@ function clearAll() {
 </script>
 
 <template>
-  <!--
-    布局说明（桌面端 lg 以上）：
-      整页可以正常滚动（右侧有整页滚动条），从上到下依次是：
-      顶栏 / 两栏主区 / 知识框架图。
-
-      两栏各自锁定高度（约一屏减去顶栏），内容在面板内部滚动 ——
-      所以右侧解释再长，撑高的也只是它自己的滚动区，不会把页面无限拉长。
-
-      知识框架图区域**始终渲染**，没数据时显示占位提示 ——
-      这样图出现时页面不会突然跳高，评委第一眼也能看到还有这个功能。
-
-      小屏（< lg）不锁高度，退回普通文档流，否则手机上会挤成一团。
-  -->
   <div class="min-h-screen bg-[#f5f6f8] text-slate-800">
+    <!--
+      布局说明（桌面端 lg 以上）：
+        整页可以正常滚动（右侧有整页滚动条），从上到下依次是：
+        顶栏 / 两栏主区 / 知识框架图。
+
+        两栏各自锁定高度（约一屏减去顶栏），内容在面板内部滚动 ——
+        所以右侧解释再长，撑高的也只是它自己的滚动区，不会把页面无限拉长。
+
+        知识框架图区域**始终渲染**，没数据时显示占位提示 ——
+        这样图出现时页面不会突然跳高，评委第一眼也能看到还有这个功能。
+
+        小屏（< lg）不锁高度，退回普通文档流，否则手机上会挤成一团。
+    -->
     <!-- 顶栏 -->
     <header class="shrink-0 border-b border-slate-200 bg-white px-6 py-4">
       <div class="mx-auto flex max-w-[1400px] items-center justify-between">
@@ -271,9 +271,7 @@ function clearAll() {
           <h1 class="text-lg font-semibold tracking-wide text-slate-900">麦穗 · 代码理解助手</h1>
           <span class="text-xs text-slate-400">WheatBend</span>
         </div>
-        <span class="hidden text-xs text-slate-400 sm:block">
-          贴代码 · 不用提问 · 自动讲解
-        </span>
+        <span class="hidden text-xs text-slate-400 sm:block"> 贴代码 · 不用提问 · 自动讲解 </span>
       </div>
     </header>
 

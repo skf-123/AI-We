@@ -191,7 +191,9 @@ export async function retrieveDocs(
     .slice(0, ragCfg.topK)
 
   if (hits.length === 0) {
-    console.log(`[rag] ${detected} 类候选 ${candidates.length} 条，但都低于阈值 ${ragCfg.minScore}，降级`)
+    console.log(
+      `[rag] ${detected} 类候选 ${candidates.length} 条，但都低于阈值 ${ragCfg.minScore}，降级`,
+    )
     return []
   }
 

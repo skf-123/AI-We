@@ -42,11 +42,12 @@ const NODE_W = 190
 const NODE_H = 62
 
 /** 三种节点类型的配色 */
-const TYPE_STYLE: Record<GraphNodeType, { border: string; bg: string; text: string; tag: string }> = {
-  code: { border: '#10b981', bg: 'rgba(16,185,129,0.08)', text: '#047857', tag: '代码' },
-  tech: { border: '#3b82f6', bg: 'rgba(59,130,246,0.08)', text: '#1d4ed8', tag: '技术' },
-  concept: { border: '#f59e0b', bg: 'rgba(245,158,11,0.10)', text: '#b45309', tag: '概念' },
-}
+const TYPE_STYLE: Record<GraphNodeType, { border: string; bg: string; text: string; tag: string }> =
+  {
+    code: { border: '#10b981', bg: 'rgba(16,185,129,0.08)', text: '#047857', tag: '代码' },
+    tech: { border: '#3b82f6', bg: 'rgba(59,130,246,0.08)', text: '#1d4ed8', tag: '技术' },
+    concept: { border: '#f59e0b', bg: 'rgba(245,158,11,0.10)', text: '#b45309', tag: '概念' },
+  }
 
 const layout = computed(() => {
   const g = new dagre.graphlib.Graph()
@@ -58,7 +59,8 @@ const layout = computed(() => {
   }
   // 只连两端都存在的线，防止 AI 偶尔给出对不上的 id 直接把图画崩
   const validEdges = props.data.edges.filter(
-    (e) => props.data.nodes.some((n) => n.id === e.from) && props.data.nodes.some((n) => n.id === e.to),
+    (e) =>
+      props.data.nodes.some((n) => n.id === e.from) && props.data.nodes.some((n) => n.id === e.to),
   )
   for (const e of validEdges) g.setEdge(e.from, e.to)
 
@@ -122,7 +124,10 @@ function styleOf(type: GraphNodeType) {
               background: styleOf(p.data.type).bg,
             }"
           >
-            <div class="text-[10px] font-medium tracking-wider" :style="{ color: styleOf(p.data.type).text }">
+            <div
+              class="text-[10px] font-medium tracking-wider"
+              :style="{ color: styleOf(p.data.type).text }"
+            >
               {{ styleOf(p.data.type).tag }}
             </div>
             <div class="mt-0.5 text-[13px] font-semibold leading-tight text-slate-800">
