@@ -98,9 +98,9 @@
   pointer-events: none;
   background: radial-gradient(
     ellipse at center,
-    rgba(120, 155, 200, 0.14) 0%,
-    rgba(120, 155, 200, 0.05) 46%,
-    rgba(120, 155, 200, 0) 72%
+    rgba(94, 130, 182, 0.3) 0%,
+    rgba(94, 130, 182, 0.13) 48%,
+    rgba(94, 130, 182, 0) 74%
   );
 }
 
@@ -134,9 +134,15 @@
   left: 4px;
   right: 4px;
   bottom: 4px;
-  height: 12px;
+  /* 要够高，才能从页面下缘那道弧里露出来。
+     露出来的这块就是"书页那一叠"，所以是浅色 ——
+     不够高的话露的就是更底下的深色封面，画面会多出一道黑箍。 */
+  height: 22px;
   border-radius: 0 0 2px 2px;
-  background: repeating-linear-gradient(to bottom, #feffff 0 1px, #e2eaf4 1px 2px);
+  /* 上段是实的（就是一叠纸的断面），下缘那一小截画成细线（书口） */
+  background:
+    repeating-linear-gradient(to bottom, #feffff 0 1px, #e2eaf4 1px 2px) bottom / 100% 8px no-repeat,
+    linear-gradient(to bottom, #f6fafd 0%, #e7eef6 100%);
 }
 
 /* ═══════ ③ 摊开的两页 ═══════
@@ -148,11 +154,18 @@
   bottom: 15px;
 }
 
+/* ⚠️ 页面是**弯的**，不是矩形。
+   摊开的书，每页的下缘都朝中缝垂下去，所以整本的底边是一道弧 ——
+   画成矩形的话，看着就是"一叠纸垛起来"，而不是一本摊开的书。
+   底边用多段折线逼近一条弧。
+   这是本项目里唯一用 clip-path 的地方：它只拍平自己子树里的元素，
+   而页面里只有 2D 的文字线，所以安全（绝不能用在外层 3D 容器上）。 */
 .bk-page--left {
   left: 4px;
   width: calc(50% - 4px);
   border-radius: 4px 0 0 3px;
   background: linear-gradient(to right, #ffffff 0%, #edf3f9 62%, #b9c8db 100%);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 86% 95%, 68% 90%, 50% 86%, 32% 83%, 15% 81%, 0 80%);
 }
 
 .bk-page--right {
@@ -160,6 +173,19 @@
   width: calc(50% - 4px);
   border-radius: 0 4px 3px 0;
   background: linear-gradient(to left, #ffffff 0%, #edf3f9 62%, #b9c8db 100%);
+  clip-path: polygon(0 0, 100% 0, 100% 80%, 85% 81%, 68% 83%, 50% 86%, 32% 90%, 14% 95%, 0 100%);
+}
+
+/* 页面鼓起来的那道弧：靠一道横贯的高光暗示页面是曲面，不是平的 */
+.bk-page::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 70% 42% at 50% 104%,
+    rgba(255, 255, 255, 0.85) 0%,
+    rgba(255, 255, 255, 0) 62%
+  );
 }
 
 /* ═══════ ④ 页面上的"字" ═══════
@@ -168,6 +194,7 @@
 .bk-line {
   position: absolute;
   left: 12%;
+  z-index: 1; /* 压在页面那道高光之上，否则字会被洗掉 */
   height: 2px;
   border-radius: 1px;
   background: #93a6bd;
@@ -233,12 +260,16 @@
 .bk-leaf-face--front {
   border-radius: 0 4px 3px 0;
   background: linear-gradient(to left, #ffffff 0%, #f4f8fc 68%, #ccd8e6 100%);
+  /* 和右页同一个弯法，翻动时形状才接得上 */
+  clip-path: polygon(0 0, 100% 0, 100% 80%, 85% 81%, 68% 83%, 50% 86%, 32% 90%, 14% 95%, 0 100%);
 }
 
 .bk-leaf-face--back {
   border-radius: 4px 0 0 3px;
   background: linear-gradient(to right, #ffffff 0%, #f4f8fc 68%, #ccd8e6 100%);
   transform: rotateY(180deg);
+  /* 翻到左边之后，它要接的是左页的形状 */
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 86% 95%, 68% 90%, 50% 86%, 32% 83%, 15% 81%, 0 80%);
 }
 
 @keyframes bk-turn {
