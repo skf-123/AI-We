@@ -199,7 +199,7 @@
   border-radius: 1px;
   background: #93a6bd;
   transform-origin: left center;
-  animation: bk-write 3.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation: bk-write 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 .bk-line:nth-child(1) {
@@ -210,12 +210,12 @@
 .bk-line:nth-child(2) {
   top: 40%;
   width: 74%;
-  animation-delay: 0.17s;
+  animation-delay: 0.09s;
 }
 .bk-line:nth-child(3) {
   top: 58%;
   width: 46%;
-  animation-delay: 0.34s;
+  animation-delay: 0.18s;
 }
 
 @keyframes bk-write {
@@ -223,13 +223,13 @@
   4% {
     transform: scaleX(0);
   }
-  30% {
+  28% {
     transform: scaleX(1);
   }
-  76% {
+  72% {
     transform: scaleX(1);
   }
-  88%,
+  86%,
   100% {
     transform: scaleX(0);
   }
@@ -246,7 +246,12 @@
   bottom: 15px;
   transform-style: preserve-3d;
   transform-origin: left center;
-  animation: bk-turn 3.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  /* ⚠️ 周期必须短。
+     书本的可见窗口只有「等首字」那一秒多，而翻页排在周期的后半 ——
+     周期一长（之前是 3.8 秒），翻页要 2.4 秒才开始，
+     等于**翻了但没人看得见**。压到 1.6 秒之后，
+     "写满 → 翻页"整个故事能在一秒多里跑完。 */
+  animation: bk-turn 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 
 .bk-leaf-face {
@@ -274,14 +279,14 @@
 
 @keyframes bk-turn {
   0%,
-  62% {
+  34% {
     transform: rotateY(0deg);
   }
-  78%,
-  88% {
+  62%,
+  76% {
     transform: rotateY(-180deg);
   }
-  98%,
+  96%,
   100% {
     transform: rotateY(0deg);
   }
