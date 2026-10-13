@@ -439,9 +439,19 @@ function clearAll() {
             {{ errorMsg }}
           </div>
 
-          <!-- 空状态 -->
+          <!--
+            空状态。同一块地方，两种面孔：
+
+            - 还没点「开始解析」→ 一段引导文字，教用户怎么用。
+              此刻系统什么都没做，放动画等于撒谎。
+            - 点了、但正文还没吐出来的那一两秒 → 换成一本放大的书。
+
+            这段等待是整个流程里唯一「真的在等、又没东西可看」的时段 ——
+            正文一开始流，文字本身就在持续告诉你进度了。
+          -->
           <div v-else-if="isEmpty" class="flex h-full items-center justify-center px-6 text-center">
-            <p class="text-sm leading-relaxed text-slate-400">
+            <BookLoader v-if="loading" />
+            <p v-else class="text-sm leading-relaxed text-slate-400">
               左边粘贴代码，点「开始解析」。<br />
               这里会依次出现：逐词逐句 → 局部关系 → 整段作用 → 技术溯源。
             </p>
@@ -513,6 +523,21 @@ function clearAll() {
         <div class="h-[300px] sm:h-[400px]">
           <GraphView v-if="graphData" :data="graphData" />
 
+          <!--
+            正在解析：把占位文字换成「代码块 → 知识框架图」的动画。
+
+            图正在被搭出来，这里就该演这个过程 —— 而不是摆一句静态说明。
+            原来的说明文字整个消失，只在动画下面留一行小字。
+          -->
+          <div
+            v-else-if="loading"
+            class="flex h-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-6"
+          >
+            <CodeToGraphHint />
+            <p class="text-xs text-slate-400">缓冲中…</p>
+          </div>
+
+          <!-- 还没开始解析：说明这块地方将来会出现什么 -->
           <div
             v-else
             class="flex h-full items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 px-6 text-center"
