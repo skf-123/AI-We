@@ -99,7 +99,9 @@
   top: 1px;
   bottom: -4px;
   border-radius: 6px;
-  background: linear-gradient(to bottom, #b3c2d4 0%, #8296ae 100%);
+  background: linear-gradient(to bottom, #7c92ad 0%, #55698a 100%);
+  /* 顶边一道高光 —— 硬壳书那块板子的受光边。没有它，封面看着是块平色块 */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
 }
 
 /* ═══════ ② 书口 ═══════
@@ -111,7 +113,7 @@
   bottom: 4px;
   height: 12px;
   border-radius: 0 0 2px 2px;
-  background: repeating-linear-gradient(to bottom, #fcfdfe 0 1px, #e3eaf2 1px 2px);
+  background: repeating-linear-gradient(to bottom, #feffff 0 1px, #e2eaf4 1px 2px);
 }
 
 /* ═══════ ③ 摊开的两页 ═══════
@@ -127,14 +129,14 @@
   left: 4px;
   width: calc(50% - 4px);
   border-radius: 4px 0 0 3px;
-  background: linear-gradient(to right, #fbfcfe 0%, #eaf0f7 68%, #c6d2e0 100%);
+  background: linear-gradient(to right, #ffffff 0%, #edf3f9 62%, #b9c8db 100%);
 }
 
 .bk-page--right {
   right: 4px;
   width: calc(50% - 4px);
   border-radius: 0 4px 3px 0;
-  background: linear-gradient(to left, #fbfcfe 0%, #eaf0f7 68%, #c6d2e0 100%);
+  background: linear-gradient(to left, #ffffff 0%, #edf3f9 62%, #b9c8db 100%);
 }
 
 /* ═══════ ④ 页面上的"字" ═══════
@@ -145,7 +147,7 @@
   left: 12%;
   height: 2px;
   border-radius: 1px;
-  background: #a9b8c9;
+  background: #93a6bd;
   transform-origin: left center;
   animation: bk-write 3.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
@@ -207,12 +209,12 @@
 
 .bk-leaf-face--front {
   border-radius: 0 4px 3px 0;
-  background: linear-gradient(to left, #ffffff 0%, #f1f5fa 70%, #d9e1ea 100%);
+  background: linear-gradient(to left, #ffffff 0%, #f4f8fc 68%, #ccd8e6 100%);
 }
 
 .bk-leaf-face--back {
   border-radius: 4px 0 0 3px;
-  background: linear-gradient(to right, #ffffff 0%, #f1f5fa 70%, #d9e1ea 100%);
+  background: linear-gradient(to right, #ffffff 0%, #f4f8fc 68%, #ccd8e6 100%);
   transform: rotateY(180deg);
 }
 
@@ -241,7 +243,7 @@
   height: 11px;
   transform: translateX(-50%);
   border-radius: 0 0 6px 6px;
-  background: linear-gradient(to bottom, #95a8bf 0%, #7a8ea7 100%);
+  background: linear-gradient(to bottom, #6b809e 0%, #4d6183 100%);
 }
 
 /* 地面投影：把书"放"在桌面上，不是浮在空中 */
@@ -252,11 +254,7 @@
   bottom: 0;
   height: 10px;
   border-radius: 50%;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(100, 116, 139, 0.28),
-    rgba(100, 116, 139, 0) 70%
-  );
+  background: radial-gradient(ellipse at center, rgba(51, 65, 85, 0.34), rgba(51, 65, 85, 0) 70%);
 }
 
 /* 系统开了「减少动态效果」→ 停在写满、摊开的样子 */
