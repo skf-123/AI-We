@@ -1,111 +1,155 @@
 <script setup lang="ts">
 /**
- * 一本不断「打开又合上」的小书。
+ * 一本摊开、书页来回翻动的小书。
  *
- * 用在「解析结果」面板正在生成时的位置 —— 替掉原来那个只会微弱闪烁的绿方块。
- * 含义：内容正在被翻开、生成出来。
+ * 用在「解析结果」面板等首字的那一两秒 —— 整条流程里唯一
+ * 「真的在等、又没东西可看」的时段。
  *
- * 纯 CSS 3D：perspective + transform-style: preserve-3d + rotateY + 关键帧。
- * 零依赖、零许可问题。
+ * ── 为什么这版才像书 ──
+ * 前四版都丑，根因是我只画了「两块斜矩形」，一本书该有的东西一个都没有。
+ * 这一版把书的特征补齐了：
+ *   ① 书沟阴影 —— 两页靠近中缝处用渐变压暗，页面才有"凹进去"的立体感
+ *   ② 正反两面的书页 —— 翻过去能看到纸背（backface-visibility + 两个面）
+ *   ③ 俯视 22° —— 露出"摊在桌上"的透视，而不是正面一块牌子
+ *   ④ 地面投影 —— 书底下一条模糊的椭圆影，把它"放"在桌面上
  *
- * ── 为什么是"开合"而不是"翻页" ──
- * 一开始做的是"右页绕书脊翻到左边"（经典翻页）。放大一看**完全不像书**：
- * 26px 的空间里，两团圆角矩形只是在互相挪动，看着像一根被切开的进度条。
- * 根因是尺寸 —— 那么小的面积放不下"书的轮廓"，只能靠颜色差异，而颜色差异
- * 在这个尺度上太弱。
+ * 纯 CSS 3D，零依赖、零许可问题。
  *
- * 所以改成**形状变化**：合上时是一个矩形，打开时两张页面各转 50° 变成 V 形。
- * 轮廓变化足够大，小尺寸也一眼看得出来。
- *
- * ⚠️ 踩坑提醒（来自「书本效果」那份调研）：父级只要出现 overflow 非 visible、
- *    opacity < 1、filter、clip-path 这类"分组属性"，浏览器会把 preserve-3d
- *    强制降级成 flat，立体感直接消失。所以这一块外面**不要**套这类样式。
+ * ⚠️ 两个坑（都踩过）：
+ *   · 父级出现 overflow / opacity<1 / filter / clip-path 这类"分组属性"，
+ *     浏览器会把 preserve-3d 强制降级成 flat —— 所以这一块外面不能套这类样式。
+ *   · 所以翻页**不能用 opacity 淡入淡出**（那会让两面被拍平、纸背就露不出来），
+ *     只能让它翻过去再翻回来。
  */
 </script>
 
 <template>
-  <!-- 纯装饰，对读屏器隐藏（旁边的「正在生成…」才是内容） -->
-  <span class="book-scene" aria-hidden="true">
-    <span class="book">
-      <span class="book-page book-page--left" />
-      <span class="book-page book-page--right" />
+  <!-- 纯装饰，对读屏器隐藏 -->
+  <span class="bk" aria-hidden="true">
+    <span class="bk-book">
+      <span class="bk-page bk-page--left" />
+      <span class="bk-page bk-page--right" />
+      <span class="bk-leaf">
+        <span class="bk-leaf-face bk-leaf-face--front" />
+        <span class="bk-leaf-face bk-leaf-face--back" />
+      </span>
     </span>
+    <span class="bk-ground" />
   </span>
 </template>
 
 <style scoped>
-/* 尺寸放大到 52px：26px 时试过三版（翻页 / 加书脊 / 开合）都读不出"书" ——
-   太小了，放不下书的形。放大后才画得出书脊、页面透视和翻动的纵深。 */
-.book-scene {
+.bk {
   display: inline-block;
-  width: 52px;
-  height: 34px;
-  perspective: 180px;
+  position: relative;
+  width: 64px;
+  height: 46px;
+  perspective: 260px;
+  perspective-origin: 50% 35%;
   vertical-align: middle;
 }
 
-.book {
+.bk-book {
   position: relative;
   display: block;
   width: 100%;
   height: 100%;
+  transform: rotateX(22deg);
   transform-style: preserve-3d;
 }
 
-.book-page {
+/* ---------- 摊开的两页 ----------
+   靠近中缝（书沟）处压暗，是"页面凹进去"这个立体感的全部来源。 */
+.bk-page {
   position: absolute;
   top: 0;
   width: 50%;
   height: 100%;
 }
 
-/* 左页：绕自己的右边缘（书脊）开合 */
-.book-page--left {
+.bk-page--left {
   left: 0;
-  background: #cbd5e1;
-  border-radius: 4px 0 0 4px;
-  transform-origin: right center;
-  animation: book-open-left 2.6s ease-in-out infinite;
+  border-radius: 5px 0 0 5px;
+  background: linear-gradient(to right, #e8edf4 0%, #d9e1ec 70%, #b9c7d8 100%);
 }
 
-/* 右页：绕自己的左边缘开合；颜色深一档，合上时能看出"这是一本有封面的书" */
-.book-page--right {
+.bk-page--right {
   left: 50%;
-  background: #94a3b8;
-  border-radius: 0 4px 4px 0;
+  border-radius: 0 5px 5px 0;
+  background: linear-gradient(to left, #e8edf4 0%, #d9e1ec 70%, #b9c7d8 100%);
+}
+
+/* ---------- 翻动的那一页 ----------
+   两个面各自贴一张"纸"，背面转到 180° 挡住后脑勺 —— 翻过去才看得到纸背。 */
+.bk-leaf {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  transform-style: preserve-3d;
   transform-origin: left center;
-  animation: book-open-right 2.6s ease-in-out infinite;
+  /* 1.9 秒一个来回 —— 因为这本书的可见窗口只有「等首字」那一秒多，
+     周期太长的话用户根本看不到一页翻完。 */
+  animation: bk-turn 1.9s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 
-/* ⚠️ 关键：角度**永远不回到 0°**。
-   回到 0° 就是"合上"，而平视一本合着的书，画面上就是一个矩形 ——
-   于是有一半时间读不出"书"。让它一直保持摊开的 V 形，只做开合幅度的呼吸，
-   形状就始终是"一本打开的书"。 */
-@keyframes book-open-left {
+.bk-leaf-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  /* 翻动页比静止页亮，再加一道投影 —— 否则两边都是近白色，
+     翻起来根本看不出哪一页在动 */
+  box-shadow: 0 2px 5px rgba(71, 85, 105, 0.22);
+}
+
+.bk-leaf-face--front {
+  border-radius: 0 5px 5px 0;
+  background: linear-gradient(to left, #ffffff 0%, #eef2f7 70%, #d5dde8 100%);
+}
+
+.bk-leaf-face--back {
+  border-radius: 5px 0 0 5px;
+  background: linear-gradient(to right, #ffffff 0%, #eef2f7 70%, #d5dde8 100%);
+  transform: rotateY(180deg);
+}
+
+/* 翻过去、停一下、翻回来。不能淡入淡出 —— 见文件头注释。 */
+@keyframes bk-turn {
   0%,
-  100% {
-    transform: rotateY(-36deg);
+  6% {
+    transform: rotateY(0deg);
   }
-  50% {
-    transform: rotateY(-62deg);
+  50%,
+  64% {
+    transform: rotateY(-180deg);
+  }
+  96%,
+  100% {
+    transform: rotateY(0deg);
   }
 }
 
-@keyframes book-open-right {
-  0%,
-  100% {
-    transform: rotateY(36deg);
-  }
-  50% {
-    transform: rotateY(62deg);
-  }
+/* 地面投影：把书"放"在桌面上，不是浮在空中 */
+.bk-ground {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  bottom: -2px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(100, 116, 139, 0.32),
+    rgba(100, 116, 139, 0) 70%
+  );
 }
 
-/* 系统开了「减少动态效果」→ 停在合上的样子，不翻 */
+/* 系统开了「减少动态效果」→ 停在摊开的样子，不翻 */
 @media (prefers-reduced-motion: reduce) {
-  .book-page--left,
-  .book-page--right {
+  .bk-leaf {
     animation: none;
+    transform: rotateY(-36deg);
   }
 }
 </style>
