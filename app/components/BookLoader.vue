@@ -99,7 +99,7 @@
   top: 1px;
   bottom: -4px;
   border-radius: 6px;
-  background: linear-gradient(to bottom, #7c92ad 0%, #55698a 100%);
+  background: linear-gradient(to bottom, #a2b2c7 0%, #7b8fa8 100%);
   /* 顶边一道高光 —— 硬壳书那块板子的受光边。没有它，封面看着是块平色块 */
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
 }
@@ -243,7 +243,7 @@
   height: 11px;
   transform: translateX(-50%);
   border-radius: 0 0 6px 6px;
-  background: linear-gradient(to bottom, #6b809e 0%, #4d6183 100%);
+  background: linear-gradient(to bottom, #8b9eb5 0%, #6a7e95 100%);
 }
 
 /* 地面投影：把书"放"在桌面上，不是浮在空中 */
@@ -254,7 +254,7 @@
   bottom: 0;
   height: 10px;
   border-radius: 50%;
-  background: radial-gradient(ellipse at center, rgba(51, 65, 85, 0.34), rgba(51, 65, 85, 0) 70%);
+  background: radial-gradient(ellipse at center, rgba(71, 85, 105, 0.26), rgba(71, 85, 105, 0) 70%);
 }
 
 /* 系统开了「减少动态效果」→ 停在写满、摊开的样子 */
