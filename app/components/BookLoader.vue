@@ -33,6 +33,10 @@
 <template>
   <!-- 纯装饰，对读屏器隐藏 -->
   <span class="bk" aria-hidden="true">
+    <!-- 柔光：单独一层，垫在书后面。
+         不能用 filter: drop-shadow —— 那是"分组属性"，会把 preserve-3d 拍平。 -->
+    <span class="bk-glow" />
+
     <span class="bk-book">
       <!-- 封面 / 封底：整本的底子，比里面的书页大一圈 -->
       <span class="bk-cover" />
@@ -79,6 +83,25 @@
   perspective: 370px;
   perspective-origin: 50% 26%;
   vertical-align: middle;
+}
+
+/* ═══════ ⓪ 柔光 ═══════
+   垫在整本书后面的一圈冷色光晕，让它从白底上"浮"起来一点。
+   放在 3D 上下文**外面** —— 这样它不会被书的倾斜带着变形。 */
+.bk-glow {
+  position: absolute;
+  left: -18%;
+  right: -18%;
+  top: -12%;
+  bottom: -18%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(120, 155, 200, 0.14) 0%,
+    rgba(120, 155, 200, 0.05) 46%,
+    rgba(120, 155, 200, 0) 72%
+  );
 }
 
 /* 整本书的 3D 上下文：稍微俯视，露出"摊在桌上"的透视 */
