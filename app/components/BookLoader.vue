@@ -1,24 +1,28 @@
 <script setup lang="ts">
 /**
- * 一本摊开、书页来回翻动的小书。
+ * 一本摊开、书页翻动的小书。
  *
  * 用在「解析结果」面板等首字的那一两秒 —— 整条流程里唯一
  * 「真的在等、又没东西可看」的时段。
  *
- * ── 为什么这版才像书 ──
- * 前四版都丑，根因是我只画了「两块斜矩形」，一本书该有的东西一个都没有。
- * 这一版把书的特征补齐了：
- *   ① 书沟阴影 —— 两页靠近中缝处用渐变压暗，页面才有"凹进去"的立体感
- *   ② 正反两面的书页 —— 翻过去能看到纸背（backface-visibility + 两个面）
- *   ③ 俯视 22° —— 露出"摊在桌上"的透视，而不是正面一块牌子
- *   ④ 地面投影 —— 书底下一条模糊的椭圆影，把它"放"在桌面上
+ * ── 结构上分成两截 ──
  *
- * 纯 CSS 3D，零依赖、零许可问题。
+ *  上半截「书页」：用 CSS 3D 做（perspective + preserve-3d + rotateY）。
+ *    两页摊开、中缝有书沟阴影，还有一张翻动中的书页（正反两面）。
+ *
+ *  下半截「厚度」：用 2D 画出来，**故意不放进 3D 上下文**——
+ *    因为 clip-path 这类属性会把 preserve-3d 拍平。这一截负责
+ *    把书"是一本有封面、有封底、有书脊的实物"这件事说清楚：
+ *      ① 书口：一叠纸的侧边，用 repeating-linear-gradient 画成一排细线
+ *      ② 封面/封底：底下那一条，两头略宽（近大远小），中间被书脊压出一个凹口
+ *      ③ 书脊：中缝最下面那一小块，颜色最深，是整本书的最低点
+ *
+ * 没有这三样，画面上就只是"两片纸在翻"。
  *
  * ⚠️ 两个坑（都踩过）：
  *   · 父级出现 overflow / opacity<1 / filter / clip-path 这类"分组属性"，
- *     浏览器会把 preserve-3d 强制降级成 flat —— 所以这一块外面不能套这类样式。
- *   · 所以翻页**不能用 opacity 淡入淡出**（那会让两面被拍平、纸背就露不出来），
+ *     浏览器会把 preserve-3d 强制降级成 flat。
+ *   · 所以翻页**不能用 opacity 淡入淡出**（那会拍平两个面、纸背就露不出来），
  *     只能让它翻过去再翻回来。
  */
 </script>
@@ -26,40 +30,52 @@
 <template>
   <!-- 纯装饰，对读屏器隐藏 -->
   <span class="bk" aria-hidden="true">
+    <!-- 上半截：书页（3D） -->
     <span class="bk-book">
       <span class="bk-page bk-page--left" />
       <span class="bk-page bk-page--right" />
+
       <span class="bk-leaf">
         <span class="bk-leaf-face bk-leaf-face--front" />
         <span class="bk-leaf-face bk-leaf-face--back" />
       </span>
     </span>
+
+    <!-- 下半截：厚度（2D，故意不放进 3D 上下文，见文件头注释） -->
+    <span class="bk-thick">
+      <span class="bk-edges" />
+      <span class="bk-cover" />
+      <span class="bk-spine" />
+    </span>
+
     <span class="bk-ground" />
   </span>
 </template>
 
 <style scoped>
 .bk {
-  display: inline-block;
   position: relative;
-  width: 64px;
-  height: 46px;
+  display: inline-block;
+  width: 68px;
+  height: 58px;
   perspective: 260px;
-  perspective-origin: 50% 35%;
+  perspective-origin: 50% 28%;
   vertical-align: middle;
 }
 
+/* ═══════════ 上半截：书页 ═══════════ */
+
 .bk-book {
-  position: relative;
-  display: block;
+  position: absolute;
+  left: 0;
+  top: 0;
   width: 100%;
-  height: 100%;
+  height: 40px;
   transform: rotateX(22deg);
   transform-style: preserve-3d;
 }
 
-/* ---------- 摊开的两页 ----------
-   靠近中缝（书沟）处压暗，是"页面凹进去"这个立体感的全部来源。 */
+/* 靠近中缝（书沟）处压暗，是"页面凹进去"这个立体感的全部来源 */
 .bk-page {
   position: absolute;
   top: 0;
@@ -79,8 +95,7 @@
   background: linear-gradient(to left, #e8edf4 0%, #d9e1ec 70%, #b9c7d8 100%);
 }
 
-/* ---------- 翻动的那一页 ----------
-   两个面各自贴一张"纸"，背面转到 180° 挡住后脑勺 —— 翻过去才看得到纸背。 */
+/* 翻动页：两个面各贴一张纸，背面转 180° 挡住后脑勺 —— 翻过去才看得到纸背 */
 .bk-leaf {
   position: absolute;
   left: 50%;
@@ -89,8 +104,7 @@
   height: 100%;
   transform-style: preserve-3d;
   transform-origin: left center;
-  /* 1.9 秒一个来回 —— 因为这本书的可见窗口只有「等首字」那一秒多，
-     周期太长的话用户根本看不到一页翻完。 */
+  /* 1.9 秒一个来回 —— 这本书的可见窗口只有「等首字」那一秒多 */
   animation: bk-turn 1.9s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 
@@ -98,8 +112,7 @@
   position: absolute;
   inset: 0;
   backface-visibility: hidden;
-  /* 翻动页比静止页亮，再加一道投影 —— 否则两边都是近白色，
-     翻起来根本看不出哪一页在动 */
+  /* 比静止页亮 + 一道投影：否则两边都是近白色，翻起来看不出哪一页在动 */
   box-shadow: 0 2px 5px rgba(71, 85, 105, 0.22);
 }
 
@@ -114,7 +127,6 @@
   transform: rotateY(180deg);
 }
 
-/* 翻过去、停一下、翻回来。不能淡入淡出 —— 见文件头注释。 */
 @keyframes bk-turn {
   0%,
   6% {
@@ -130,13 +142,61 @@
   }
 }
 
+/* ═══════════ 下半截：厚度 ═══════════ */
+
+.bk-thick {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 7px;
+  height: 15px;
+}
+
+/* ① 书口：一叠纸的侧边。用重复渐变画成一排细线 —— 这几根线就是"很多页" */
+.bk-edges {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: 0;
+  height: 6px;
+  background: repeating-linear-gradient(to bottom, #f4f7fb 0 1px, #dbe3ec 1px 2px);
+  border-radius: 0 0 2px 2px;
+}
+
+/* ② 封面 / 封底：底下这一条，两头略宽（近大远小），
+      中间被书脊压出一个凹口 —— 凹口用 clip-path 挖出来 */
+.bk-cover {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 10px;
+  background: linear-gradient(to bottom, #a8b6c8 0%, #8c9db3 100%);
+  clip-path: polygon(0 0, 42% 0, 50% 32%, 58% 0, 100% 0, 100% 100%, 0 100%);
+  /* 圆角只留一点点 —— 给太多会变成药丸，不像书的硬壳边 */
+  border-radius: 0 0 2px 2px;
+}
+
+/* ③ 书脊：中缝最下面那一小块，颜色最深 —— 它是整本书的最低点，
+      也是"封面和封底是在这里连起来"的视觉交代 */
+.bk-spine {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 7px;
+  height: 13px;
+  transform: translateX(-50%);
+  background: linear-gradient(to bottom, #93a3b8 0%, #7c8ea5 100%);
+  border-radius: 0 0 2px 2px;
+}
+
 /* 地面投影：把书"放"在桌面上，不是浮在空中 */
 .bk-ground {
   position: absolute;
-  left: 6%;
-  right: 6%;
-  bottom: -2px;
-  height: 6px;
+  left: 4%;
+  right: 4%;
+  bottom: -1px;
+  height: 7px;
   border-radius: 50%;
   background: radial-gradient(
     ellipse at center,
