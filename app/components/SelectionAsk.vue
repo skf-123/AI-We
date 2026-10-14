@@ -22,8 +22,14 @@ const props = defineProps<{
   open: boolean
   /** 用户选中的那一小段 */
   selection: string
-  /** 选区位置（视口坐标），气泡贴着它出现 */
-  anchor: { left: number; right: number; top: number; bottom: number } | null
+  /**
+   * 选区的 Range 副本。
+   *
+   * 为什么不用"快照矩形"：气泡要**跟着选区走**（滚动时重算位置），
+   * 而快照一算出来就定死了，滚一下就脱开。Range 对象在浏览器把选区
+   * 清掉之后依然能算出坐标，正好满足这个需求。
+   */
+  range: Range | null
   /** 整段原始代码 —— 追问得有上下文，"这两行"才指得清 */
   code: string
 }>()
@@ -55,22 +61,136 @@ const scrollRef = ref<HTMLElement | null>(null)
 
 let controller: AbortController | null = null
 
+// ---------------- 锚点：跟着选区走 ----------------
+
+const anchorRect = ref<{ left: number; right: number; top: number; bottom: number } | null>(null)
+
+/**
+ * 锚点取**选区里第一个还在视口内的那一行**。
+ *
+ * 为什么不能拿整个选区的 getBoundingClientRect()：全选的时候那是个横跨
+ * 几千像素的外接框，它的 top 早跑到屏幕外了 —— 拿它当锚点，气泡只能贴到
+ * "选区的最后一行"（也就是拖选的落点）旁边。用户看到的就是"怎么还在最下面"。
+ */
+function computeAnchor() {
+  const r = props.range
+  if (!r) {
+    anchorRect.value = null
+    return
+  }
+
+  const u = r.getBoundingClientRect()
+  if (u.width === 0 && u.height === 0) {
+    anchorRect.value = null
+    return
+  }
+
+  // 取选区**顶边**；如果顶部已经滚出屏幕，就夹进视口。
+  //
+  // 为什么不按 getClientRects() 找"第一个可见行"：右栏是**内部滚动**的容器，
+  // 被它裁掉的那些行，坐标可能还落在视口范围内 —— 于是会选中一个用户根本
+  // 看不见的行，气泡跟着乱跑。夹取顶边更简单，结果也稳定。
+  //
+  // "全选"这种情况正是靠它修正的：整个选区的外接框顶边早在屏幕外，
+  // 夹取之后气泡落在**看得见的那段选区的顶部**，而不是拖选的落点（最下面）。
+  const top = Math.min(Math.max(u.top, 8), Math.max(8, window.innerHeight - 40))
+
+  // 底边也要看着点：全选时外接框的底边在屏幕外很远（几千像素），
+  // 一旦"上方放不下、翻到下面"就会拿它当参照，把气泡扔到选区最下面去。
+  // 底边超出视口时，就按"一行"算，而不是按整个选区算。
+  const bottomOffScreen = u.bottom > window.innerHeight
+  const bottom = bottomOffScreen ? top + 24 : u.bottom
+
+  const next = { left: u.left, right: u.left + 1, top, bottom }
+
+  // 位移不到 0.5px 就不更新 —— 否则每帧都会触发一次组件重渲染。
+  // 锚点是 rAF 循环里每帧算的，这个判断不能省。
+  const cur = anchorRect.value
+  if (cur && Math.abs(cur.top - next.top) < 0.5 && Math.abs(cur.left - next.left) < 0.5) return
+
+  anchorRect.value = next
+}
+
+/**
+ * 跟随循环：只要还有选区（按钮可见或面板开着），就**每帧**重算一次锚点。
+ *
+ * 为什么不用 scroll 监听：右栏是**内部滚动**的容器，页面里能滚动的东西不止一处，
+ * 监听谁都不全 —— 实测就漏了（框滚了 200px，锚点纹丝不动）。
+ * 每帧算一次 getBoundingClientRect 很便宜，而且任何滚动、布局变化、
+ * 动画移动都自动跟得上，不用关心"是谁滚的"。
+ */
+let followRaf = 0
+
+function startFollow() {
+  if (followRaf) return
+  const tick = () => {
+    computeAnchor()
+    followRaf = requestAnimationFrame(tick)
+  }
+  followRaf = requestAnimationFrame(tick)
+}
+
+function stopFollow() {
+  if (followRaf) {
+    cancelAnimationFrame(followRaf)
+    followRaf = 0
+  }
+}
+
+// ---------------- 拖动：记的是"相对锚点的偏移" ----------------
+
+/**
+ * 拖动产生的是**偏移量**而不是绝对位置 —— 这样它和"跟着选区走"就不打架：
+ * 滚动时锚点重算、面板跟着走，**同时保留**用户拖出来的那段偏移。
+ * 如果拖动记的是绝对坐标，滚动一跟随就会把用户摆好的位置冲掉。
+ */
+const dragOffset = ref({ x: 0, y: 0 })
+let dragFrom: { x: number; y: number } | null = null
+
+function startDrag(e: PointerEvent) {
+  dragFrom = { x: e.clientX - dragOffset.value.x, y: e.clientY - dragOffset.value.y }
+  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+}
+
+function onDrag(e: PointerEvent) {
+  if (!dragFrom) return
+  dragOffset.value = { x: e.clientX - dragFrom.x, y: e.clientY - dragFrom.y }
+}
+
+function endDrag() {
+  dragFrom = null
+}
+
+const panelEl = ref<HTMLElement | null>(null)
+
+/** 面板高度实测不到时（首帧）用的估值 */
+const PANEL_H_FALLBACK = 260
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi)
+
 const panelStyle = computed(() => {
-  const r = props.anchor
-  if (!r || typeof window === 'undefined') return {}
+  const a = anchorRect.value
+  if (!a || typeof window === 'undefined') return {}
 
-  const left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - BUBBLE_W - 8))
+  const { x: dx, y: dy } = dragOffset.value
+  const dragged = dx !== 0 || dy !== 0
+  const h = panelEl.value?.offsetHeight || PANEL_H_FALLBACK
 
-  // 默认贴在选区**上方**（面板底边离选区顶边 8px）。
-  // 用 bottom 定位而不是 top：面板高度是不定的（对话越长越高），
-  // 用 bottom 才能保证它"底边贴着选区上方"、往上长，而不是把选区盖住。
-  const above = { left: `${left}px`, bottom: `${window.innerHeight - r.top + 8}px`, width: `${BUBBLE_W}px` }
+  const left = clamp(a.left + dx, 8, Math.max(8, window.innerWidth - BUBBLE_W - 8))
 
-  // 上方放不下就翻到下面 —— 否则贴在视口顶边之外就看不见了
-  const roomAbove = r.top - 8
-  if (roomAbove >= 240) return above
+  // 一切以**选区顶边**为参照，不做"上/下翻转"那套 —— 它依赖"整个选区的底边"，
+  // 而全选时那个底边在屏幕外几千像素处，正是气泡被扔到最下面的原因。
+  // 优先放在顶边上方；上方放不下，就放到这条线下面一点（a.top + 28 ≈ 一行之后）。
+  //
+  // ⚠️ 拖动偏移是 **+ dy**，不是 − dy：这里是"往上长"的写法，
+  //    写成减号的话，往下拖会让面板往上跑（方向反了）。
+  let top = a.top - 8 - h + dy
+  if (!dragged && top < 8) top = a.top + 28 + dy
 
-  return { left: `${left}px`, top: `${r.bottom + 8}px`, width: `${BUBBLE_W}px` }
+  // 别让面板被推出视口 —— 拖出去看不见了，用户就没法再拖回来
+  top = clamp(top, 8, Math.max(8, window.innerHeight - h - 8))
+
+  return { left: `${left}px`, top: `${top}px`, width: `${BUBBLE_W}px` }
 })
 
 /**
@@ -80,18 +200,18 @@ const panelStyle = computed(() => {
  * 一选就弹一个大面板会打断这件事 —— 所以先给一个可以无视的小按钮。
  */
 const triggerStyle = computed(() => {
-  const r = props.anchor
-  if (!r || typeof window === 'undefined') return {}
+  const a = anchorRect.value
+  if (!a || typeof window === 'undefined') return {}
 
   const W = 64
-  const H = 26 // 按钮高度（估），用来算"放在选区上方"的位置
-  const left = Math.min(Math.max(8, r.right + 6), Math.max(8, window.innerWidth - W - 8))
+  const H = 26 // 按钮高度（估）
+  const left = clamp(a.right + 6, 8, Math.max(8, window.innerWidth - W - 8))
 
-  // 和面板一致：默认贴选区**上方**
-  const top = r.top - H - 6
-  return top >= 4
-    ? { left: `${left}px`, top: `${top}px` }
-    : { left: `${left}px`, top: `${Math.min(r.bottom + 6, window.innerHeight - H - 8)}px` }
+  // 和面板一致：以**选区顶边**为参照，优先放在它上方
+  const above = a.top - H - 4
+  const top = above >= 4 ? above : a.top + 4
+
+  return { left: `${left}px`, top: `${clamp(top, 4, Math.max(4, window.innerHeight - H - 4))}px` }
 })
 
 /** 回答是流式的，得跟着往下滚，否则后半截看不见 */
@@ -224,14 +344,39 @@ watch(
 )
 
 onMounted(() => window.addEventListener('keydown', onGlobalKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onGlobalKeydown)
+  stopFollow()
+})
+
+// 有选区就开始跟随（按钮可见时也要跟），选区没了就停 —— 别让这个循环空转
+watch(
+  () => props.range,
+  (r) => {
+    // 换了新选区 → 偏移归零。否则"上一次拖到哪"会跟着带到下一次，
+    // 用户会看到气泡莫名其妙地偏着出现。
+    dragOffset.value = { x: 0, y: 0 }
+
+    if (r) {
+      computeAnchor()
+      startFollow()
+    } else {
+      stopFollow()
+      anchorRect.value = null
+    }
+  },
+  { immediate: true },
+)
+
+// 面板开合时也立刻算一次（开的那一帧就要落在正确位置，不能等下一帧）
+watch(() => props.open, computeAnchor)
 </script>
 
 <template>
   <Teleport to="body">
     <!-- 第一步：只是个小按钮。用户不理它，就当没出现过 -->
     <button
-      v-if="!open && selection && anchor"
+      v-if="!open && selection && anchorRect"
       type="button"
       class="ask-trigger"
       :style="triggerStyle"
@@ -243,13 +388,24 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
     <!-- 第二步：点了按钮才展开的问答面板 -->
     <div
       v-if="open"
+      ref="panelEl"
       class="ask-bubble"
       :style="panelStyle"
       role="dialog"
       aria-label="针对选中代码追问"
     >
-      <!-- 顶部：选中了什么 -->
-      <div class="flex items-start justify-between gap-2 border-b border-slate-100 px-3 py-2">
+      <!--
+        顶部：选中了什么，同时兼作**拖动把手**。
+        拖动改的是相对锚点的偏移，所以"拖到别处"和"跟着选区走"可以同时成立。
+      -->
+      <div
+        class="flex cursor-move touch-none items-start justify-between gap-2 border-b border-slate-100 px-3 py-2 select-none"
+        title="按住拖动"
+        @pointerdown.prevent="startDrag"
+        @pointermove="onDrag"
+        @pointerup="endDrag"
+        @pointercancel="endDrag"
+      >
         <div class="min-w-0">
           <div class="text-[11px] text-slate-400">已选中</div>
           <div class="truncate font-mono-code text-[12px] text-slate-600">
@@ -260,6 +416,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
           type="button"
           class="shrink-0 rounded px-1 text-slate-400 transition hover:text-slate-600"
           aria-label="关闭"
+          @pointerdown.stop
           @click="close"
         >
           ✕

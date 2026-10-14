@@ -37,7 +37,7 @@ const emit = defineEmits<{
    */
   (
     e: 'selection',
-    payload: { text: string; anchorLines: number[] | null; rect: DOMRect | null },
+    payload: { text: string; anchorLines: number[] | null; range: Range | null },
   ): void
 }>()
 
@@ -125,13 +125,13 @@ function onBodyMouseUp() {
   if (!box.contains(range.commonAncestorContainer)) return
 
   const text = sel.toString().trim()
-  const r = range.getBoundingClientRect()
 
   emit('selection', {
     text,
     anchorLines: anchorLinesOf(range),
-    // 空选区（只是点了一下）时这个矩形是 0，交给页面去判断要不要用
-    rect: text ? { ...r.toJSON() } as DOMRect : null,
+    // 带**真正的 Range**，不是快照矩形 —— 气泡要能在滚动时重算"选区现在在哪"。
+    // cloneRange() 让这个副本脱离当前选区，之后浏览器把选区清掉了它照样能用。
+    range: text ? range.cloneRange() : null,
   })
 }
 

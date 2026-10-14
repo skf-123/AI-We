@@ -46,10 +46,14 @@ const graphData = computed(() => parseGraphData(output.value))
 /** 左栏要高亮的代码行号（1 起）。由「在解析结果里选中一段」驱动 */
 const highlightLines = ref<number[]>([])
 
-/** 追问气泡：选中了什么、选区在屏幕哪儿、面板展开了没有 */
+/** 追问气泡：选中了什么、选区在哪（Range）、面板展开了没有 */
 const askOpen = ref(false)
 const askSelection = ref('')
-const askRect = ref<{ left: number; right: number; top: number; bottom: number } | null>(null)
+/**
+ * 选区的 Range 副本 —— 气泡靠它算位置，而且滚动时要重算。
+ * 不用"快照矩形"是因为它一旦算出来就定死了，滚动后就和选区脱开。
+ */
+const askRange = ref<Range | null>(null)
 
 /**
  * 右栏把"选中了什么"抛上来，这里做两件事：
@@ -62,7 +66,7 @@ const askRect = ref<{ left: number; right: number; top: number; bottom: number }
 function onSelection(payload: {
   text: string
   anchorLines: number[] | null
-  rect: DOMRect | null
+  range: Range | null
 }) {
   const hit = resolveLines(payload.text, payload.anchorLines, code.value)
   highlightLines.value = hit.lines
@@ -74,19 +78,12 @@ function onSelection(payload: {
   if (!payload.text) {
     askOpen.value = false
     askSelection.value = ''
-    askRect.value = null
+    askRange.value = null
     return
   }
 
   askSelection.value = payload.text
-  askRect.value = payload.rect
-    ? {
-        left: payload.rect.left,
-        right: payload.rect.right,
-        top: payload.rect.top,
-        bottom: payload.rect.bottom,
-      }
-    : null
+  askRange.value = payload.range
 }
 
 /**
@@ -97,7 +94,7 @@ function onSelection(payload: {
 function closeAsk() {
   askOpen.value = false
   askSelection.value = ''
-  askRect.value = null
+  askRange.value = null
 }
 
 async function analyze() {
@@ -106,7 +103,7 @@ async function analyze() {
   highlightLines.value = []
   askOpen.value = false
   askSelection.value = ''
-  askRect.value = null
+  askRange.value = null
 
   // 小屏是上下堆叠布局：输入区在上、结果区在下，点完按钮结果还在屏幕外，
   // 用户会以为"点了没反应"。桌面端是左右两栏、结果就在旁边，不需要滚。
@@ -124,7 +121,7 @@ function clearAll() {
   highlightLines.value = []
   askOpen.value = false
   askSelection.value = ''
-  askRect.value = null
+  askRange.value = null
 }
 </script>
 
@@ -193,7 +190,7 @@ function clearAll() {
     <SelectionAsk
       v-model:open="askOpen"
       :selection="askSelection"
-      :anchor="askRect"
+      :range="askRange"
       :code="code"
       @close="closeAsk"
     />
