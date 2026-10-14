@@ -14,13 +14,7 @@
  * 这样评委点开看到的是"我们整理的内容"，而不是一个 MDN 跳转。
  */
 
-interface RagSource {
-  id: string
-  title: string
-  label: string
-  url: string
-  score: number
-}
+import type { RagSource } from '~/types/analysis'
 
 defineProps<{ sources: RagSource[] }>()
 

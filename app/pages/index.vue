@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { GraphEdge, GraphNode, RagSource } from '~/types/analysis'
+
 /**
  * M0 主页面：贴代码 → 自动出四段解析。
  *
@@ -16,15 +18,6 @@ const CODE_MAX = 20000
 
 /** 超过这个长度就开始醒目提醒（还没到上限） */
 const CODE_WARN_AT = 18000
-
-/** 知识库检索到的引用来源（服务端通过响应头 X-Rag-Sources 传来） */
-interface RagSource {
-  id: string
-  title: string
-  label: string
-  url: string
-  score: number
-}
 
 const code = ref('')
 const output = ref('')
@@ -110,18 +103,6 @@ const graphData = computed(() => {
     return null
   }
 })
-
-interface GraphNode {
-  id: string
-  label: string
-  type: 'code' | 'tech' | 'concept'
-  detail?: string
-}
-interface GraphEdge {
-  from: string
-  to: string
-  label?: string
-}
 
 const isEmpty = computed(() => output.value.trim().length === 0)
 

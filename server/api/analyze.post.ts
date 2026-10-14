@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { SYSTEM_PROMPT, RAG_INSTRUCTION, buildUserPrompt } from '../utils/prompt'
+import { toTextStream } from '../utils/stream'
 import { retrieveDocs } from '../rag/retrieve'
 import type { EmbedConfig, RagConfig, RagSource } from '../rag/types'
 
@@ -24,44 +25,6 @@ const RequestSchema = z.object({
     .min(1, '请先粘贴一段代码')
     .max(20000, '代码太长了，请控制在 2 万字符以内'),
 })
-
-/** 把上游的 SSE 流转成纯文本流 */
-async function* toTextStream(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
-  const reader = body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-
-      // SSE 以换行分隔；最后一段可能不完整，留在 buffer 里等下一轮
-      const lines = buffer.split('\n')
-      buffer = lines.pop() ?? ''
-
-      for (const line of lines) {
-        const trimmed = line.trim()
-        if (!trimmed.startsWith('data:')) continue
-
-        const payload = trimmed.slice(5).trim()
-        if (payload === '[DONE]') return
-
-        try {
-          const chunk = JSON.parse(payload)
-          const text = chunk?.choices?.[0]?.delta?.content
-          if (text) yield text
-        } catch {
-          // 上游偶尔会切出不完整的分片，忽略即可，不中断整个流
-        }
-      }
-    }
-  } finally {
-    reader.cancel().catch(() => {})
-  }
-}
 
 export default defineEventHandler(async (event) => {
   // ---- 1. 校验输入 ----

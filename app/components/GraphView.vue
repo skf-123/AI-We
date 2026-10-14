@@ -16,24 +16,7 @@ import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
 
-/** 节点类型，必须与 server/utils/prompt.ts 里约定的三种一致 */
-type GraphNodeType = 'code' | 'tech' | 'concept'
-
-interface GraphNode {
-  id: string
-  label: string
-  type: GraphNodeType
-  detail?: string
-}
-interface GraphEdge {
-  from: string
-  to: string
-  label?: string
-}
-interface GraphData {
-  nodes: GraphNode[]
-  edges: GraphEdge[]
-}
+import type { GraphData, GraphNodeType } from '~/types/analysis'
 
 const props = defineProps<{ data: GraphData }>()
 
