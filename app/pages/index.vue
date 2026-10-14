@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useAnalysis } from '~/composables/useAnalysis'
 import { parseGraphData } from '~/utils/analysis-sections'
+import { resolveLines } from '~/utils/locate-lines'
 
 /**
  * 主页面。贴代码 → 自动出四段解析 + 知识框架图。
@@ -34,15 +35,36 @@ const code = ref('')
 /** 解析链路的状态与请求，全在 composable 里 */
 const { output, sources, errorMsg, loading, done, run, stop, reset } = useAnalysis()
 
-/** 两个面板的实例引用。只用到它们暴露的 scrollIntoView —— 结构类型，不依赖组件内部 */
+/** 两个面板的实例引用。只用到它们暴露的 scrollIntoView / focusLines —— 结构类型，不依赖组件内部 */
 const analysisRef = ref<{ scrollIntoView: () => void } | null>(null)
 const graphPanelRef = ref<{ scrollIntoView: () => void } | null>(null)
+const codePaneRef = ref<{ focusLines: (lines: number[]) => void } | null>(null)
 
 /** 图 JSON：由页面统一算一次，两个面板各自收结果，谁也不依赖谁 */
 const graphData = computed(() => parseGraphData(output.value))
 
+/** 左栏要高亮的代码行号（1 起）。由「在解析结果里选中一段」驱动 */
+const highlightLines = ref<number[]>([])
+
+/**
+ * 右栏把"选中了什么"抛上来，这里换算成原始代码的行号。
+ *
+ * 换算需要**原始代码**，而代码只有页面手上有 —— 所以这一步留在页面，
+ * 面板不需要为了高亮去认识左栏。选不中任何行就清空高亮（点空白处 = 取消选中）。
+ */
+function onLocate(payload: { text: string; anchorLines: number[] | null }) {
+  const hit = resolveLines(payload.text, payload.anchorLines, code.value)
+  highlightLines.value = hit.lines
+
+  if (hit.lines.length > 0) {
+    nextTick(() => codePaneRef.value?.focusLines(hit.lines))
+  }
+}
+
 async function analyze() {
   if (loading.value || !code.value.trim()) return
+
+  highlightLines.value = []
 
   // 小屏是上下堆叠布局：输入区在上、结果区在下，点完按钮结果还在屏幕外，
   // 用户会以为"点了没反应"。桌面端是左右两栏、结果就在旁边，不需要滚。
@@ -57,6 +79,7 @@ function clearAll() {
   stop()
   code.value = ''
   reset()
+  highlightLines.value = []
 }
 </script>
 
@@ -93,10 +116,12 @@ function clearAll() {
     >
       <!-- 左：输入 -->
       <CodePane
+        ref="codePaneRef"
         v-model="code"
         :loading="loading"
         :max-length="CODE_MAX"
         :warn-at="CODE_WARN_AT"
+        :highlight-lines="highlightLines"
         @analyze="analyze"
         @stop="stop"
         @clear="clearAll"
@@ -112,6 +137,7 @@ function clearAll() {
         :done="done"
         :graph-ready="Boolean(graphData)"
         @request-graph="graphPanelRef?.scrollIntoView()"
+        @locate="onLocate"
       />
     </main>
 
