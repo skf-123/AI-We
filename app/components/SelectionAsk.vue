@@ -124,7 +124,12 @@ let followRaf = 0
 function startFollow() {
   if (followRaf) return
   const tick = () => {
-    computeAnchor()
+    // 只在**面板还没打开**时才跟着走 —— 那是给那个小按钮用的：
+    // 它要一直贴着选区，用户滚到哪它跟到哪。
+    //
+    // 面板一旦打开就**冻住**：用户正在读、正在问，这时窗口或选区一动
+    // 面板就跟着跳，很烦；何况他还能自己拖。
+    if (!props.open) computeAnchor()
     followRaf = requestAnimationFrame(tick)
   }
   followRaf = requestAnimationFrame(tick)
@@ -368,7 +373,7 @@ watch(
   { immediate: true },
 )
 
-// 面板开合时也立刻算一次（开的那一帧就要落在正确位置，不能等下一帧）
+// 面板开的那一帧先定位一次（就落在按钮刚才待的地方），之后不再跟随
 watch(() => props.open, computeAnchor)
 </script>
 
