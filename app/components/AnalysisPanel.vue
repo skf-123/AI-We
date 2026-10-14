@@ -9,8 +9,9 @@
  * 唯一的例外是**它自己那个滚动容器**：流式自动跟随必须贴着 DOM 做，
  * 让页面越界去调 `outputBoxRef.scrollTop` 才是耦合，所以这段逻辑留在组件内。
  */
-import type { RagSource } from '~/types/analysis'
-import { parseSections } from '~/utils/analysis-sections'
+import glossaryData from '~/data/glossary.json'
+import type { GlossaryTerm, RagSource } from '~/types/analysis'
+import { parseSections, SECTION_TITLES } from '~/utils/analysis-sections'
 
 const props = defineProps<{
   /** 流式原始文本（未切分） */
@@ -36,6 +37,54 @@ const outputBoxRef = ref<HTMLElement | null>(null)
 const sections = computed(() => parseSections(props.output))
 
 const isEmpty = computed(() => props.output.trim().length === 0)
+
+/**
+ * 术语只在「四、技术溯源」那一段生效。
+ *
+ * 那一段本来就是逐条讲「这项技术从哪来、当初解决什么」的地方，
+ * 术语密度最高、读者最需要一个能就地查的入口；而别处的正文提到
+ * "Python""数组"这类词时如果也变蓝，反而碎。
+ */
+const TRACE_TITLE: string = SECTION_TITLES[3]
+
+const terms = glossaryData as GlossaryTerm[]
+const termIndex = new Map(terms.map((t) => [t.term, t]))
+
+/** 引用卡片列表的实例：点正文里的 [n] 时调它暴露的 focus() */
+const sourceListRef = ref<{ focus: (oneBased: number) => void } | null>(null)
+
+/** 当前打开的术语卡，以及它贴着哪一个词 */
+const activeTerm = ref<GlossaryTerm | null>(null)
+const termAnchor = ref<{ left: number; right: number; top: number; bottom: number } | null>(null)
+
+function onTerm(payload: { key: string; rect: DOMRect }) {
+  const found = termIndex.get(payload.key)
+  if (!found) return
+  activeTerm.value = found
+  termAnchor.value = {
+    left: payload.rect.left,
+    right: payload.rect.right,
+    top: payload.rect.top,
+    bottom: payload.rect.bottom,
+  }
+}
+
+function onCite(index: number) {
+  sourceListRef.value?.focus(index)
+}
+
+function closeTerm() {
+  activeTerm.value = null
+  termAnchor.value = null
+}
+
+// 新一轮解析开始，把上一轮开着的小卡收掉
+watch(
+  () => props.loading,
+  (v) => {
+    if (v) closeTerm()
+  },
+)
 
 /**
  * 是否跟随最新内容自动滚到底部。
@@ -154,11 +203,16 @@ defineExpose({ scrollIntoView })
           class="rounded-lg border border-slate-100 bg-slate-50 p-3.5"
         >
           <h2 class="mb-2 text-sm font-semibold text-emerald-700">{{ s.title }}</h2>
-          <MarkdownBlock :text="s.body" />
+          <MarkdownBlock
+            :text="s.body"
+            :terms="s.title === TRACE_TITLE ? terms : undefined"
+            @term="onTerm"
+            @cite="onCite"
+          />
         </article>
 
         <!-- 知识库检索到的引用来源，紧跟在四段解释之后 -->
-        <SourceList v-if="sources.length" :sources="sources" />
+        <SourceList v-if="sources.length" ref="sourceListRef" :sources="sources" />
 
         <!--
           知识框架图的入口。
@@ -183,5 +237,8 @@ defineExpose({ scrollIntoView })
         <span v-if="loading" class="inline-block h-4 w-2 animate-pulse bg-emerald-500" />
       </div>
     </div>
+
+    <!-- 术语解释卡（Teleport 到 body，不受本面板的 overflow 裁剪） -->
+    <TermCard :term="activeTerm" :anchor="termAnchor" @close="closeTerm" />
   </section>
 </template>

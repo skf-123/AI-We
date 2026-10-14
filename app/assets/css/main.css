@@ -94,6 +94,57 @@ body {
   line-height: 1.6;
 }
 
+/* ------------------------------------------------------------------
+ * 术语与引用编号：正文里"能点"的两样东西
+ *
+ * 两条硬约束，都是为了"正文的文字与排版一字不改"：
+ *
+ *   1. 上浮**只用 `position: relative` + `top`，不用 `transform`**。
+ *      transform 对**行内元素无效**；要让它生效就得把术语改成 inline-block，
+ *      而 inline-block 的纵向 padding/背景会**把行盒撑高** ——
+ *      整段的行距、段间距、甚至折行位置都会跟着变。
+ *      relative + top 只是把元素画得高一点，**不参与布局计算**。
+ *
+ *   2. **不给纵向 padding / margin**。
+ *      行内元素的 border 与背景本来就不计入行盒高度，
+ *      所以下划线和悬停底色都不会挤动任何东西。
+ *
+ * 平时就有那条虚线：用户得先知道"这能点"，功能才有人用。
+ * ------------------------------------------------------------------ */
+.md-body .term {
+  position: relative;
+  top: 0;
+  border-bottom: 1px dashed #6ee7b7;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    top 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.md-body .term:hover {
+  background-color: #ecfdf5;
+  border-bottom-color: #10b981;
+  border-bottom-style: solid;
+  top: -1px;
+}
+
+/* 引用编号：保留方括号原文（[1] 还是 [1]），只让它可点、悬停有提示 */
+.md-body .cite {
+  position: relative;
+  top: 0;
+  color: #0284c7;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    top 0.15s ease;
+}
+
+.md-body .cite:hover {
+  background-color: #e0f2fe;
+  top: -1px;
+}
+
 /* 标题（模型常用 ## / ### 当小标题） */
 .md-body h1,
 .md-body h2,

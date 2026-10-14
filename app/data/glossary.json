@@ -1,0 +1,93 @@
+[
+  {
+    "term": "PEP",
+    "numbered": true,
+    "short": "Python 的「提案文档」编号。Python 每次要改语言或标准库，都得先写一份 PEP 说清楚「为什么改、怎么改」，公开讨论通过后才落地。看到 PEP 后面跟数字，就是指向某一份具体提案。",
+    "source": {
+      "label": "PEP 1 · PEP 的目的与写作规范",
+      "url": "https://peps.python.org/pep-0001/"
+    }
+  },
+  {
+    "term": "ECMAScript",
+    "short": "JavaScript 的「官方标准名字」。JavaScript 是各浏览器实现，ECMAScript 是写进国际标准的那份规范；两者说的基本是同一门语言。",
+    "source": {
+      "label": "ECMA-262 · ECMAScript 语言规范",
+      "url": "https://ecma-international.org/publications-and-standards/standards/ecma-262/"
+    }
+  },
+  {
+    "term": "ES5",
+    "short": "ECMAScript 第 5 版（2009 年）。它补上了数组的 filter / map / reduce 这类方法，也是「严格模式」的来源。",
+    "source": {
+      "label": "ECMA-262 第 5.1 版",
+      "url": "https://262.ecma-international.org/5.1/"
+    }
+  },
+  {
+    "term": "ES6",
+    "aliases": ["ES2015"],
+    "short": "ECMAScript 第 6 版（2015 年），也叫 ES2015。这是改动最大的一版：let / const、箭头函数、类、模块、Promise 都是它带来的。",
+    "source": {
+      "label": "ECMA-262 第 6 版（ES2015）",
+      "url": "https://262.ecma-international.org/6.0/"
+    }
+  },
+  {
+    "term": "JIT",
+    "short": "即时编译（Just-In-Time）。程序跑起来之后，把「跑得最勤」的那部分代码临时编译成机器码，兼顾启动快和跑得快。",
+    "source": {
+      "label": "MDN · 即时编译",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Glossary/Just_In_Time_Compilation"
+    }
+  },
+  {
+    "term": "GIL",
+    "short": "全局解释器锁（Global Interpreter Lock）。CPython 里的一把大锁：同一时刻只允许一个线程执行 Python 字节码，所以多线程干不了「多核并行计算」的活。",
+    "source": {
+      "label": "Python 文档 · 术语表",
+      "url": "https://docs.python.org/zh-cn/3/glossary.html#term-global-interpreter-lock"
+    }
+  },
+  {
+    "term": "字节码",
+    "short": "介于源代码和机器码之间的「中间指令」。Java、Python 都先编译成字节码，再由虚拟机一条条执行——这样同一份程序换个平台也能跑。",
+    "source": {
+      "label": "Python 文档 · 术语表",
+      "url": "https://docs.python.org/zh-cn/3/glossary.html#term-bytecode"
+    }
+  },
+  {
+    "term": "标准库",
+    "short": "语言自带的那批模块，装好语言就有，不用另外下载。它是「官方维护、随语言一起更新」的，和第三方包要分开看。",
+    "source": {
+      "label": "Python 标准库文档",
+      "url": "https://docs.python.org/zh-cn/3/library/index.html"
+    }
+  },
+  {
+    "term": "API",
+    "short": "程序之间约定好的「怎么调用我」。一个函数、一个 HTTP 接口、一个库对外暴露的那些方法，都可以叫 API。",
+    "source": {
+      "label": "MDN · API",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Glossary/API"
+    }
+  },
+  {
+    "term": "ORM",
+    "short": "对象关系映射（Object-Relational Mapping）。让你用「对象」的写法操作数据库表，不用手写 SQL——代价是复杂查询往往不如直接写 SQL 清楚。",
+    "source": {
+      "label": "Django 文档 · 模型（ORM）",
+      "url": "https://docs.djangoproject.com/en/stable/topics/db/models/"
+    }
+  },
+  {
+    "term": "垃圾回收",
+    "aliases": ["GC"],
+    "short": "自动把「已经没人用」的对象占的内存收回去。有了它就不用像 C 那样手动 free，代价是回收的时机不完全由你控制。",
+    "source": {
+      "label": "MDN · JavaScript 内存管理",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Memory_management"
+    }
+  }
+]

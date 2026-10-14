@@ -16,7 +16,10 @@
 
 import type { RagSource } from '~/types/analysis'
 
-defineProps<{ sources: RagSource[] }>()
+const props = defineProps<{ sources: RagSource[] }>()
+
+/** 整块的引用容器，focus() 要靠它在里面找第 n 张卡片 */
+const listRef = ref<HTMLElement | null>(null)
 
 /** 哪些条目是展开的（存下标，允许同时展开多条） */
 const expanded = ref<Set<number>>(new Set())
@@ -27,19 +30,8 @@ const contents = ref<Record<string, string>>({})
 /** 正在取哪一条（用来显示"加载中"） */
 const loadingId = ref<string | null>(null)
 
-async function toggle(index: number, id: string) {
-  const next = new Set(expanded.value)
-
-  if (next.has(index)) {
-    next.delete(index)
-    expanded.value = next
-    return
-  }
-
-  next.add(index)
-  expanded.value = next
-
-  // 取过一次就不再取
+/** 取正文。取过一次就不再取 */
+async function loadContent(id: string) {
   if (contents.value[id] !== undefined) return
 
   loadingId.value = id
@@ -55,13 +47,53 @@ async function toggle(index: number, id: string) {
   }
 }
 
+function expand(index: number) {
+  const next = new Set(expanded.value)
+  next.add(index)
+  expanded.value = next
+}
+
+async function toggle(index: number, id: string) {
+  if (expanded.value.has(index)) {
+    const next = new Set(expanded.value)
+    next.delete(index)
+    expanded.value = next
+    return
+  }
+
+  expand(index)
+  await loadContent(id)
+}
+
+/**
+ * 从正文里的引用编号跳过来：展开第 n 条，并让它滚进视野。
+ *
+ * ⚠️ 参数是**从 1 开始**的（模型在正文里写的是 `[1]`），这里减 1 变下标。
+ * 越界就静默忽略 —— 模型可能写了 `[3]`，但这次只检索到 2 条。
+ */
+function focus(oneBased: number) {
+  const index = oneBased - 1
+  const item = props.sources[index]
+  if (!item) return
+
+  expand(index)
+  void loadContent(item.id)
+
+  nextTick(() => {
+    const el = listRef.value?.querySelectorAll('li')[index]
+    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  })
+}
+
+defineExpose({ focus })
+
 function contentOf(id: string) {
   return contents.value[id]
 }
 </script>
 
 <template>
-  <section class="rounded-lg border border-sky-200 bg-sky-50 p-3.5">
+  <section ref="listRef" class="rounded-lg border border-sky-200 bg-sky-50 p-3.5">
     <div class="mb-2.5 flex flex-wrap items-center gap-2">
       <span class="text-sm font-semibold text-sky-700">引用来源</span>
       <span class="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] text-sky-700">

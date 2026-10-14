@@ -54,8 +54,13 @@ export interface GraphData {
 export interface GlossaryTerm {
   /** 匹配用的主词形，例如 "PEP" */
   term: string
-  /** 别名（同样会被匹配），例如 ["PEP 318", "PEP 498"] */
+  /** 别名（同样会被匹配），例如 ["ES2015"] */
   aliases?: string[]
+  /**
+   * 词后面允许跟一个编号，整体算一处命中。
+   * 例如 PEP 会匹配到 "PEP 318" 整串，而不是只标出一个 PEP、把编号晾在外面。
+   */
+  numbered?: boolean
   /** 一两句大白话解释 */
   short: string
   /** 官方出处 */
