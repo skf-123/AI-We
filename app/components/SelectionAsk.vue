@@ -171,6 +171,9 @@ const panelEl = ref<HTMLElement | null>(null)
 /** 面板高度实测不到时（首帧）用的估值 */
 const PANEL_H_FALLBACK = 260
 
+/** 顶部那个拖动把手的高度（夹取时只保证它露在屏幕里） */
+const HEADER_H = 44
+
 const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi)
 
 const panelStyle = computed(() => {
@@ -178,22 +181,34 @@ const panelStyle = computed(() => {
   if (!a || typeof window === 'undefined') return {}
 
   const { x: dx, y: dy } = dragOffset.value
-  const dragged = dx !== 0 || dy !== 0
   const h = panelEl.value?.offsetHeight || PANEL_H_FALLBACK
 
   const left = clamp(a.left + dx, 8, Math.max(8, window.innerWidth - BUBBLE_W - 8))
 
-  // 一切以**选区顶边**为参照，不做"上/下翻转"那套 —— 它依赖"整个选区的底边"，
-  // 而全选时那个底边在屏幕外几千像素处，正是气泡被扔到最下面的原因。
-  // 优先放在顶边上方；上方放不下，就放到这条线下面一点（a.top + 28 ≈ 一行之后）。
+  // 先算**基准位置**：优先贴在选区顶边上方；上方放不下，就放到这条线下面一点
+  // （a.top + 28 ≈ 一行之后）。
   //
-  // ⚠️ 拖动偏移是 **+ dy**，不是 − dy：这里是"往上长"的写法，
-  //    写成减号的话，往下拖会让面板往上跑（方向反了）。
-  let top = a.top - 8 - h + dy
-  if (!dragged && top < 8) top = a.top + 28 + dy
+  // ⚠️ 这个"翻转"绝不能受"拖过没有"影响。踩过的坑：
+  //    写成 `if (!dragged && base < 8) 翻到下面` 之后，拖过一次就永远只走"上方"，
+  //    而矮窗口下面板比锚点上方的空间大得多 —— 算出来的 top 恒为负，被夹在 8，
+  //    **面板钉死、拖不动**（用户报的"向某处依附"就是这个）。
+  //    先定基准、再加偏移，才是对的顺序。
+  let base = a.top - 8 - h
+  if (base < 8) base = a.top + 28
 
-  // 别让面板被推出视口 —— 拖出去看不见了，用户就没法再拖回来
-  top = clamp(top, 8, Math.max(8, window.innerHeight - h - 8))
+  // ⚠️ 拖动偏移是 **+ dy**：这里是"往上长"的写法，写成减号会让往下拖变成往上跑。
+  //    （这里必须是 let —— 下面还要夹取。先前写成 const 又赋值，
+  //      渲染函数直接抛 TypeError，面板根本出不来，而 lint 没抓到。）
+  let top = base + dy
+
+  // 夹取的对象是**拖动把手（标题栏）**，不是整个面板。
+  //
+  // ⚠️ 这里踩过坑：原来夹的是整个面板（上界 = 视口高 − 面板高 − 8）。
+  //    缩小浏览器比例、把面板撑到高度上限、再恢复比例之后，面板高会接近视口高，
+  //    那个上界就掉到 8 以下、被 Math.max 兜成 8 —— 夹取范围塌成 [8, 8]，
+  //    **面板被钉死，怎么拖都不动**（"向某处依附、拖不动"就是它）。
+  //    改成只保证把手露在屏幕里，面板再高也永远拖得动。
+  top = clamp(top, 8, Math.max(8, window.innerHeight - HEADER_H - 8))
 
   return { left: `${left}px`, top: `${top}px`, width: `${BUBBLE_W}px` }
 })
@@ -364,11 +379,25 @@ watch(
 
     if (r) {
       computeAnchor()
-      startFollow()
     } else {
-      stopFollow()
       anchorRect.value = null
     }
+  },
+  { immediate: true },
+)
+
+/**
+ * 跟随循环只在「有选区 **且** 面板没打开」时跑。
+ *
+ * ⚠️ 面板打开时锚点是冻住的，循环却还在每帧调 `range.getBoundingClientRect()`
+ *    —— 那玩意儿**会强制浏览器同步重排**，白白做 60 次/秒，正是
+ *    "刚打开有点顿"的嫌疑。面板一开就整个停掉。
+ */
+watch(
+  [() => props.range, () => props.open],
+  () => {
+    if (props.range && !props.open) startFollow()
+    else stopFollow()
   },
   { immediate: true },
 )
