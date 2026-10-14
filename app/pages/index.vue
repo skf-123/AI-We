@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { RagSource } from '~/types/analysis'
+import { useAnalysis } from '~/composables/useAnalysis'
 import { parseGraphData } from '~/utils/analysis-sections'
 
 /**
@@ -9,13 +9,14 @@ import { parseGraphData } from '~/utils/analysis-sections'
  *   · 排版：顶栏 / 两栏主区 / 图区 / 页脚
  *   · 编排：三个面板之间的动线（按钮 → 解析 → 滚到结果 / 滚到图）
  *
- * 具体的事情都在组件里：
+ * 具体的事情都在别处：
  *   CodePane       输入区（含示例、字数提醒、三个按钮）
  *   AnalysisPanel  右栏解析结果（含流式自动跟随）
  *   GraphPanel     知识框架图（含三种状态）
+ *   useAnalysis    请求与状态（怎么调接口、怎么拆流、引用来源藏在哪个响应头）
  *
- * 这样一来，「项目树」那个新页面只要用同样的组件拼一遍就行，
- * 不必把这套逻辑复制第二份。
+ * 这样一来，「项目树」那个新页面只要用同样的组件和同一个 composable
+ * 拼一遍就行，不必把这套逻辑复制第二份。
  */
 
 /**
@@ -29,11 +30,9 @@ const CODE_MAX = 20000
 const CODE_WARN_AT = 18000
 
 const code = ref('')
-const output = ref('')
-const errorMsg = ref('')
-const loading = ref(false)
-const done = ref(false)
-const sources = ref<RagSource[]>([])
+
+/** 解析链路的状态与请求，全在 composable 里 */
+const { output, sources, errorMsg, loading, done, run, stop, reset } = useAnalysis()
 
 /** 两个面板的实例引用。只用到它们暴露的 scrollIntoView —— 结构类型，不依赖组件内部 */
 const analysisRef = ref<{ scrollIntoView: () => void } | null>(null)
@@ -42,93 +41,22 @@ const graphPanelRef = ref<{ scrollIntoView: () => void } | null>(null)
 /** 图 JSON：由页面统一算一次，两个面板各自收结果，谁也不依赖谁 */
 const graphData = computed(() => parseGraphData(output.value))
 
-let controller: AbortController | null = null
-
 async function analyze() {
   if (loading.value || !code.value.trim()) return
-
-  output.value = ''
-  errorMsg.value = ''
-  sources.value = []
-  loading.value = true
-  done.value = false
-  // 自动跟随的重置在 AnalysisPanel 内部（它 watch loading 的上升沿）
-
-  controller = new AbortController()
 
   // 小屏是上下堆叠布局：输入区在上、结果区在下，点完按钮结果还在屏幕外，
   // 用户会以为"点了没反应"。桌面端是左右两栏、结果就在旁边，不需要滚。
   if (window.matchMedia('(max-width: 1023px)').matches) {
-    nextTick(() => analysisRef.value?.scrollIntoView())
+    analysisRef.value?.scrollIntoView()
   }
 
-  try {
-    const res = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: code.value }),
-      signal: controller.signal,
-    })
-
-    if (!res.ok || !res.body) {
-      // 服务端用 createError 返回的是 JSON，这里尽力把它读成人话
-      let msg = `请求失败（HTTP ${res.status}）`
-      try {
-        const data = await res.json()
-        msg = data?.statusMessage || data?.message || msg
-      } catch {
-        /* 保持默认提示 */
-      }
-      errorMsg.value = msg
-      return
-    }
-
-    // 引用来源走响应头，读 body 之前先取出来 ——
-    // 这样卡片在打字机刚开始输出时就能显示，不用等全文流完
-    const rawSources = res.headers.get('X-Rag-Sources')
-    if (rawSources) {
-      try {
-        sources.value = JSON.parse(decodeURIComponent(rawSources))
-      } catch {
-        sources.value = []
-      }
-    }
-
-    // 逐块读取，读一块、显示一块 —— 这就是打字机效果的来源。
-    // 「跟着滚到底部」不在这里做：那是 AnalysisPanel 自己 watch output 的事。
-    const reader = res.body.getReader()
-    const decoder = new TextDecoder()
-
-    while (true) {
-      const { done: finished, value } = await reader.read()
-      if (finished) break
-      output.value += decoder.decode(value, { stream: true })
-    }
-
-    done.value = true
-  } catch (err) {
-    if ((err as Error)?.name === 'AbortError') {
-      done.value = true
-    } else {
-      errorMsg.value = `出错了：${err instanceof Error ? err.message : String(err)}`
-    }
-  } finally {
-    loading.value = false
-    controller = null
-  }
-}
-
-function stop() {
-  controller?.abort()
-  loading.value = false
+  await run(code.value)
 }
 
 function clearAll() {
   stop()
   code.value = ''
-  output.value = ''
-  errorMsg.value = ''
-  done.value = false
+  reset()
 }
 </script>
 
