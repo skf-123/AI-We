@@ -31,10 +31,14 @@ const emit = defineEmits<{
   (e: 'request-graph'): void
   /**
    * 用户在正文里选了一段（或点了空白处）。这里只负责从 DOM 里读出
-   * "选中了什么 + 它属于哪几行"，**换算成代码行号交给页面** ——
-   * 因为原始代码在页面手上，面板不该为了这件事认识左栏。
+   * "选中了什么 + 它属于哪几行 + 它在屏幕的什么位置"，**换算成代码行号、
+   * 决定要不要弹追问，都交给页面** —— 因为原始代码在页面手上，
+   * 面板不该为了这两件事认识左栏、也不该认识那个气泡。
    */
-  (e: 'locate', payload: { text: string; anchorLines: number[] | null }): void
+  (
+    e: 'selection',
+    payload: { text: string; anchorLines: number[] | null; rect: DOMRect | null },
+  ): void
 }>()
 
 const panelRef = ref<HTMLElement | null>(null)
@@ -120,7 +124,15 @@ function onBodyMouseUp() {
   // 点的必须是在本面板里面，别把页面上别处的选区也当回事
   if (!box.contains(range.commonAncestorContainer)) return
 
-  emit('locate', { text: sel.toString().trim(), anchorLines: anchorLinesOf(range) })
+  const text = sel.toString().trim()
+  const r = range.getBoundingClientRect()
+
+  emit('selection', {
+    text,
+    anchorLines: anchorLinesOf(range),
+    // 空选区（只是点了一下）时这个矩形是 0，交给页面去判断要不要用
+    rect: text ? { ...r.toJSON() } as DOMRect : null,
+  })
 }
 
 // 新一轮解析开始，把上一轮开着的小卡收掉

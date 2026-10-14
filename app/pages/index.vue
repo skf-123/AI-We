@@ -46,25 +46,67 @@ const graphData = computed(() => parseGraphData(output.value))
 /** 左栏要高亮的代码行号（1 起）。由「在解析结果里选中一段」驱动 */
 const highlightLines = ref<number[]>([])
 
+/** 追问气泡：选中了什么、选区在屏幕哪儿、面板展开了没有 */
+const askOpen = ref(false)
+const askSelection = ref('')
+const askRect = ref<{ left: number; right: number; top: number; bottom: number } | null>(null)
+
 /**
- * 右栏把"选中了什么"抛上来，这里换算成原始代码的行号。
+ * 右栏把"选中了什么"抛上来，这里做两件事：
  *
- * 换算需要**原始代码**，而代码只有页面手上有 —— 所以这一步留在页面，
- * 面板不需要为了高亮去认识左栏。选不中任何行就清空高亮（点空白处 = 取消选中）。
+ *   1. 换算成原始代码的行号、让左栏亮起来 —— 换算需要**原始代码**，
+ *      而代码只有页面手上有，所以这一步留在页面，面板不必认识左栏。
+ *   2. 记下选区，让追问气泡浮出来 —— 只是点一下（没选中东西）就清空，
+ *      相当于"点空白处取消选中"。
  */
-function onLocate(payload: { text: string; anchorLines: number[] | null }) {
+function onSelection(payload: {
+  text: string
+  anchorLines: number[] | null
+  rect: DOMRect | null
+}) {
   const hit = resolveLines(payload.text, payload.anchorLines, code.value)
   highlightLines.value = hit.lines
 
   if (hit.lines.length > 0) {
     nextTick(() => codePaneRef.value?.focusLines(hit.lines))
   }
+
+  if (!payload.text) {
+    askOpen.value = false
+    askSelection.value = ''
+    askRect.value = null
+    return
+  }
+
+  askSelection.value = payload.text
+  askRect.value = payload.rect
+    ? {
+        left: payload.rect.left,
+        right: payload.rect.right,
+        top: payload.rect.top,
+        bottom: payload.rect.bottom,
+      }
+    : null
+}
+
+/**
+ * 关掉追问气泡时，把选区也一并清掉。
+ * 否则那个小「提问」按钮会立刻又冒出来 —— 用户刚说了"不用"，
+ * 还杵着一个按钮在等他，很别扭。要再问就重新选一次。
+ */
+function closeAsk() {
+  askOpen.value = false
+  askSelection.value = ''
+  askRect.value = null
 }
 
 async function analyze() {
   if (loading.value || !code.value.trim()) return
 
   highlightLines.value = []
+  askOpen.value = false
+  askSelection.value = ''
+  askRect.value = null
 
   // 小屏是上下堆叠布局：输入区在上、结果区在下，点完按钮结果还在屏幕外，
   // 用户会以为"点了没反应"。桌面端是左右两栏、结果就在旁边，不需要滚。
@@ -80,6 +122,9 @@ function clearAll() {
   code.value = ''
   reset()
   highlightLines.value = []
+  askOpen.value = false
+  askSelection.value = ''
+  askRect.value = null
 }
 </script>
 
@@ -137,12 +182,21 @@ function clearAll() {
         :done="done"
         :graph-ready="Boolean(graphData)"
         @request-graph="graphPanelRef?.scrollIntoView()"
-        @locate="onLocate"
+        @selection="onSelection"
       />
     </main>
 
     <!-- 知识框架图 -->
     <GraphPanel ref="graphPanelRef" :data="graphData" :loading="loading" />
+
+    <!-- 追问气泡（Teleport 到 body，不受面板 overflow 裁剪） -->
+    <SelectionAsk
+      v-model:open="askOpen"
+      :selection="askSelection"
+      :anchor="askRect"
+      :code="code"
+      @close="closeAsk"
+    />
 
     <footer class="shrink-0 px-4 pb-4 text-center text-xs text-slate-400 sm:px-6 sm:pb-6">
       麦穗团队 · 传智杯 AI Web 开发挑战赛

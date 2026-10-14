@@ -55,7 +55,7 @@ Nuxt 服务端（server/api/analyze.post.ts）
 
 ### 核心设计
 
-系统由下面十部分组成。每一部分都是为解决一个具体问题而设计的。
+系统由下面十一部分组成。每一部分都是为解决一个具体问题而设计的。
 
 | # | 模块 | 在哪 | 它解决什么问题 |
 |---|---|---|---|
@@ -69,6 +69,7 @@ Nuxt 服务端（server/api/analyze.post.ts）
 | 8 | **降级体系** —— 检索不到 / 服务不可用 / 遇到未收录的语言 | 散在各处 | 任何一环出问题都优雅退回，不报错、不白屏 |
 | 9 | **离线工具** —— 向量预计算脚本 + 检索阈值校准探针 | `scripts/` | 让检索质量可以被测量和调优，而不是拍脑袋 |
 | 10 | **工程决策与文档** —— 不做独立后端、不装向量数据库、以及 `docs/` 里的说明 | `README.md` + `docs/` | 记录"为什么这么选"，让方案可解释 |
+| 11 | **交互层** —— 术语/引用可点、选中正文联动左栏高亮、就地多轮追问 | `app/components/` + `app/utils/` | 把"读完了还有疑问"接住，而不是让用户自己再去搜 |
 
 ### 两个关键设计决策
 
@@ -86,6 +87,42 @@ Nuxt 服务端（server/api/analyze.post.ts）
 
 所以检索前先判断代码语言，只在该语言的资料里找；遇到没收录的语言（C++、Go 等）直接跳过检索，
 干净地降级为纯模型回答。详见 `server/rag/retrieve.ts` 顶部的注释。
+
+---
+
+## 交互层（可点、可追问）
+
+主链路负责"把代码讲一遍"，讲完之后的疑问由这一层接住。
+
+**① 术语可点**
+
+「四、技术溯源」里的名词（PEP、ES5、JIT、GIL…）可以点开看解释和官方出处。
+词表单独放在 `app/data/glossary.json`，**没有**并进 `server/rag/corpus.json` ——
+语料是给向量检索用的，混进去会被当成检索候选、可能挤掉本该命中的段落，
+而且改它必须重跑 `rag:build` 重新校准阈值。词表只给前端用，不参与检索。
+（术语只在技术溯源那一段生效：那一段才逐条讲技术来历，术语密度最高。）
+
+**② 引用编号可点**
+
+正文里的 `[1]` 点一下，下面那张引用卡片会展开并滚进视野。
+
+**③ 选中正文 → 左栏对应代码行高亮**
+
+「逐词逐句」里写的 `第 7 行` 本来就是**原始代码的真实行号**，渲染时把它写进
+DOM 的 `data-line-start`，选中那一段就能精确定位，不用去猜、也不用正则文本。
+锚点找不到时（比如在技术溯源里选了一句），再拿选中的文字去原代码里逐行对；
+两条路都落空就**不高亮、不报错**。
+
+> 左栏是原生 `<textarea>`，**没法只给某几行加背景色**。所以底下垫了一层"镜像层"：
+> 同字体、同字号、同行距、同内边距的 div，装着同一份文本（透明），只给命中的行上背景。
+> 为什么不用 `(行号-1) × 行高` 硬算 —— 长行会折行，折行之后"逻辑第 N 行"在屏幕上
+> 占几行就不确定了。镜像层的滚动条宽度是**实测**的（`offsetWidth - clientWidth`），
+> 保证两边内容区严格相等、折行位置逐一相同。
+
+**④ 就地追问，可多轮**
+
+选中一段 → 浮出一个小「提问」按钮 → 展开问答面板，可以接着往下问。
+对话历史由前端保存、随每次请求带上，`/api/ask` 保持**无状态**（不引存储、不管并发）。
 
 ---
 
@@ -201,14 +238,29 @@ AI-Web/
 ├── app/                           # 前端（Nuxt 4 约定：源码在 app/ 下）
 │   ├── app.vue                    # 应用外壳
 │   ├── error.vue                  # 全局错误页（接口挂了/页面出错时接管）
-│   ├── assets/css/main.css        # 全局样式 + Vue Flow 浅色覆盖
+│   ├── assets/css/main.css        # 全局样式 + markdown 正文排版 + Vue Flow 浅色覆盖
 │   ├── components/
-│   │   ├── GraphView.vue          # 知识框架图（Vue Flow + dagre）
-│   │   └── SourceList.vue         # 引用来源卡片
-│   └── pages/index.vue            # 主页面
+│   │   ├── CodePane.vue           # 左栏：输入 + 行高亮（镜像层）
+│   │   ├── AnalysisPanel.vue      # 右栏：解析结果 + 流式自动跟随
+│   │   ├── GraphPanel.vue         # 知识框架图区域（三种状态）
+│   │   ├── GraphView.vue          # 知识框架图本体（Vue Flow + dagre）
+│   │   ├── MarkdownBlock.vue      # 模型输出的 markdown 渲染
+│   │   ├── SourceList.vue         # 引用来源卡片
+│   │   ├── TermCard.vue           # 术语解释卡（点了正文里的术语弹出）
+│   │   ├── SelectionAsk.vue       # 追问气泡（可多轮）
+│   │   ├── BookLoader.vue         # 等待动画：摊开翻页的书
+│   │   └── CodeToGraphHint.vue    # 等待动画：代码块 → 知识框架图
+│   ├── composables/useAnalysis.ts # 解析链路的状态与请求（页面只管排版）
+│   ├── data/glossary.json         # 术语词表（给前端用，不参与向量检索）
+│   ├── types/analysis.ts          # 跨组件共享的数据形状（单一来源）
+│   ├── utils/                     # 纯函数：切分 / 定位 / markdown 插件
+│   └── pages/index.vue            # 主页面（只剩排版与编排）
 ├── server/                        # 后端（Nitro，跑在同一个进程里）
-│   ├── api/analyze.post.ts        # POST /api/analyze —— 唯一接口
+│   ├── api/analyze.post.ts        # POST /api/analyze —— 主链路：五段解析
+│   ├── api/ask.post.ts            # POST /api/ask     —— 针对选中片段的追问
+│   ├── api/source/[id].get.ts     # GET  /api/source/:id —— 取一条语料正文
 │   ├── utils/prompt.ts            # 提示词（核心资产）
+│   ├── utils/stream.ts            # 把上游 SSE 拆成纯文本流（两个接口共用）
 │   └── rag/                       # ★ 知识库
 │       ├── corpus.json            #   人工整理的语料（改这个）
 │       ├── corpus.embeddings.json #   预计算向量（脚本生成，要提交）
