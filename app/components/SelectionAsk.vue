@@ -184,25 +184,38 @@ const HEADER_H = 44
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi)
 
+/**
+ * 「基准位置」= 不含拖动偏移时面板该待的 top。
+ *
+ * 算它要用到**面板自己的高度**（贴在选区上方 = 选区顶边 − 面板高 − 8），
+ * 而面板高是 `20dvh` —— **会随窗口/缩放变**。
+ *
+ * ⚠️ 所以基准必须**在打开的那一刻定一次、之后冻住**。
+ *    早先是每帧现算的，于是缩放时高度一变、基准跟着变，
+ *    手指没动面板却"跳一段"（抓着像抓空）。
+ *    冻住之后：高度照样跟着窗口变，但**顶边不动**，面板只会往下长或往上缩。
+ */
+const baseTop = ref<number | null>(null)
+
+function computeBaseTop(): number {
+  const a = anchorRect.value
+  if (!a || typeof window === 'undefined') return 8
+  const h = panelEl.value?.offsetHeight || PANEL_H_FALLBACK
+  const above = a.top - 8 - h
+  return above < 8 ? a.top + 28 : above
+}
+
 const panelStyle = computed(() => {
   const a = anchorRect.value
   if (!a || typeof window === 'undefined') return {}
 
   const { x: dx, y: dy } = dragOffset.value
-  const h = panelEl.value?.offsetHeight || PANEL_H_FALLBACK
 
   const left = clamp(a.left + dx, 8, Math.max(8, window.innerWidth - bubbleW.value - 8))
 
-  // 先算**基准位置**：优先贴在选区顶边上方；上方放不下，就放到这条线下面一点
-  // （a.top + 28 ≈ 一行之后）。
-  //
-  // ⚠️ 这个"翻转"绝不能受"拖过没有"影响。踩过的坑：
-  //    写成 `if (!dragged && base < 8) 翻到下面` 之后，拖过一次就永远只走"上方"，
-  //    而矮窗口下面板比锚点上方的空间大得多 —— 算出来的 top 恒为负，被夹在 8，
-  //    **面板钉死、拖不动**（用户报的"向某处依附"就是这个）。
-  //    先定基准、再加偏移，才是对的顺序。
-  let base = a.top - 8 - h
-  if (base < 8) base = a.top + 28
+  // 基准：面板开着时用**打开那一刻冻住**的值，否则现算。
+  // 这样缩放导致高度变化时，面板只是变高变矮，**顶边不会跳**。
+  const base = props.open && baseTop.value !== null ? baseTop.value : computeBaseTop()
 
   // ⚠️ 拖动偏移是 **+ dy**：这里是"往上长"的写法，写成减号会让往下拖变成往上跑。
   //    （这里必须是 let —— 下面还要夹取。先前写成 const 又赋值，
@@ -419,8 +432,22 @@ watch(
   { immediate: true },
 )
 
-// 面板开的那一帧先定位一次（就落在按钮刚才待的地方），之后不再跟随
-watch(() => props.open, computeAnchor)
+// 面板开合：
+//   · 开 → 先定位一次（落在按钮刚才待的地方），再**把基准钉住**
+//   · 关 → 松开基准，下次开再定
+watch(
+  () => props.open,
+  async (open) => {
+    if (!open) {
+      baseTop.value = null
+      return
+    }
+    computeAnchor()
+    // 等面板真正挂上再量高度 —— 这一帧之前量到的是兜底估值
+    await nextTick()
+    baseTop.value = computeBaseTop()
+  },
+)
 </script>
 
 <template>
