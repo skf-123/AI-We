@@ -22,9 +22,8 @@ import { termPlugin } from '~/utils/markdown-terms'
 const props = defineProps<{
   text: string
   /**
-   * 术语词表。**只有「四、技术溯源」那一段会传** ——
-   * 那一段才是逐条讲「这项技术从哪来、当初解决什么」的地方，
-   * 术语只在那一段落点，误伤最小。
+   * 术语词表。**正文的每一段都会传**（判据见 AnalysisPanel 里 terms 的注释）。
+   * 不传或传空 ⇒ 这一段不做术语标记，但引用编号仍然可点。
    */
   terms?: GlossaryTerm[]
 }>()

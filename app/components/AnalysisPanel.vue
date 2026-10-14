@@ -11,7 +11,7 @@
  */
 import glossaryData from '~/data/glossary.json'
 import type { GlossaryTerm, RagSource } from '~/types/analysis'
-import { parseSections, SECTION_TITLES } from '~/utils/analysis-sections'
+import { parseSections } from '~/utils/analysis-sections'
 import { rangeLines } from '~/utils/locate-lines'
 
 const props = defineProps<{
@@ -50,14 +50,17 @@ const sections = computed(() => parseSections(props.output))
 const isEmpty = computed(() => props.output.trim().length === 0)
 
 /**
- * 术语只在「四、技术溯源」那一段生效。
+ * 术语词表，**正文的每一段都传**。
  *
- * 那一段本来就是逐条讲「这项技术从哪来、当初解决什么」的地方，
- * 术语密度最高、读者最需要一个能就地查的入口；而别处的正文提到
- * "Python""数组"这类词时如果也变蓝，反而碎。
+ * 原先只在「四、技术溯源」那一段传，理由是"别处会碎"。实测不成立：
+ * 词表里那批"普通词"（API、字节码、垃圾回收…）在真实输出里几乎不出现，
+ * 而模型点名的位置恰恰常在「一、逐词逐句」（"这是装饰器语法糖，等价于…"），
+ * 正好是最需要就地查的那一处。
+ *
+ * 现在把关只落在**一个地方**：收不收进词表。收进来的词就意味着
+ * "它值得单独解释" —— 那它在哪一段出现都值得解释。
+ * 判据一句话：**可不可点，由词表和文本里有没有决定，不由它在第几段决定。**
  */
-const TRACE_TITLE: string = SECTION_TITLES[3]
-
 const terms = glossaryData as GlossaryTerm[]
 const termIndex = new Map(terms.map((t) => [t.term, t]))
 
@@ -263,7 +266,7 @@ defineExpose({ scrollIntoView })
           <h2 class="mb-2 text-sm font-semibold text-emerald-700">{{ s.title }}</h2>
           <MarkdownBlock
             :text="s.body"
-            :terms="s.title === TRACE_TITLE ? terms : undefined"
+            :terms="terms"
             @term="onTerm"
             @cite="onCite"
           />
