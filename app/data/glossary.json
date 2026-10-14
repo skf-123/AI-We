@@ -89,5 +89,14 @@
       "label": "MDN · JavaScript 内存管理",
       "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Memory_management"
     }
+  },
+  {
+    "term": "语法糖",
+    "aliases": ["糖衣语法", "syntactic sugar"],
+    "short": "为「让代码更好写、更好读」而加进语言的一种写法。它本身不增加语言能表达的东西——总有一套等价但更啰嗦的写法，执行前会被还原成那一套（叫「脱糖」）。所以糖只改写法，不改语言的能力。这个词 1966 年由彼得·兰丁提出。",
+    "source": {
+      "label": "Jargon File · 术语定名出处",
+      "url": "http://catb.org/~esr/jargon/html/S/syntactic-sugar.html"
+    }
   }
 ]

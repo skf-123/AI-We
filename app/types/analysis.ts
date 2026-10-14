@@ -63,6 +63,14 @@ export interface GlossaryTerm {
   numbered?: boolean
   /** 一两句大白话解释 */
   short: string
-  /** 官方出处 */
+  /**
+   * 出处。
+   *
+   * **以各语言的官方文档为主** —— MDN、Python 文档术语表、ECMA-262、框架官方文档。
+   *
+   * 例外只有一类：**跨语言的元概念**（例：「语法糖」）。它描述的是"写法"这件事本身，
+   * 不属于任何一门具体语言，因此**不存在任何一份语言规范会去定义它** ——
+   * 这类词只能引权威第三方，并且要在 label 里写清它是什么性质的出处。
+   */
   source: { label: string; url: string }
 }
