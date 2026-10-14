@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { toTextStream } from '../utils/stream'
+import { HISTORY_ITEM_GUARD, charBudgetOf, trimHistory } from '../utils/history'
 
 /**
  * POST /api/ask —— 针对解析结果里选中的一小段代码追问。
@@ -18,7 +19,7 @@ import { toTextStream } from '../utils/stream'
  * 检索带来的收益有限、却会明显拉长等待。留作后续可选项。
  */
 
-const HistoryItem = z.object({
+const HistoryItemSchema = z.object({
   role: z.enum(['user', 'assistant']),
   content: z.string().max(8000),
 })
@@ -29,8 +30,14 @@ const RequestSchema = z.object({
   /** 用户在解析结果里选中的那一小段 */
   selection: z.string().trim().max(2000).default(''),
   question: z.string().trim().min(1, '请先写一个问题').max(500, '问题太长了，请精简一下'),
-  /** 之前问过的，让它可以接着往下答 */
-  history: z.array(HistoryItem).max(20).default([]),
+  /**
+   * 之前问过的，让它可以接着往下答。
+   *
+   * ⚠️ 这里的 max 是**护栏**，只负责"接不接受这个请求"，**不决定带多少**。
+   *    真正决定带多少的是下面的长度预算（见 server/utils/history.ts）。
+   *    两者分开，顺序也不能反。
+   */
+  history: z.array(HistoryItemSchema).max(HISTORY_ITEM_GUARD).default([]),
 })
 
 const SYSTEM_PROMPT = `你是一位极其耐心的编程导师，正在辅导一个「自学编程、但看不懂别人代码」的人。
@@ -75,7 +82,13 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { code, selection, question, history } = parsed.data
+  const { code, selection, question } = parsed.data
+
+  // ---- 2.5 历史按**长度**裁（不是按条数）----
+  // 从最近往前累加到预算为止。注意顺序：schema 那层只管"接不接受这个请求"，
+  // 这里才决定"给模型看多少"。
+  const charBudget = charBudgetOf(config.askHistoryTokens)
+  const history = trimHistory(parsed.data.history, charBudget)
 
   // ---- 3. 组装消息 ----
   // 选中的那一段单独摆出来，并用「他选中了」说明它的身份 ——
@@ -124,11 +137,30 @@ export default defineEventHandler(async (event) => {
   }
 
   // ---- 5. 把文本流交给浏览器（与主链路同一套拆壳逻辑）----
-  return new Response(toTextStream(upstream.body) as unknown as ReadableStream, {
-    headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'no-cache, no-transform',
-      'X-Accel-Buffering': 'no',
-    },
-  })
+  const headers: Record<string, string> = {
+    'Content-Type': 'text/plain; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    'X-Accel-Buffering': 'no',
+  }
+
+  // 裁掉了多少轮，走响应头告诉前端。
+  // 跟引用来源走 X-Rag-Sources 是同一个道理：这是**服务端已经确定的事实**，
+  // 不该让前端自己再算一遍（两边各算一套，迟早会漂移）。
+  //
+  // ⚠️ 两个细节都踩过：
+  //   · 判据用**条数**（有没有真裁掉东西），不用轮数 ——
+  //     裁掉 1 条时 items 22→21，用 ceil 算轮数两边都是 11，头就带不上了，等于"裁了不说"
+  //   · 轮数用 **floor**，它表示"少掉了几整轮"，跟用户的直觉一致
+  const totalItems = parsed.data.history.length
+  const usedItems = history.length
+  if (usedItems < totalItems) {
+    headers['X-Ask-History'] = encodeURIComponent(
+      JSON.stringify({
+        usedRounds: Math.floor(usedItems / 2),
+        totalRounds: Math.floor(totalItems / 2),
+      }),
+    )
+  }
+
+  return new Response(toTextStream(upstream.body) as unknown as ReadableStream, { headers })
 })

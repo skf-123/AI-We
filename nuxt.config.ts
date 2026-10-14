@@ -62,5 +62,14 @@ export default defineNuxtConfig({
     ragEnabled: true,
     ragTopK: 4,
     ragMinScore: 0.38,
+
+    // ---------- 追问（/api/ask）带多少历史 ----------
+    // 模型没有记忆，每问一次都要把之前的对话重新发一遍。一直问下去不能无限带，
+    // 所以按**长度**给一个预算（不是按条数 —— 为什么不用条数、这个数怎么定的，
+    // 见 docs/追问上下文预算说明.md，那里有实测数据）。
+    //
+    // 换算是 ÷0.6（见 server/utils/history.ts），10 万 token ≈ 16.6 万字符 ≈ 470 轮典型问答。
+    // 要调就只动这一个数，不用改代码：环境变量 NUXT_ASK_HISTORY_TOKENS 可覆盖。
+    askHistoryTokens: 100000,
   },
 })

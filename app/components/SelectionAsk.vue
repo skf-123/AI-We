@@ -43,6 +43,13 @@ const question = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
 
+/**
+ * 有多少轮对话被裁掉了（不再带给模型）。
+ * 由服务端在响应头 X-Ask-History 里告知 —— 前端不算这个数，
+ * 免得两边各算一套迟早漂移。0 表示没裁。
+ */
+const trimmedRounds = ref(0)
+
 const inputRef = ref<HTMLTextAreaElement | null>(null)
 const scrollRef = ref<HTMLElement | null>(null)
 
@@ -53,12 +60,17 @@ const panelStyle = computed(() => {
   if (!r || typeof window === 'undefined') return {}
 
   const left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - BUBBLE_W - 8))
-  const spaceBelow = window.innerHeight - r.bottom - 16
-  const flipUp = spaceBelow < 260 && r.top > 300
 
-  return flipUp
-    ? { left: `${left}px`, bottom: `${window.innerHeight - r.top + 8}px`, width: `${BUBBLE_W}px` }
-    : { left: `${left}px`, top: `${r.bottom + 8}px`, width: `${BUBBLE_W}px` }
+  // 默认贴在选区**上方**（面板底边离选区顶边 8px）。
+  // 用 bottom 定位而不是 top：面板高度是不定的（对话越长越高），
+  // 用 bottom 才能保证它"底边贴着选区上方"、往上长，而不是把选区盖住。
+  const above = { left: `${left}px`, bottom: `${window.innerHeight - r.top + 8}px`, width: `${BUBBLE_W}px` }
+
+  // 上方放不下就翻到下面 —— 否则贴在视口顶边之外就看不见了
+  const roomAbove = r.top - 8
+  if (roomAbove >= 240) return above
+
+  return { left: `${left}px`, top: `${r.bottom + 8}px`, width: `${BUBBLE_W}px` }
 })
 
 /**
@@ -72,9 +84,14 @@ const triggerStyle = computed(() => {
   if (!r || typeof window === 'undefined') return {}
 
   const W = 64
+  const H = 26 // 按钮高度（估），用来算"放在选区上方"的位置
   const left = Math.min(Math.max(8, r.right + 6), Math.max(8, window.innerWidth - W - 8))
-  const top = Math.min(r.bottom + 6, window.innerHeight - 40)
-  return { left: `${left}px`, top: `${top}px` }
+
+  // 和面板一致：默认贴选区**上方**
+  const top = r.top - H - 6
+  return top >= 4
+    ? { left: `${left}px`, top: `${top}px` }
+    : { left: `${left}px`, top: `${Math.min(r.bottom + 6, window.innerHeight - H - 8)}px` }
 })
 
 /** 回答是流式的，得跟着往下滚，否则后半截看不见 */
@@ -128,6 +145,18 @@ async function ask(text: string) {
       turns.value.pop()
       errorMsg.value = msg
       return
+    }
+
+    // 服务端可能裁掉了更早的几轮。它把这件事放在响应头里告诉我们，
+    // 而不是让前端自己按预算算一遍 —— 预算在服务端，前端算不出权威答案。
+    const rawHistory = res.headers.get('X-Ask-History')
+    if (rawHistory) {
+      try {
+        const info = JSON.parse(decodeURIComponent(rawHistory))
+        trimmedRounds.value = Math.max(0, (info.totalRounds ?? 0) - (info.usedRounds ?? 0))
+      } catch {
+        trimmedRounds.value = 0
+      }
     }
 
     const reader = res.body.getReader()
@@ -187,6 +216,7 @@ watch(
       turns.value = []
       question.value = ''
       errorMsg.value = ''
+      trimmedRounds.value = 0
       return
     }
     nextTick(() => inputRef.value?.focus())
@@ -238,6 +268,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
 
       <!-- 对话流 -->
       <div ref="scrollRef" class="max-h-[46vh] overflow-y-auto overscroll-contain px-3 py-2.5">
+        <!--
+          裁切提示。用户往回翻还能看到那些轮次，但模型已经不记得了 ——
+          不说清楚，用户会以为它记得，然后被一个"答非所问"困惑。
+        -->
+        <p
+          v-if="trimmedRounds > 0"
+          class="mb-2 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] leading-4 text-slate-500"
+        >
+          更早的 {{ trimmedRounds }} 轮已不再带给模型（仍显示在这里）
+        </p>
+
         <!-- 还没开始问：给三个预设问题，别让用户卡在"我该问什么" -->
         <div v-if="turns.length === 0" class="space-y-2">
           <p class="text-[12px] text-slate-500">选中的这几行有疑问？直接问：</p>

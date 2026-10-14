@@ -8,6 +8,7 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "rag:build": "node --env-file=.env scripts/build-embeddings.mjs",
+    "ask:probe": "node --env-file=.env scripts/ask-latency-probe.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
