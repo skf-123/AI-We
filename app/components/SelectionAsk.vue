@@ -39,7 +39,15 @@ const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
-const BUBBLE_W = 380
+/**
+ * 气泡宽度：写死，但**大小屏分档**。
+ *
+ * 手机上的 CSS 视口只有 360~430（机型数据：安卓基准 360、苹果 390/414），
+ * 380px 的气泡会顶满两边、不留边，所以要窄一档。
+ * 用 vu 这个 ref 而不是直接读 innerWidth —— 旋转/改窗口大小时宽度才跟得上。
+ */
+const vw = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
+const bubbleW = computed(() => (vw.value < 640 ? 300 : 380))
 
 /** 预设问题。产品卖点是"零提示词"，所以不能让用户到这里卡在"我该问什么" */
 const PRESETS = ['这几行在干什么？', '为什么这么写？', '有什么风险？']
@@ -183,7 +191,7 @@ const panelStyle = computed(() => {
   const { x: dx, y: dy } = dragOffset.value
   const h = panelEl.value?.offsetHeight || PANEL_H_FALLBACK
 
-  const left = clamp(a.left + dx, 8, Math.max(8, window.innerWidth - BUBBLE_W - 8))
+  const left = clamp(a.left + dx, 8, Math.max(8, window.innerWidth - bubbleW.value - 8))
 
   // 先算**基准位置**：优先贴在选区顶边上方；上方放不下，就放到这条线下面一点
   // （a.top + 28 ≈ 一行之后）。
@@ -210,7 +218,7 @@ const panelStyle = computed(() => {
   //    改成只保证把手露在屏幕里，面板再高也永远拖得动。
   top = clamp(top, 8, Math.max(8, window.innerHeight - HEADER_H - 8))
 
-  return { left: `${left}px`, top: `${top}px`, width: `${BUBBLE_W}px` }
+  return { left: `${left}px`, top: `${top}px`, width: `${bubbleW.value}px` }
 })
 
 /**
@@ -363,9 +371,18 @@ watch(
   },
 )
 
-onMounted(() => window.addEventListener('keydown', onGlobalKeydown))
+function onResize() {
+  vw.value = window.innerWidth
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onGlobalKeydown)
+  window.addEventListener('resize', onResize)
+})
+
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onGlobalKeydown)
+  window.removeEventListener('resize', onResize)
   stopFollow()
 })
 
@@ -458,7 +475,7 @@ watch(() => props.open, computeAnchor)
       </div>
 
       <!-- 对话流 -->
-      <div ref="scrollRef" class="max-h-[46vh] overflow-y-auto overscroll-contain px-3 py-2.5">
+      <div ref="scrollRef" class="ask-conversation overflow-y-auto overscroll-contain px-3 py-2.5">
         <!--
           裁切提示。用户往回翻还能看到那些轮次，但模型已经不记得了 ——
           不说清楚，用户会以为它记得，然后被一个"答非所问"困惑。
@@ -552,6 +569,25 @@ watch(() => props.open, computeAnchor)
 </template>
 
 <style scoped>
+/*
+ * 对话区高度 = **当前可见窗口的 20%**。
+ *
+ * 注意是固定 `height`，不是 `max-height` —— 原来用上限，导致"还没问"时
+ * 只占 74px、一有回答就撑到 369px，面板整个跳一截。写死之后前后一样高。
+ *
+ * 用 **dvh** 而不是 vh：移动浏览器的地址栏会吃掉高度，vh 会算多
+ * （机型数据里明确列的三个高频坑之一）。@supports 兜底，老浏览器退回 vh。
+ */
+.ask-conversation {
+  height: 20vh;
+}
+
+@supports (height: 20dvh) {
+  .ask-conversation {
+    height: 20dvh;
+  }
+}
+
 /* 选中后浮出的那个小按钮：小、贴着选区，不抢戏 */
 .ask-trigger {
   position: fixed;
