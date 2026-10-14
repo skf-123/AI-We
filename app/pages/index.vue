@@ -75,12 +75,20 @@ function onSelection(payload: {
     nextTick(() => codePaneRef.value?.focusLines(hit.lines))
   }
 
+  // 点空白（没选中任何东西）→ 关掉气泡。这一条不受下面那条影响。
   if (!payload.text) {
     askOpen.value = false
     askSelection.value = ''
     askRange.value = null
     return
   }
+
+  // **面板开着的时候，新选区不理会。**
+  //
+  // 用户正在问，这时他顺手又划了一段（可能是想确认、也可能是去找别的东西），
+  // 不该把面板从他拖到的位置拽走。所以"开着的面板"和"没打开的气泡"状态要分开：
+  // 左栏高亮照常跟着新选区走（那是另一回事），但气泡自己的选区与位置冻住不动。
+  if (askOpen.value) return
 
   askSelection.value = payload.text
   askRange.value = payload.range
