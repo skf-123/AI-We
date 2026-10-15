@@ -163,6 +163,18 @@ npm run rag:build      # 重新生成向量
 node --env-file=.env scripts/rag-probe.mjs
 ```
 
+**想知道「检索到底带来了什么」，跑 A/B（需要本地 dev server 在跑）：**
+
+```bash
+npm run rag:ab
+```
+
+同一样本跑两遍 —— 一次带检索到的资料、一次不带，对比第四部分「技术溯源」。
+两臂除「有没有资料」以外完全相同：A 臂打的就是本机的 `/api/analyze`（生产链路本身），
+B 臂的提示词从 `server/utils/prompt.ts` 导入、模型参数照抄接口设置。
+实测数据与结论见 [`docs/知识库设计说明.md`](docs/知识库设计说明.md) 的「那它到底有没有用」一节 ——
+包括我们**说不出**「生成质量显著提升」这件事，以及为什么。
+
 **优雅降级**：检索不到 / embedding 服务挂了 / 语料缺失 / 遇到未收录的语言（如 C++）
 → 自动退回纯模型回答，不报错、不白屏。
 
@@ -280,11 +292,14 @@ AI-Web/
 │       ├── embed.ts               #   调智谱 embedding
 │       └── retrieve.ts            #   语言过滤 + 余弦 + top-k
 ├── scripts/
-│   ├── build-embeddings.mjs       # npm run rag:build
-│   └── rag-probe.mjs              # 检索阈值校准探针
+│   ├── build-embeddings.mjs       # npm run rag:build —— 改了语料重算向量
+│   ├── rag-probe.mjs              # 检索阈值校准探针
+│   ├── ask-latency-probe.mjs      # npm run ask:probe —— 追问历史预算的实测
+│   └── rag-ab-probe.mjs           # npm run rag:ab    —— RAG 开关的 A/B
 ├── docs/                          # 设计文档
-│   ├── 知识库设计说明.md           #   为什么语料是"手写卡片"而不是下载文档
-│   └── 响应式与浏览器兼容说明.md     #   支持的视口范围、布局陷阱（min-w-0）、浏览器要求
+│   ├── 知识库设计说明.md           #   为什么用"手写卡片" + 检索怎么实现的 + 实测效果
+│   ├── 响应式与浏览器兼容说明.md     #   支持的视口范围、布局陷阱（min-w-0）、浏览器要求
+│   └── 追问上下文预算说明.md        #   追问带多少历史，参数怎么用实测定下来的
 ├── nuxt.config.ts                 # 框架配置 + 服务端私有配置
 ├── package.json                   # 依赖清单
 ├── .npmrc                         # 固定使用官方 npm 源（原因见下）
