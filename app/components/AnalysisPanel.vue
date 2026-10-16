@@ -228,9 +228,18 @@ defineExpose({ scrollIntoView })
       </span>
     </div>
 
+    <!-- ⚠️ overscroll-contain 只加在 lg，小屏坚决不能有它。
+         小屏（<lg）这个容器没有固定高度、跟着内容长，实测 390 宽的手机上它有
+         5728px 高却不可滚动，而它占满整宽（324/390）—— 带上 overscroll-contain
+         就等于「手势到我这儿就被吃掉、又不许传给页面」，于是整页滑不动。
+         2026-10-16 实测（仿真 390×844 + 合成触摸拖动）：
+           正中 x=195 → 页面 0px 不动；最右 x=370 → 345px；最左 x=20 → 345px
+           仅把 overscroll-behavior-y 改回 auto，正中立刻恢复 345px
+         desktop（≥lg）才需要它：那时面板锁定一屏高度、内部滚动，
+         滚到底不该把整页也带着滚。 -->
     <div
       ref="outputBoxRef"
-      class="min-h-[240px] flex-1 overflow-y-auto overscroll-contain pr-1 sm:min-h-[320px] lg:min-h-0"
+      class="min-h-[240px] flex-1 overflow-y-auto pr-1 sm:min-h-[320px] lg:min-h-0 lg:overscroll-contain"
       @scroll.passive="onOutputScroll"
       @mouseup="onBodyMouseUp"
     >
