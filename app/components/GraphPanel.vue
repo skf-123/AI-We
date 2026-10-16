@@ -68,8 +68,7 @@ defineExpose({ scrollIntoView })
             解析完成后，这里会画出这段代码的知识框架图<br />
             <span class="text-[13px]">
               节点分三类：
-              <span class="text-emerald-600">代码</span>、
-              <span class="text-blue-600">技术</span>、
+              <span class="text-emerald-600">代码</span>、 <span class="text-blue-600">技术</span>、
               <span class="text-amber-600">概念</span>
             </span>
           </p>

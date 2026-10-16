@@ -63,11 +63,7 @@ const askRange = ref<Range | null>(null)
  *   2. 记下选区，让追问气泡浮出来 —— 只是点一下（没选中东西）就清空，
  *      相当于"点空白处取消选中"。
  */
-function onSelection(payload: {
-  text: string
-  anchorLines: number[] | null
-  range: Range | null
-}) {
+function onSelection(payload: { text: string; anchorLines: number[] | null; range: Range | null }) {
   const hit = resolveLines(payload.text, payload.anchorLines, code.value)
   highlightLines.value = hit.lines
 

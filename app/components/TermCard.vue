@@ -51,7 +51,13 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
-    <div v-if="term" class="term-card" :style="style" role="dialog" :aria-label="`术语：${term.term}`">
+    <div
+      v-if="term"
+      class="term-card"
+      :style="style"
+      role="dialog"
+      :aria-label="`术语：${term.term}`"
+    >
       <div class="flex items-start justify-between gap-2">
         <span class="text-[13px] font-semibold text-emerald-700">{{ term.term }}</span>
         <button

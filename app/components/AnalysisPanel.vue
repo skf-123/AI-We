@@ -106,7 +106,8 @@ function anchorLinesOf(range: Range): number[] | null {
   while (node && node !== box) {
     if (node instanceof HTMLElement) {
       const start = node.getAttribute('data-line-start')
-      if (start) return rangeLines(Number(start), Number(node.getAttribute('data-line-end') ?? start))
+      if (start)
+        return rangeLines(Number(start), Number(node.getAttribute('data-line-end') ?? start))
     }
     node = node.parentNode
   }
@@ -234,7 +235,10 @@ defineExpose({ scrollIntoView })
       @mouseup="onBodyMouseUp"
     >
       <!-- 出错 -->
-      <div v-if="errorMsg" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+      <div
+        v-if="errorMsg"
+        class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"
+      >
         {{ errorMsg }}
       </div>
 
@@ -264,12 +268,7 @@ defineExpose({ scrollIntoView })
           class="rounded-lg border border-slate-100 bg-slate-50 p-3.5"
         >
           <h2 class="mb-2 text-sm font-semibold text-emerald-700">{{ s.title }}</h2>
-          <MarkdownBlock
-            :text="s.body"
-            :terms="terms"
-            @term="onTerm"
-            @cite="onCite"
-          />
+          <MarkdownBlock :text="s.body" :terms="terms" @term="onTerm" @cite="onCite" />
         </article>
 
         <!-- 知识库检索到的引用来源，紧跟在四段解释之后 -->

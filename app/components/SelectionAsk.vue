@@ -552,7 +552,10 @@ watch(
           </div>
         </div>
 
-        <p v-if="errorMsg" class="mt-2 rounded border border-rose-200 bg-rose-50 p-2 text-[12px] text-rose-700">
+        <p
+          v-if="errorMsg"
+          class="mt-2 rounded border border-rose-200 bg-rose-50 p-2 text-[12px] text-rose-700"
+        >
           {{ errorMsg }}
         </p>
       </div>

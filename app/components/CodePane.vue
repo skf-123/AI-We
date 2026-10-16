@@ -188,11 +188,9 @@ watch(
         :style="{ right: `${scrollbarW}px` }"
         aria-hidden="true"
       >
-        <span
-          v-for="(line, i) in mirrorLines"
-          :key="i"
-          :class="{ 'line-hit': hitSet.has(i + 1) }"
-        >{{ line }}{{ i < mirrorLines.length - 1 ? '\n' : '' }}</span>
+        <span v-for="(line, i) in mirrorLines" :key="i" :class="{ 'line-hit': hitSet.has(i + 1) }"
+          >{{ line }}{{ i < mirrorLines.length - 1 ? '\n' : '' }}</span
+        >
       </div>
 
       <textarea

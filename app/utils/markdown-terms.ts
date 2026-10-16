@@ -81,7 +81,10 @@ function makeNeedles(terms: GlossaryTerm[]): Needle[] {
   return needles.sort((a, b) => b.test.source.length - a.test.source.length)
 }
 
-function makeText(state: { Token: new (type: string, tag: string, nesting: number) => Token }, content: string): Token {
+function makeText(
+  state: { Token: new (type: string, tag: string, nesting: number) => Token },
+  content: string,
+): Token {
   const token = new state.Token('text', '', 0)
   token.content = content
   return token
