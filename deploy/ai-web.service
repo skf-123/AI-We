@@ -1,0 +1,48 @@
+# 麦穗 · 代码理解助手 —— systemd 常驻单元
+#
+# 用法：拷到 /etc/systemd/system/ai-web.service，然后
+#       sudo systemctl daemon-reload && sudo systemctl enable --now ai-web
+
+[Unit]
+Description=麦穗 · 代码理解助手（Nuxt 服务端）
+Documentation=https://github.com/skf-123/AI-We
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# 公网服务不用 root 跑：装机器时建一个专用的系统用户 aiweb
+User=aiweb
+Group=aiweb
+WorkingDirectory=/opt/ai-web
+
+# ★ 密钥只从这个文件来（权限 600、属主 aiweb），unit 里不放任何明文 key ——
+#   这样这个 unit 文件本身可以随便看、可以进 git。
+#   文件格式就是 .env 那套 KEY=value，systemd 直接读得懂。
+#   ⚠️ .env 被 .gitignore 排除，靠 scp 单独传，永远不进仓库。
+EnvironmentFile=/opt/ai-web/.env
+
+Environment=NODE_ENV=production
+Environment=PORT=3000
+# 只监听本机回环：3000 不对公网开放，外面统一走 Caddy 的 443
+Environment=HOST=127.0.0.1
+
+ExecStart=/usr/bin/node /opt/ai-web/.output/server/index.mjs
+
+# 崩了自动拉起来。演示期间不能被一次偶发崩溃放倒，
+# 而且 systemd enable 之后服务器重启服务也会自己回来。
+Restart=always
+RestartSec=3
+
+# 日志进 journal：journalctl -u ai-web -f
+StandardOutput=journal
+StandardError=journal
+
+# 一点基础加固：这个进程既不需要提权，也不需要动系统目录
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

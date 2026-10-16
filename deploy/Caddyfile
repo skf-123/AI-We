@@ -1,0 +1,28 @@
+# 麦穗 · 代码理解助手 —— Caddy 反向代理
+#
+# 用法：整份覆盖 /etc/caddy/Caddyfile，然后 sudo systemctl reload caddy
+#
+# 这份配置刻意只做两件事，别的都不写：
+#   1. 收到 ai-web.work / www.ai-web.work 的请求，转给本机 3000 的 Nuxt
+#   2. 自动申请并续期 Let's Encrypt 证书、自动开 HTTP/2
+#
+# 为什么必须 HTTP/2：浏览器在 HTTP/1.1 下同源最多 6 条连接，而压缩包入口是
+# 「一个文件一路流式请求」。本地实测：并发 10 比并发 5 慢 1.7 倍，并发 40 慢 6 倍，
+# 卡的就是这 6 条连接。HTTPS + h2 一上，这个天花板才消失。
+#
+# 为什么不写这几样（都是有意的）：
+#   证书路径 / tls 指令 —— Caddy 看到域名就自动去 Let's Encrypt 申请、自动续期。
+#                          手写路径只会多一个写错的地方。
+#   flush_interval    —— 官方文档写明：Content-Length 未知的响应「一律立即 flush」，
+#                        而 Nuxt 的流式输出正是这种（裸 ReadableStream，无 Content-Length）。
+#                        写了会被忽略，还附带「客户端断开也不取消后端请求」的副作用 ——
+#                        用户中途关页面会白烧 token。
+#   encode gzip       —— 压缩需要把内容攒起来才压，和「一个字一个字吐」直接冲突。
+#                        静态资源那点传输量不值得拿打字机效果去换。
+
+ai-web.work, www.ai-web.work {
+	reverse_proxy 127.0.0.1:3000
+}
+
+# ⚠️ 如果 www 的 A 记录还没在云解析里加，先把上面那行的 www 去掉再启动 ——
+#    名字解析不到，Caddy 给 www 申请的证书会失败并反复重试（不影响裸域名，但日志很吵）。
