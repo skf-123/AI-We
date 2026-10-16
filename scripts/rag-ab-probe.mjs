@@ -24,12 +24,7 @@
  *   npm run rag:ab                        # 跑内置的三个示例（从 CodePane.vue 里读，不另抄一份）
  *   npm run rag:ab -- "Python · 装饰器"    # 只跑指定那一个
  */
-import fs from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const ROOT = join(__dirname, '..')
+import { loadSamples } from './lib/code-samples.mjs'
 
 const BASE = (process.env.NUXT_LLM_BASE_URL || 'https://api.deepseek.com').replace(/\/$/, '')
 const KEY = process.env.NUXT_LLM_API_KEY
@@ -42,34 +37,9 @@ const { SYSTEM_PROMPT, buildUserPrompt } = await import(
 )
 
 /**
- * 示例代码从 app/components/CodePane.vue 里读。
- * 这样「探针量的样本」永远等于「演示时用的样本」，不会各写一份然后漂移。
+ * 示例代码从共用的 scripts/lib/code-samples.mjs 读 —— 它从 CodePane.vue 里取，
+ * 保证「探针量的样本」永远等于「演示时用的样本」。
  */
-function loadSamples() {
-  const src = fs.readFileSync(join(ROOT, 'app/components/CodePane.vue'), 'utf8')
-  const start = src.indexOf('const SAMPLES')
-  // 注意：要从「= 」之后的第一个 [ 开始。类型注解 `{ label: string; code: string }[]`
-  // 里本身就有一对中括号，从 start 往后找会提前配平，得到一个空数组。
-  const eq = src.indexOf('=', start)
-  const head = src.indexOf('[', eq)
-
-  let depth = 0
-  let end = -1
-  for (let i = head; i < src.length; i++) {
-    if (src[i] === '[') depth++
-    else if (src[i] === ']') {
-      depth--
-      if (depth === 0) {
-        end = i
-        break
-      }
-    }
-  }
-  if (end === -1) throw new Error('没能从 CodePane.vue 里解析出 SAMPLES')
-
-  // 只读本地源码里的一段字面量，不执行任何外部输入
-  return eval(`(${src.slice(head, end + 1)})`)
-}
 
 /** 读一条 SSE 流，拼成纯文本 */
 async function readTextStream(body) {
@@ -102,11 +72,18 @@ async function readTextStream(body) {
 
 /** A 臂：打真实接口（production 链路） */
 async function runWithRag(code) {
-  const res = await fetch(`${APP}/api/analyze`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code }),
-  })
+  let res
+  try {
+    res = await fetch(`${APP}/api/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    })
+  } catch {
+    // 连不上通常只有一个原因：开发服务器没起。给一句能直接照做的提示，
+    // 而不是让 fetch 抛一个光秃秃的 "fetch failed"
+    throw new Error(`${APP} 连不上 —— 开发服务器起了吗？（npm run dev）`)
+  }
   if (!res.ok) throw new Error(`${APP}/api/analyze 返回 ${res.status}（dev server 起了吗？）`)
 
   const header = res.headers.get('x-rag-sources')
