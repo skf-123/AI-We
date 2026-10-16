@@ -35,16 +35,20 @@ git --no-pager log --oneline -1
 # ------------------------------------------------------------
 step "2/4 装依赖"
 # ------------------------------------------------------------
-# ⚠️ 这里**必须**是 npm install，不要为了"可复现"换成 npm ci。
+# 为什么是「删干净再装」，而不是直接 npm install（更不能是 npm ci）：
 #
-# 原因：package-lock.json 里只有 win32 的原生包条目。五个原生模块
-# （esbuild / rollup / @tailwindcss/oxide / lightningcss / rolldown）
-# 在 Linux 上一条可安装记录都没有 —— 实测 `npm ci --dry-run --os=linux`
-# 的安装计划里命中 0 条。npm ci 严格照锁文件装，到 Linux 上必然缺包。
+# ① 锁文件是在 Windows 上生成的，原生包条目按 win32 解析。带着它装，npm 不会
+#    去取 Linux 的原生二进制 —— 实测装完 node_modules/@rolldown/ 下只有
+#    pluginutils，缺 binding-linux-x64-gnu，构建第一步 nuxt prepare 就失败。
+# ② 那把锁文件删掉、让 npm 按 Linux 重新解析呢？会撞上另一个坑：arborist 解析
+#    Nuxt 的 peer 依赖图时崩溃（TypeError: Cannot read properties of null
+#    (reading 'edgesOut')）。
 #
-# 想在 Windows 上提前复现这个判断（换平台、加依赖时都用得上）：
-#   npm ci --dry-run --ignore-scripts --os=linux --cpu=x64 --libc=glibc
-npm install
+# 所以两件事必须一起做：删掉 node_modules 与锁文件，并用 --legacy-peer-deps
+# 跳过 peer 解析。这样既绕开崩的那一处，又能按本机平台把原生包装齐。
+# 2026-10-16 实测：全套原生包就位，构建 12.6 秒通过。
+rm -rf node_modules package-lock.json
+npm install --legacy-peer-deps
 
 # ------------------------------------------------------------
 step "3/4 构建"
