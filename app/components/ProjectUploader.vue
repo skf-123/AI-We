@@ -119,6 +119,13 @@ function emitFiles(raw: { path: string; file: File }[]) {
     emit('error', '这个文件夹是空的。')
     return
   }
+
+  // 第一版只做文件夹；拖进来一个压缩包时明确说清楚，别让它变成「未命名项目」
+  const archive = /\.(zip|rar|7z|tar|tgz|gz)$/i
+  if (normalized.length === 1 && archive.test(normalized[0]!.path)) {
+    emit('error', '第一版只支持拖入文件夹；zip 压缩包在后续版本支持。')
+    return
+  }
   if (normalized.length > PROJECT_LIMITS.maxFiles) {
     emit('error', `文件太多了（${normalized.length} 个），上限是 ${PROJECT_LIMITS.maxFiles} 个。`)
     return
@@ -182,7 +189,8 @@ function emitFiles(raw: { path: string; file: File }[]) {
 
       <p class="mt-5 max-w-md text-xs leading-relaxed text-slate-400">
         依赖（node_modules / target / .idea 等）只登记位置，不会上传给模型。<br />
-        单文件上限 1 MB，整个项目上限 100 MB。zip 压缩包在后续版本支持。
+        用户相关文件选中总量上限 1.9 MB（依赖 / 产物不计入），整个文件夹上限 100MB。<br />
+        zip 压缩包在后续版本支持。
       </p>
 
       <input

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ProjectTreeNode } from '~/types/project'
 import { useProjectSession, type ProjectSelectionPayload } from '~/composables/useProjectSession'
-import { formatSize } from '~/utils/project-files'
+import { formatSize, PROJECT_LIMITS } from '~/utils/project-files'
 
 useHead({ title: '整个项目 · 麦穗 · 代码理解助手' })
 
@@ -76,6 +76,10 @@ const {
 
 const analysisRef = ref<{ scrollIntoView: () => void } | null>(null)
 
+/** 用户相关文件（用户代码 + 配置）的选中总量上限 */
+const userBudget = PROJECT_LIMITS.maxUserBytes
+const overBudget = computed(() => stats.value.parseBytes > userBudget)
+
 function onSelect(payload: ProjectSelectionPayload) {
   void selectProject(payload)
 }
@@ -101,6 +105,7 @@ function onGraphSelectGroup(id: string) {
 }
 
 async function onStart() {
+  if (overBudget.value) return
   const ok = await startParsing()
   if (ok) scrollToAnalysis()
 }
@@ -222,12 +227,22 @@ onBeforeUnmount(() => {
             />
 
             <div
+              v-if="overBudget"
+              class="border-t border-rose-100 bg-rose-50 px-4 py-2.5 text-[11.5px] leading-relaxed text-rose-700"
+            >
+              选中的用户相关文件共 {{ formatSize(stats.parseBytes) }}，超过
+              {{ formatSize(userBudget) }} 上限。请取消一些文件后再开始解析。
+            </div>
+
+            <div
               class="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-slate-100 px-4 py-3"
             >
               <span class="text-xs text-slate-500">
                 <b class="text-slate-800">{{ stats.parseCount }}</b> 个源文件 +
                 <b class="text-slate-800">{{ stats.contextCount }}</b> 个配置文件（默认仅作上下文）
-                <span class="text-slate-400"> · 约 {{ formatSize(stats.parseBytes) }}</span>
+                <span :class="overBudget ? 'font-medium text-rose-600' : 'text-slate-400'">
+                  · {{ formatSize(stats.parseBytes) }} / {{ formatSize(userBudget) }}</span
+                >
               </span>
               <span class="text-xs text-slate-400">
                 跳过 {{ stats.skippedCount }} 个文件 · 约 {{ formatSize(stats.skippedBytes) }}
@@ -238,7 +253,7 @@ onBeforeUnmount(() => {
                   <button
                     type="button"
                     class="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300"
-                    :disabled="queueFiles.length === 0 || mapLoading"
+                    :disabled="queueFiles.length === 0 || mapLoading || overBudget"
                     @click="onStart"
                   >
                     {{ mapLoading ? '正在生成目录说明…' : '开始解析 →' }}

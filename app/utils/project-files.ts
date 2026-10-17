@@ -10,12 +10,18 @@ import type { ProjectFileEntry, ProjectTreeNode } from '~/types/project'
 
 /**
  * 输入侧上限（快照第十一节第 30 条第 5 小节）。
- * 这是「别把浏览器拖死」的上限；真正送给模型的项目代码仍按 1.9MB 预算，两者不是一回事。
+ *
+ * ⚠️ 用户相关文件（用户代码 + 配置）**不按单文件大小跳过** ——
+ *    一个 2 MB 的源文件只要选中总量没超，就应当正常带上。
+ *    真正的闸门是「选中的用户相关文件总量 ≤ 1.9 MB」。
  */
 export const PROJECT_LIMITS = {
+  /** 整个文件夹（拖入时）的原始大小上限，防止把浏览器拖死 */
   maxTotal: 100 * 1024 * 1024,
+  /** 文件数上限 */
   maxFiles: 10_000,
-  maxSingle: 1024 * 1024,
+  /** 用户相关文件选中总量的上限；依赖 / 产物不计入 */
+  maxUserBytes: Math.round(1.9 * 1024 * 1024),
 } as const
 
 /** 依赖 / 编译产物 / IDE 目录：命中即整棵子树跳过，不经过 LLM */
@@ -281,20 +287,6 @@ export function makeFileEntry(path: string, size: number): ProjectFileEntry {
   const normalized = normalizePath(path)
   const name = baseName(normalized)
   const meta = classifyFile(normalized)
-
-  // 单文件超过 1 MB：不读内容，只登记位置（拖一个 node_modules 进来也不卡）
-  if (size > PROJECT_LIMITS.maxSingle) {
-    return {
-      path: normalized,
-      name,
-      size,
-      category: 'system',
-      skipReason: '单文件超过 1 MB',
-      unrecorded: false,
-      include: false,
-      configMode: 'context',
-    }
-  }
 
   return {
     path: normalized,
