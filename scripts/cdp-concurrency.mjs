@@ -18,7 +18,7 @@
  * 多路复用会让这条限制消失，那时要拿同一个脚本在线上再量一次。**
  *
  * ── 前置条件（两个都要在）──
- *   1. 开发服务器跑着：      npm run dev            → http://localhost:3000
+ *   1. 开发服务器跑着：      npm run dev            → http://localhost:3000/code
  *   2. headless Chrome 开着远程调试端口 9222
  *
  * ── 用法 ──
@@ -30,7 +30,7 @@
 import { loadSamples } from './lib/code-samples.mjs'
 
 const CDP = process.env.CDP_URL || 'http://127.0.0.1:9222'
-const TARGET_URL = process.env.APP_URL || 'http://localhost:3000/'
+const TARGET_URL = process.env.APP_URL || 'http://localhost:3000/code'
 
 const levels = process.argv
   .slice(2)

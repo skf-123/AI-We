@@ -2,6 +2,8 @@
 import { useProjectSession, type ProjectSelectionPayload } from '~/composables/useProjectSession'
 import { formatSize } from '~/utils/project-files'
 
+useHead({ title: '整个项目 · 麦穗 · 代码理解助手' })
+
 /**
  * 项目入口主页面。
  *
@@ -102,29 +104,8 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="min-h-dvh bg-[#f5f6f8] text-slate-800">
-    <!-- 顶栏 -->
-    <header class="border-b border-slate-200 bg-white px-4 py-3 sm:px-6 sm:py-4">
-      <div class="mx-auto flex max-w-[1400px] items-center justify-between gap-3">
-        <div class="flex min-w-0 items-baseline gap-3">
-          <NuxtLink to="/" class="truncate text-lg font-semibold tracking-wide text-slate-900">
-            麦穗 · 代码理解助手
-          </NuxtLink>
-          <span class="hidden text-xs text-slate-400 sm:block">WheatBend</span>
-        </div>
-
-        <nav class="flex shrink-0 items-center gap-1 rounded-full bg-slate-100 p-1 text-xs">
-          <NuxtLink
-            to="/"
-            class="rounded-full px-3 py-1 text-slate-500 transition hover:text-slate-800"
-          >
-            贴代码
-          </NuxtLink>
-          <span class="rounded-full bg-white px-3 py-1 font-medium text-emerald-700 shadow-sm">
-            整个项目
-          </span>
-        </nav>
-      </div>
-    </header>
+    <!-- 顶栏（三个页面共用） -->
+    <SiteHeader active="project" />
 
     <main class="mx-auto w-full max-w-[1400px] px-4 py-4 sm:px-6 sm:py-6">
       <!-- 步骤条 -->
