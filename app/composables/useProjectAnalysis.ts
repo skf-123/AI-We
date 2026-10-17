@@ -1,0 +1,264 @@
+import type { FileProgress } from '~/types/project'
+import { normalizePath } from '~/utils/project-files'
+import { useAnalysis } from './useAnalysis'
+
+/**
+ * 逐文件解析的并发池。
+ *
+ * 池子放在前端（快照第十一节第 30 条第 4 小节）：
+ *   · 服务端保持无状态，现有 /api/analyze 一行不动
+ *   · 每个文件一个请求、一路流对应一个文件，不需要发明分隔协议
+ *
+ * 语义（与快照第 29 / 30 条一致）：
+ *   queue 待解析；running 在飞（≤ limit）；完成一个补一个，不是等一批全完。
+ *   stop() 一次 abort 所有在飞 + 清空队列；失败继续；点排队中的文件可插队。
+ *
+ * 并发档位由协议决定，不交给模型：h2/h3 → 32，http/1.1 → 5。
+ */
+
+export interface ProjectSourceFile {
+  path: string
+  file: File
+}
+
+/** 一行确定性判定（快照第十一节第 29 条实测定的档位） */
+export function detectConcurrencyLimit(): number {
+  if (typeof performance === 'undefined') return 5
+
+  const nav = performance.getEntriesByType('navigation')[0] as
+    | PerformanceNavigationTiming
+    | undefined
+  const proto = nav?.nextHopProtocol
+
+  return proto === 'h2' || proto === 'h3' ? 32 : 5
+}
+
+export function useProjectAnalysis() {
+  /** path → 界面要的状态。流式过程中由 watch 持续同步 */
+  const progress = reactive<Record<string, FileProgress>>({})
+
+  const total = ref(0)
+  const finished = ref(0)
+  const runningCount = ref(0)
+  const allSettled = ref(false)
+  const limit = ref(detectConcurrencyLimit())
+  const stopped = ref(false)
+
+  const instances: Record<string, ReturnType<typeof useAnalysis>> = {}
+  const watcherStops: (() => void)[] = []
+  /** 已读到的文件原文：汇总调用抽第三段 / import 时用，不再读一遍盘 */
+  const texts = new Map<string, string>()
+  const handles = new Map<string, File>()
+
+  let queue: string[] = []
+  const running = new Set<string>()
+  /** 项目结构结论 —— 每次请求原样带上，作为前缀缓存的公共前缀 */
+  let context = ''
+
+  function ensure(path: string) {
+    const existing = instances[path]
+    if (existing) return existing
+
+    const inst = useAnalysis({
+      endpoint: '/api/project/analyze',
+      buildBody: (code) => ({ code, path, projectContext: context }),
+    })
+    instances[path] = inst
+    progress[path] = {
+      status: 'pending',
+      output: '',
+      sources: [],
+      error: '',
+      truncated: false,
+    }
+
+    // useAnalysis 是每个文件一个实例、状态互相独立；这里把它的 ref
+    // 镜像到 progress，目录树和右侧面板都只读 progress，不认识 composable。
+    const stop = watch(
+      [inst.output, inst.sources, inst.errorMsg, inst.truncated],
+      () => {
+        const p = progress[path]
+        if (!p) return
+        p.output = inst.output.value
+        p.sources = [...inst.sources.value]
+        p.error = inst.errorMsg.value
+        p.truncated = inst.truncated.value
+      },
+      { immediate: true },
+    )
+    watcherStops.push(stop)
+
+    return inst
+  }
+
+  async function pump() {
+    if (stopped.value) return
+
+    while (queue.length > 0 && running.size < limit.value) {
+      const path = queue.shift()!
+      ensure(path)
+      if (progress[path]!.status === 'done') continue
+
+      running.add(path)
+      runningCount.value = running.size
+      progress[path]!.status = 'running'
+      void processOne(path)
+    }
+
+    if (!stopped.value && running.size === 0 && queue.length === 0 && total.value > 0) {
+      allSettled.value = true
+    }
+  }
+
+  async function processOne(path: string) {
+    const inst = ensure(path)
+
+    try {
+      const file = handles.get(path)
+      if (!file) throw new Error('文件内容已丢失，请重新上传')
+
+      const text = await file.text()
+      texts.set(path, text)
+      await inst.run(text)
+
+      const p = progress[path]!
+      // run() 内部已经写完，watch 还没 flush —— 这里同步读一遍，避免状态晚一拍
+      p.output = inst.output.value
+      p.sources = [...inst.sources.value]
+      p.truncated = inst.truncated.value
+      p.error = inst.errorMsg.value
+
+      if (stopped.value) {
+        p.status = 'error'
+        p.error = '已停止'
+      } else {
+        p.status = p.error ? 'error' : 'done'
+      }
+    } catch (err) {
+      const p = progress[path]!
+      p.status = 'error'
+      p.error = err instanceof Error ? err.message : String(err)
+    } finally {
+      running.delete(path)
+      runningCount.value = running.size
+      finished.value++
+
+      if (stopped.value) {
+        if (running.size === 0) allSettled.value = false
+      } else {
+        void pump()
+      }
+    }
+  }
+
+  /**
+   * 开始解析。会先清掉上一轮的全部状态。
+   * context 由页面在项目地图完成后生成，已经保证是稳定字符串。
+   */
+  async function start(files: ProjectSourceFile[], projectContext: string) {
+    reset()
+    context = projectContext
+
+    for (const item of files) {
+      const path = normalizePath(item.path)
+      handles.set(path, item.file)
+      queue.push(path)
+    }
+
+    total.value = queue.length
+    stopped.value = false
+    await pump()
+  }
+
+  /** 停止：一次掐掉所有在飞 + 清空队列，且不触发汇总 */
+  function stop() {
+    stopped.value = true
+    queue = []
+
+    for (const inst of Object.values(instances)) inst.stop()
+
+    for (const path of running) {
+      const p = progress[path]
+      if (p && p.status === 'running') {
+        p.status = 'error'
+        p.error = '已停止'
+      }
+    }
+
+    running.clear()
+    runningCount.value = 0
+    allSettled.value = false
+  }
+
+  /** 单文件重试：把失败项重新放回队首 */
+  function retry(path: string) {
+    const key = normalizePath(path)
+    const p = progress[key]
+    if (!p || p.status !== 'error') return
+
+    p.status = 'pending'
+    p.error = ''
+    p.output = ''
+    p.sources = []
+    p.truncated = false
+
+    const i = queue.indexOf(key)
+    if (i !== -1) queue.splice(i, 1)
+    queue.unshift(key)
+
+    stopped.value = false
+    allSettled.value = false
+    void pump()
+  }
+
+  /** 点开一个还在排队的文件 → 移到队首（不改并发上限） */
+  function prioritize(path: string) {
+    const key = normalizePath(path)
+    const i = queue.indexOf(key)
+    if (i > 0) {
+      queue.splice(i, 1)
+      queue.unshift(key)
+    }
+  }
+
+  function reset() {
+    for (const inst of Object.values(instances)) inst.stop()
+    for (const stopWatcher of watcherStops) stopWatcher()
+    watcherStops.length = 0
+
+    for (const key of Object.keys(instances)) delete instances[key]
+    for (const key of Object.keys(progress)) delete progress[key]
+
+    texts.clear()
+    handles.clear()
+    queue = []
+    running.clear()
+
+    context = ''
+    total.value = 0
+    finished.value = 0
+    runningCount.value = 0
+    allSettled.value = false
+    stopped.value = false
+  }
+
+  function textOf(path: string): string {
+    return texts.get(normalizePath(path)) ?? ''
+  }
+
+  return {
+    progress,
+    total,
+    finished,
+    runningCount,
+    allSettled,
+    limit,
+    stopped,
+    start,
+    stop,
+    retry,
+    prioritize,
+    reset,
+    textOf,
+  }
+}

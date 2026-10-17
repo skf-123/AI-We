@@ -15,7 +15,17 @@ import type { RagSource } from '~/types/analysis'
  *    让这个 composable 去操作某个面板的 scrollTop，等于把请求逻辑和某一处
  *    视图绑死，那就白抽了。
  */
-export function useAnalysis() {
+export interface UseAnalysisOptions {
+  /** 默认 /api/analyze；项目入口传 /api/project/analyze */
+  endpoint?: string
+  /** 默认只发 { code }；项目入口要额外带上文件路径与项目结构结论 */
+  buildBody?: (code: string) => Record<string, unknown>
+}
+
+export function useAnalysis(options: UseAnalysisOptions = {}) {
+  const endpoint = options.endpoint ?? '/api/analyze'
+  const buildBody = options.buildBody ?? ((code: string) => ({ code }))
+
   /** 流式原始文本（未切分） */
   const output = ref('')
   /** 知识库检索到的引用来源，走 X-Rag-Sources 响应头传来 */
@@ -23,6 +33,8 @@ export function useAnalysis() {
   const errorMsg = ref('')
   const loading = ref(false)
   const done = ref(false)
+  /** 服务端是否因为超长截断过（X-Project-Truncated），贴代码入口恒为 false */
+  const truncated = ref(false)
 
   let controller: AbortController | null = null
 
@@ -36,16 +48,17 @@ export function useAnalysis() {
     output.value = ''
     errorMsg.value = ''
     sources.value = []
+    truncated.value = false
     loading.value = true
     done.value = false
 
     controller = new AbortController()
 
     try {
-      const res = await fetch('/api/analyze', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify(buildBody(code)),
         signal: controller.signal,
       })
 
@@ -72,6 +85,9 @@ export function useAnalysis() {
           sources.value = []
         }
       }
+
+      // 项目模式下单文件超过 50000 字符会被服务端截断，界面上要明说
+      truncated.value = Boolean(res.headers.get('X-Project-Truncated'))
 
       // 逐块读取，读一块、显示一块 —— 这就是打字机效果的来源
       const reader = res.body.getReader()
@@ -109,7 +125,8 @@ export function useAnalysis() {
     errorMsg.value = ''
     done.value = false
     sources.value = []
+    truncated.value = false
   }
 
-  return { output, sources, errorMsg, loading, done, run, stop, reset }
+  return { output, sources, errorMsg, loading, done, truncated, run, stop, reset }
 }
