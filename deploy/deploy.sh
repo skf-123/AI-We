@@ -46,7 +46,18 @@ step "2/4 装依赖"
 #
 # 所以两件事必须一起做：删掉 node_modules 与锁文件，并用 --legacy-peer-deps
 # 跳过 peer 解析。这样既绕开崩的那一处，又能按本机平台把原生包装齐。
-# 2026-10-16 实测：全套原生包就位，构建 12.6 秒通过。
+#
+# ③ 但只做到②还不够 —— npm 自己的可选依赖 bug（npm/cli#4828）会间歇性发作：
+#    同一条命令，手动跑一次成了、脚本里跑一次就报 Cannot find native binding。
+#    npm 10.9.9 上就是这么飘的；升到 12.2.0 之后没再出现。
+#    所以下面先卡一道 npm 版本，别让部署的成功率取决于运气。
+npm_major=$(npm -v | cut -d. -f1)
+if [ "$npm_major" -lt 12 ]; then
+	echo "npm $(npm -v) 偏旧，先升级（装依赖那一步的已知 bug 在旧版会间歇性发作）"
+	npm install -g npm@12
+	echo "npm 现在是 $(npm -v)"
+fi
+
 rm -rf node_modules package-lock.json
 npm install --legacy-peer-deps
 
