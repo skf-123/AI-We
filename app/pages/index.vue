@@ -153,7 +153,21 @@ function clearAll() {
           </h1>
           <span class="text-xs text-slate-400">WheatBend</span>
         </div>
-        <span class="hidden text-xs text-slate-400 sm:block"> 贴代码 · 不用提问 · 自动讲解 </span>
+
+        <div class="flex shrink-0 items-center gap-3">
+          <span class="hidden text-xs text-slate-400 sm:block"> 贴代码 · 不用提问 · 自动讲解 </span>
+          <nav class="flex items-center gap-1 rounded-full bg-slate-100 p-1 text-xs">
+            <span class="rounded-full bg-white px-3 py-1 font-medium text-emerald-700 shadow-sm">
+              贴代码
+            </span>
+            <NuxtLink
+              to="/project"
+              class="rounded-full px-3 py-1 text-slate-500 transition hover:text-slate-800"
+            >
+              整个项目
+            </NuxtLink>
+          </nav>
+        </div>
       </div>
     </header>
 

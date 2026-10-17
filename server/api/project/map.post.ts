@@ -84,7 +84,7 @@ export default defineEventHandler(async (event): Promise<MapResult> => {
   const config = useRuntimeConfig(event)
   const fileHeads: MapFileHead[] = parsed.data.fileHeads
 
-  let raw = ''
+  let raw: string
   try {
     raw = await callLlmText(
       {
@@ -97,7 +97,11 @@ export default defineEventHandler(async (event): Promise<MapResult> => {
           { role: 'system', content: PROJECT_MAP_SYSTEM_PROMPT },
           {
             role: 'user',
-            content: buildProjectMapPrompt(parsed.data.projectName, parsed.data.treeText, fileHeads),
+            content: buildProjectMapPrompt(
+              parsed.data.projectName,
+              parsed.data.treeText,
+              fileHeads,
+            ),
           },
         ],
         stream: false,

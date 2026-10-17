@@ -26,8 +26,7 @@ export function detectConcurrencyLimit(): number {
   if (typeof performance === 'undefined') return 5
 
   const nav = performance.getEntriesByType('navigation')[0] as
-    | PerformanceNavigationTiming
-    | undefined
+    PerformanceNavigationTiming | undefined
   const proto = nav?.nextHopProtocol
 
   return proto === 'h2' || proto === 'h3' ? 32 : 5
@@ -110,6 +109,13 @@ export function useProjectAnalysis() {
     }
   }
 
+  /** 已完成数按状态重算，不靠累加 —— 停止后再继续时不会把同一批文件数两遍 */
+  function recountFinished() {
+    finished.value = Object.values(progress).filter(
+      (p) => p.status === 'done' || (p.status === 'error' && p.error !== '已停止'),
+    ).length
+  }
+
   async function processOne(path: string) {
     const inst = ensure(path)
 
@@ -141,7 +147,7 @@ export function useProjectAnalysis() {
     } finally {
       running.delete(path)
       runningCount.value = running.size
-      finished.value++
+      recountFinished()
 
       if (stopped.value) {
         if (running.size === 0) allSettled.value = false
@@ -188,6 +194,15 @@ export function useProjectAnalysis() {
     running.clear()
     runningCount.value = 0
     allSettled.value = false
+    recountFinished()
+  }
+
+  /** 停止之后继续：把所有没完成的文件重新排进队列 */
+  function resume() {
+    stopped.value = false
+    allSettled.value = false
+    queue = [...handles.keys()].filter((path) => progress[path]?.status !== 'done')
+    void pump()
   }
 
   /** 单文件重试：把失败项重新放回队首 */
@@ -226,8 +241,8 @@ export function useProjectAnalysis() {
     for (const stopWatcher of watcherStops) stopWatcher()
     watcherStops.length = 0
 
-    for (const key of Object.keys(instances)) delete instances[key]
-    for (const key of Object.keys(progress)) delete progress[key]
+    for (const key of Object.keys(instances)) Reflect.deleteProperty(instances, key)
+    for (const key of Object.keys(progress)) Reflect.deleteProperty(progress, key)
 
     texts.clear()
     handles.clear()
@@ -256,6 +271,7 @@ export function useProjectAnalysis() {
     stopped,
     start,
     stop,
+    resume,
     retry,
     prioritize,
     reset,

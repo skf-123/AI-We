@@ -109,7 +109,10 @@ export default defineEventHandler(async (event) => {
     headers['X-Project-Truncated'] = String(FILE_MAX)
   }
 
-  return new Response(toTextStream(upstream.body as ReadableStream<Uint8Array>) as unknown as ReadableStream, {
-    headers,
-  })
+  return new Response(
+    toTextStream(upstream.body as ReadableStream<Uint8Array>) as unknown as ReadableStream,
+    {
+      headers,
+    },
+  )
 })

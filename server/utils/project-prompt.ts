@@ -226,9 +226,7 @@ export function buildProjectMapPrompt(
   treeText: string,
   fileHeads: MapFileHead[],
 ): string {
-  const heads = fileHeads
-    .map((f) => `### ${f.path}\n${f.head.trim() || '（空文件）'}`)
-    .join('\n\n')
+  const heads = fileHeads.map((f) => `### ${f.path}\n${f.head.trim() || '（空文件）'}`).join('\n\n')
 
   return `【项目名】${projectName}
 

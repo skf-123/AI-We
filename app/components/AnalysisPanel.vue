@@ -24,6 +24,10 @@ const props = defineProps<{
   done: boolean
   /** 图 JSON 是否已经解析成功 —— 决定要不要显示「图已生成」入口 */
   graphReady: boolean
+  /** 空状态提示。项目入口传自己的文案，默认是贴代码入口那一套 */
+  emptyHint?: string
+  /** 面板标题。项目入口显示当前文件名 */
+  title?: string
 }>()
 
 const emit = defineEmits<{
@@ -212,7 +216,7 @@ defineExpose({ scrollIntoView })
     class="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:h-[calc(100vh-200px)] lg:min-h-[420px] lg:overflow-hidden"
   >
     <div class="mb-3 flex items-center gap-2">
-      <span class="text-sm text-slate-500">解析结果</span>
+      <span class="min-w-0 truncate text-sm text-slate-500">{{ title || '解析结果' }}</span>
       <span
         v-if="loading"
         class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700"
@@ -264,8 +268,11 @@ defineExpose({ scrollIntoView })
       <div v-else-if="isEmpty" class="flex h-full items-center justify-center px-6 text-center">
         <BookLoader v-if="loading" />
         <p v-else class="text-sm leading-relaxed text-slate-400">
-          左边粘贴代码，点「开始解析」。<br />
-          这里会依次出现：逐词逐句 → 局部关系 → 整段作用 → 技术溯源。
+          <template v-if="emptyHint">{{ emptyHint }}</template>
+          <template v-else>
+            左边粘贴代码，点「开始解析」。<br />
+            这里会依次出现：逐词逐句 → 局部关系 → 整段作用 → 技术溯源。
+          </template>
         </p>
       </div>
 

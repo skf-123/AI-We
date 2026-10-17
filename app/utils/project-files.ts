@@ -8,6 +8,16 @@
 
 import type { ProjectFileEntry, ProjectTreeNode } from '~/types/project'
 
+/**
+ * 输入侧上限（快照第十一节第 30 条第 5 小节）。
+ * 这是「别把浏览器拖死」的上限；真正送给模型的项目代码仍按 1.9MB 预算，两者不是一回事。
+ */
+export const PROJECT_LIMITS = {
+  maxTotal: 100 * 1024 * 1024,
+  maxFiles: 10_000,
+  maxSingle: 1024 * 1024,
+} as const
+
 /** 依赖 / 编译产物 / IDE 目录：命中即整棵子树跳过，不经过 LLM */
 export const SYSTEM_DIRS = new Set([
   'node_modules',
@@ -205,10 +215,7 @@ const UNRECORDED_EXTS = new Set([
 
 /** 统一成 / 分隔、去掉开头的 ./ */
 export function normalizePath(path: string): string {
-  return path
-    .replace(/\\/g, '/')
-    .replace(/^\.\//, '')
-    .replace(/\/+/g, '/')
+  return path.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+/g, '/')
 }
 
 function extOf(name: string): string {
@@ -230,10 +237,9 @@ function systemDirOf(path: string): string | null {
   return null
 }
 
-export function classifyFile(path: string): Pick<
-  ProjectFileEntry,
-  'category' | 'skipReason' | 'unrecorded'
-> {
+export function classifyFile(
+  path: string,
+): Pick<ProjectFileEntry, 'category' | 'skipReason' | 'unrecorded'> {
   const name = baseName(path)
   const ext = extOf(name)
   const lower = name.toLowerCase()
@@ -276,6 +282,20 @@ export function makeFileEntry(path: string, size: number): ProjectFileEntry {
   const name = baseName(normalized)
   const meta = classifyFile(normalized)
 
+  // 单文件超过 1 MB：不读内容，只登记位置（拖一个 node_modules 进来也不卡）
+  if (size > PROJECT_LIMITS.maxSingle) {
+    return {
+      path: normalized,
+      name,
+      size,
+      category: 'system',
+      skipReason: '单文件超过 1 MB',
+      unrecorded: false,
+      include: false,
+      configMode: 'context',
+    }
+  }
+
   return {
     path: normalized,
     name,
@@ -300,8 +320,7 @@ export function stripCommonRoot(paths: string[]): { root: string; paths: string[
   const root = firstSegments[0] ?? ''
 
   const shared =
-    Boolean(root) &&
-    normalized.every((p) => p.includes('/') && (p.split('/')[0] ?? '') === root)
+    Boolean(root) && normalized.every((p) => p.includes('/') && (p.split('/')[0] ?? '') === root)
 
   if (!shared) return { root: '', paths: normalized }
 
@@ -475,7 +494,7 @@ export function formatSize(bytes: number): string {
 }
 
 /** 整棵子树是不是全是系统文件（target/、.idea/ 这类） */
-function allSystem(node: ProjectTreeNode): boolean {
+export function allSystem(node: ProjectTreeNode): boolean {
   if (node.type === 'file') return node.file?.category === 'system'
   const children = node.children ?? []
   return children.length > 0 && children.every(allSystem)
@@ -504,9 +523,7 @@ export function treeToText(nodes: ProjectTreeNode[], depth = 0): string {
 
     if (allSystem(node)) {
       const first = node.children?.[0]?.file
-      lines.push(
-        `${pad}- ${node.name}/ [系统：${first?.skipReason ?? '依赖 / 产物'}，已跳过]`,
-      )
+      lines.push(`${pad}- ${node.name}/ [系统：${first?.skipReason ?? '依赖 / 产物'}，已跳过]`)
       continue
     }
 

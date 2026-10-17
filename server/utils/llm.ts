@@ -107,9 +107,9 @@ export async function callLlm(config: LlmRuntimeConfig, opts: LlmCallOptions): P
  */
 export async function callLlmText(config: LlmRuntimeConfig, opts: LlmCallOptions): Promise<string> {
   const res = await callLlm(config, { ...opts, stream: false })
-  const data = (await res.json().catch(() => null)) as
-    | { choices?: { message?: { content?: string } }[] }
-    | null
+  const data = (await res.json().catch(() => null)) as {
+    choices?: { message?: { content?: string } }[]
+  } | null
 
   return data?.choices?.[0]?.message?.content ?? ''
 }

@@ -9,11 +9,7 @@
  * 把端点换成文件节点或分组节点。所以不存两套图，也不发请求。
  */
 
-import type {
-  ProjectGraphData,
-  ProjectGraphEdge,
-  ProjectGraphNode,
-} from '~/types/project'
+import type { ProjectGraphData, ProjectGraphEdge, ProjectGraphNode } from '~/types/project'
 import { normalizePath } from './project-files'
 
 /** 与 server/utils/project-prompt.ts 的 PROJECT_SUMMARY_TITLES 保持一致 */
@@ -64,10 +60,7 @@ function endpointOf(raw: unknown, nodeIds: Set<string>, knownPaths: Set<string>)
  *   · 重复的边 → 去重
  *   · 节点超过 12 个 → 只留前 12 个（提示词要求 5~12）
  */
-export function sanitizeProjectGraph(
-  raw: unknown,
-  knownPaths: string[],
-): ProjectGraphData | null {
+export function sanitizeProjectGraph(raw: unknown, knownPaths: string[]): ProjectGraphData | null {
   if (!raw || typeof raw !== 'object') return null
 
   const source = raw as { nodes?: unknown; edges?: unknown }
@@ -108,8 +101,7 @@ export function sanitizeProjectGraph(
         seen.add(path)
         files.push({
           path,
-          role:
-            typeof fileRow.role === 'string' ? fileRow.role.trim().slice(0, 30) : undefined,
+          role: typeof fileRow.role === 'string' ? fileRow.role.trim().slice(0, 30) : undefined,
         })
       }
     }
