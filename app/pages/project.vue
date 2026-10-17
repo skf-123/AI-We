@@ -146,7 +146,7 @@ onBeforeUnmount(() => {
 
       <!-- 目录树 + 逐文件结果 -->
       <template v-else>
-        <div class="grid gap-4 lg:grid-cols-2">
+        <div class="grid gap-4 lg:grid-cols-2 lg:items-stretch">
           <section
             class="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
           >
@@ -250,11 +250,15 @@ onBeforeUnmount(() => {
             :output="activeProgress?.output ?? ''"
             :sources="activeProgress?.sources ?? []"
             :error-msg="activeProgress?.error ?? ''"
-            :loading="activeProgress?.status === 'running'"
+            :loading="
+              activeProgress?.status === 'running' ||
+              (started && activeProgress?.status === 'pending')
+            "
             :done="activeProgress?.status === 'done'"
             :graph-ready="false"
-            :title="activeTitle"
+            :subtitle="activeTitle"
             :empty-hint="emptyHint"
+            fill-height
           />
         </div>
 

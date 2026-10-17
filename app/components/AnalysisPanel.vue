@@ -26,8 +26,16 @@ const props = defineProps<{
   graphReady: boolean
   /** 空状态提示。项目入口传自己的文案，默认是贴代码入口那一套 */
   emptyHint?: string
-  /** 面板标题。项目入口显示当前文件名 */
+  /** 面板标题。默认「解析结果」 */
   title?: string
+  /** 标题下面那一行补充信息；项目入口显示当前文件路径 */
+  subtitle?: string
+  /**
+   * 高度模式。
+   * false：贴代码入口，锁一屏高度（桌面端）
+   * true：项目入口，跟随左侧目录树的高度（grid 行高由左栏决定）
+   */
+  fillHeight?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -213,20 +221,28 @@ defineExpose({ scrollIntoView })
 <template>
   <section
     ref="panelRef"
-    class="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:h-[calc(100vh-200px)] lg:min-h-[420px] lg:overflow-hidden"
+    class="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:overflow-hidden"
+    :class="fillHeight ? 'lg:h-full lg:min-h-0' : 'lg:h-[calc(100vh-200px)] lg:min-h-[420px]'"
   >
-    <div class="mb-3 flex items-center gap-2">
-      <span class="min-w-0 truncate text-sm text-slate-500">{{ title || '解析结果' }}</span>
+    <div class="mb-3 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+      <span class="shrink-0 text-sm text-slate-500">{{ title || '解析结果' }}</span>
+      <span
+        v-if="subtitle"
+        class="min-w-0 truncate font-mono text-[11.5px] text-slate-400"
+        :title="subtitle"
+      >
+        {{ subtitle }}
+      </span>
       <span
         v-if="loading"
-        class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700"
+        class="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700"
       >
         <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
         正在解析
       </span>
       <span
         v-else-if="done && !errorMsg"
-        class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"
+        class="ml-auto shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"
       >
         已完成
       </span>
