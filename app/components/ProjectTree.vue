@@ -15,13 +15,23 @@ const props = defineProps<{
   progress: Record<string, FileProgress>
   loadingNotes?: boolean
   notesDegraded?: boolean
+  /** 当前选中的文件夹（高亮） */
+  selectedFolder?: string | null
+  /** 当前展示的文件（高亮） */
+  activePath?: string | null
 }>()
 
 const emit = defineEmits<{
   (e: 'toggle-file' | 'open-file' | 'retry', path: string): void
-  (e: 'toggle-folder', node: ProjectTreeNode): void
+  (e: 'toggle-folder' | 'select-folder', node: ProjectTreeNode): void
   (e: 'config-mode', path: string, mode: ConfigMode): void
 }>()
+
+/** 选中文件夹时顺手展开它；展开状态仍由这里统一持有 */
+function onSelectFolder(node: ProjectTreeNode) {
+  openMap[node.path] = true
+  emit('select-folder', node)
+}
 
 const openMap = reactive<Record<string, boolean>>({})
 
@@ -97,12 +107,15 @@ function setAllOpen(value: boolean) {
           :depth="0"
           :open="openMap[node.path] ?? true"
           :open-map="openMap"
+          :selected-folder="selectedFolder"
+          :active-path="activePath"
           @toggle-file="(p) => emit('toggle-file', p)"
           @toggle-folder="(n) => emit('toggle-folder', n)"
           @config-mode="(p, m) => emit('config-mode', p, m)"
           @open-file="(p) => emit('open-file', p)"
           @retry="(p) => emit('retry', p)"
           @toggle-open="toggleOpen"
+          @select-folder="onSelectFolder"
         />
       </ul>
     </div>

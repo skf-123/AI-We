@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ProjectTreeNode } from '~/types/project'
 import { useProjectSession, type ProjectSelectionPayload } from '~/composables/useProjectSession'
 import { formatSize } from '~/utils/project-files'
 
@@ -40,6 +41,7 @@ const {
   tree,
   stats,
   queueFiles,
+  activePath,
   activeProgress,
   totalBytes,
   stepIndex,
@@ -48,6 +50,11 @@ const {
   summaryHasResult,
   canGenerateSummary,
   doneCount,
+  selectedFolder,
+  selectedGroup,
+  selectionFiles,
+  selectionLabel,
+  crossFileNotes,
   activeTitle,
   emptyHint,
   selectProject,
@@ -56,6 +63,8 @@ const {
   toggleFolder,
   setConfigMode,
   openFile,
+  selectFolder,
+  selectGroup,
   startParsing,
   stopParsing,
   resumeParsing,
@@ -73,16 +82,32 @@ function onSelect(payload: ProjectSelectionPayload) {
 
 function onOpenFile(path: string) {
   openFile(path)
-  scrollToAnalysisOnMobile()
+  scrollToAnalysis()
+}
+
+function onSelectFolder(node: ProjectTreeNode) {
+  selectFolder(node)
+  scrollToAnalysis()
+}
+
+function onGraphSelectFile(path: string) {
+  openFile(path)
+  scrollToAnalysis(true)
+}
+
+function onGraphSelectGroup(id: string) {
+  selectGroup(id)
+  scrollToAnalysis(true)
 }
 
 async function onStart() {
   const ok = await startParsing()
-  if (ok) scrollToAnalysisOnMobile()
+  if (ok) scrollToAnalysis()
 }
 
-function scrollToAnalysisOnMobile() {
-  if (window.matchMedia('(max-width: 1023px)').matches) {
+/** 项目图在页面下方，从图里选中后把右侧面板带回视野 */
+function scrollToAnalysis(always = false) {
+  if (always || window.matchMedia('(max-width: 1023px)').matches) {
     nextTick(() => analysisRef.value?.scrollIntoView())
   }
 }
@@ -186,11 +211,14 @@ onBeforeUnmount(() => {
               :progress="progress"
               :loading-notes="mapLoading"
               :notes-degraded="mapDegraded"
+              :selected-folder="selectedFolder"
+              :active-path="activePath"
               @toggle-file="toggleFile"
               @toggle-folder="toggleFolder"
               @config-mode="setConfigMode"
               @open-file="onOpenFile"
               @retry="retryFile"
+              @select-folder="onSelectFolder"
             />
 
             <div
@@ -245,21 +273,76 @@ onBeforeUnmount(() => {
             <p class="px-4 pb-3 text-[11px] text-slate-400">解析结果只保存在当前页面，刷新会丢。</p>
           </section>
 
-          <AnalysisPanel
-            ref="analysisRef"
-            :output="activeProgress?.output ?? ''"
-            :sources="activeProgress?.sources ?? []"
-            :error-msg="activeProgress?.error ?? ''"
-            :loading="
-              activeProgress?.status === 'running' ||
-              (started && activeProgress?.status === 'pending')
-            "
-            :done="activeProgress?.status === 'done'"
-            :graph-ready="false"
-            :subtitle="activeTitle"
-            :empty-hint="emptyHint"
-            fill-height
-          />
+          <div class="relative min-w-0 lg:min-h-0">
+            <div class="flex min-w-0 flex-col gap-2 lg:absolute lg:inset-0 lg:min-h-0">
+              <!-- 选中文件夹 / 项目图分组时，右侧先列出范围内的文件；点一下切过去 -->
+              <div
+                v-if="selectionFiles.length > 1"
+                class="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-sm"
+              >
+                <div class="flex flex-wrap items-center gap-2 px-1 pb-1.5">
+                  <span class="min-w-0 truncate text-[11px] text-slate-400">{{
+                    selectionLabel
+                  }}</span>
+                  <span class="text-[11px] text-slate-400"
+                    >· {{ selectionFiles.length }} 个文件</span
+                  >
+                  <span class="ml-auto text-[10px] text-slate-300">点文件切换右侧结果</span>
+                </div>
+
+                <div class="flex flex-wrap gap-1">
+                  <button
+                    v-for="file in selectionFiles"
+                    :key="file.path"
+                    type="button"
+                    class="max-w-full truncate rounded-md border px-2 py-1 font-mono text-[10.5px] transition"
+                    :class="
+                      file.path === activePath
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                        : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                    "
+                    :title="file.path"
+                    @click="onOpenFile(file.path)"
+                  >
+                    {{ file.name }}
+                  </button>
+                </div>
+
+                <details v-if="crossFileNotes.length" class="mt-2 border-t border-slate-100 pt-2">
+                  <summary class="cursor-pointer select-none text-[11px] text-slate-500">
+                    跨文件线索（各文件第三段，共 {{ crossFileNotes.length }} 条）
+                  </summary>
+                  <div class="mt-2 max-h-40 space-y-2 overflow-y-auto pr-1">
+                    <div v-for="note in crossFileNotes" :key="note.path">
+                      <p class="truncate font-mono text-[10px] text-slate-400" :title="note.path">
+                        {{ note.path }}
+                      </p>
+                      <p class="whitespace-pre-wrap text-[11px] leading-relaxed text-slate-600">
+                        {{ note.text }}
+                      </p>
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              <AnalysisPanel
+                ref="analysisRef"
+                class="min-h-0 flex-1"
+                :output="activeProgress?.output ?? ''"
+                :sources="activeProgress?.sources ?? []"
+                :error-msg="activeProgress?.error ?? ''"
+                :loading="
+                  activeProgress?.status === 'running' ||
+                  (started && activeProgress?.status === 'pending')
+                "
+                :done="activeProgress?.status === 'done'"
+                :graph-ready="false"
+                :subtitle="activeTitle"
+                :empty-hint="emptyHint"
+                fill-height
+              />
+            </div>
+          </div>
         </div>
 
         <!-- 全部解析完 → 手动生成项目总览与项目图 -->
@@ -339,7 +422,13 @@ onBeforeUnmount(() => {
           </article>
 
           <div v-if="summaryGraph" class="mt-4">
-            <ProjectGraph :data="summaryGraph" />
+            <ProjectGraph
+              :data="summaryGraph"
+              :selected-group="selectedGroup"
+              :active-path="activePath"
+              @select-file="onGraphSelectFile"
+              @select-group="onGraphSelectGroup"
+            />
           </div>
           <p v-else-if="summaryDone && !summaryGraph" class="mt-3 text-xs text-amber-700">
             项目图没有解析成功，上面的项目文字仍然有效。

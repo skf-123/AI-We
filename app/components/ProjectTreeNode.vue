@@ -17,11 +17,15 @@ const props = defineProps<{
   open: boolean
   /** 所有文件夹的展开状态，递归往下传 */
   openMap: Record<string, boolean>
+  /** 当前选中的文件夹 */
+  selectedFolder?: string | null
+  /** 当前展示的文件 */
+  activePath?: string | null
 }>()
 
 const emit = defineEmits<{
   (e: 'toggle-file' | 'open-file' | 'retry' | 'toggle-open', path: string): void
-  (e: 'toggle-folder', node: ProjectTreeNode): void
+  (e: 'toggle-folder' | 'select-folder', node: ProjectTreeNode): void
   (e: 'config-mode', path: string, mode: ConfigMode): void
 }>()
 
@@ -81,8 +85,12 @@ function onFileCheck() {
     <!-- 文件夹 -->
     <div
       v-if="!isFile"
-      class="flex min-h-[31px] items-center gap-2 rounded-lg px-2 py-1 hover:bg-slate-50"
-      :class="{ 'opacity-65': isSystemFolder }"
+      class="flex min-h-[31px] items-center gap-2 rounded-lg px-2 py-1"
+      :class="{
+        'bg-emerald-50 ring-1 ring-emerald-200': selectedFolder === node.path,
+        'hover:bg-slate-50': selectedFolder !== node.path,
+        'opacity-65': isSystemFolder,
+      }"
     >
       <input
         type="checkbox"
@@ -114,7 +122,7 @@ function onFileCheck() {
       <button
         type="button"
         class="truncate text-[13px] font-semibold text-slate-700"
-        @click="emit('toggle-open', node.path)"
+        @click="emit('select-folder', node)"
       >
         {{ node.name }}
       </button>
@@ -150,20 +158,27 @@ function onFileCheck() {
         :depth="depth + 1"
         :open="openMap[child.path] ?? true"
         :open-map="openMap"
+        :selected-folder="selectedFolder"
+        :active-path="activePath"
         @toggle-file="(p) => emit('toggle-file', p)"
         @toggle-folder="(n) => emit('toggle-folder', n)"
         @config-mode="(p, m) => emit('config-mode', p, m)"
         @open-file="(p) => emit('open-file', p)"
         @retry="(p) => emit('retry', p)"
         @toggle-open="(p) => emit('toggle-open', p)"
+        @select-folder="(n) => emit('select-folder', n)"
       />
     </ul>
 
     <!-- 文件 -->
     <div
       v-if="isFile"
-      class="flex min-h-[31px] items-center gap-2 rounded-lg px-2 py-1 hover:bg-slate-50"
-      :class="{ 'opacity-60': file?.category === 'system' }"
+      class="flex min-h-[31px] items-center gap-2 rounded-lg px-2 py-1"
+      :class="{
+        'bg-emerald-50 ring-1 ring-emerald-200': activePath === node.path,
+        'hover:bg-slate-50': activePath !== node.path,
+        'opacity-60': file?.category === 'system',
+      }"
     >
       <input
         type="checkbox"

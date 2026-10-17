@@ -31,7 +31,17 @@ import { defaultCollapsed, resolveGraphEdges } from '~/utils/project-graph'
  * dagre 负责算位置（与 GraphView 一致），Vue Flow 负责渲染与交互。
  */
 
-const props = defineProps<{ data: ProjectGraphData }>()
+const props = defineProps<{
+  data: ProjectGraphData
+  /** 当前选中的分组节点 */
+  selectedGroup?: string | null
+  /** 当前展示的文件 */
+  activePath?: string | null
+}>()
+
+const emit = defineEmits<{
+  (e: 'select-file' | 'select-group', value: string): void
+}>()
 
 const GRAPH_ID = 'project-graph'
 
@@ -144,6 +154,7 @@ const layout = computed(() => {
           detail: node.detail,
           filesCount: node.files!.length,
           expanded: true,
+          active: Boolean(node.files?.some((f) => f.path === props.activePath)),
         },
       })
 
@@ -192,6 +203,7 @@ const layout = computed(() => {
           detail: node.detail,
           filesCount: isGroup ? node.files!.length : 0,
           expanded: false,
+          active: Boolean(node.files?.some((f) => f.path === props.activePath)),
         },
       })
     }
@@ -377,13 +389,19 @@ onBeforeUnmount(() => {
           <!-- 普通节点：独立节点 / 收起的分组 / 展开后的分组头 -->
           <template #node-wb="p">
             <div
-              class="rounded-lg border px-3 py-2 shadow-sm"
+              class="rounded-lg border px-3 py-2 shadow-sm transition"
+              :class="{
+                'ring-2 ring-emerald-400 ring-offset-1':
+                  p.data.filesCount && (p.data.nodeId === selectedGroup || p.data.active),
+                'cursor-pointer': p.data.filesCount,
+              }"
               :style="{
                 width: `${NODE_W}px`,
                 minHeight: `${p.data.kind === 'header' ? HEADER_H : NODE_H}px`,
                 borderColor: styleOf(p.data.type).border,
                 background: styleOf(p.data.type).bg,
               }"
+              @click.stop="p.data.filesCount && emit('select-group', p.data.nodeId)"
             >
               <div class="flex items-center gap-1.5">
                 <span
@@ -425,8 +443,10 @@ onBeforeUnmount(() => {
           <!-- 展开后的文件卡片 -->
           <template #node-file="p">
             <div
-              class="flex h-full items-center gap-2 rounded-lg border border-emerald-200 border-l-[3px] border-l-emerald-500 bg-white px-2.5 shadow-sm"
+              class="flex h-full cursor-pointer items-center gap-2 rounded-lg border border-emerald-200 border-l-[3px] border-l-emerald-500 bg-white px-2.5 shadow-sm transition"
+              :class="{ 'ring-2 ring-emerald-400 ring-offset-1': p.data.path === activePath }"
               :style="{ width: `${FILE_W}px`, height: `${FILE_H}px` }"
+              @click.stop="emit('select-file', p.data.path)"
             >
               <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
               <div class="min-w-0">

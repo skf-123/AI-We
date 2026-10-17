@@ -222,7 +222,7 @@ defineExpose({ scrollIntoView })
   <section
     ref="panelRef"
     class="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:overflow-hidden"
-    :class="fillHeight ? 'lg:h-full lg:min-h-0' : 'lg:h-[calc(100vh-200px)] lg:min-h-[420px]'"
+    :class="fillHeight ? 'lg:min-h-0' : 'lg:h-[calc(100vh-200px)] lg:min-h-[420px]'"
   >
     <div class="mb-3 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
       <span class="shrink-0 text-sm text-slate-500">{{ title || '解析结果' }}</span>

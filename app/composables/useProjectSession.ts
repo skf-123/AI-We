@@ -33,6 +33,12 @@ import { useProjectSummary } from './useProjectSummary'
 /** 汇总输入的字符预算：role 总长度到这里就停止加入，避免一次调用被撑爆 */
 export const SUMMARY_CHAR_BUDGET = 300_000
 
+/** 文件所在目录；根目录文件返回 null */
+function folderOf(path: string): string | null {
+  const i = path.lastIndexOf('/')
+  return i === -1 ? null : path.slice(0, i)
+}
+
 export interface ProjectSelectionPayload {
   root: string
   files: { path: string; file: File }[]
@@ -49,6 +55,10 @@ export function useProjectSession() {
   const uploadError = ref('')
   /** 因预算未纳入汇总的文件数（0 表示全部纳入） */
   const summarySkippedCount = ref(0)
+  /** 目录树里选中的文件夹；选中文件时也设为它的父目录 */
+  const selectedFolder = ref<string | null>(null)
+  /** 项目图里选中的分组节点 id */
+  const selectedGroup = ref<string | null>(null)
 
   /** 文件内容按路径存放：地图只读头部，逐文件解析时才整份读 */
   const fileHandles = new Map<string, File>()
@@ -91,6 +101,43 @@ export function useProjectSession() {
   )
   const doneCount = computed(() => doneFiles.value.length)
 
+  /** 项目图里当前选中的分组节点 */
+  const selectedGroupNode = computed(() => {
+    if (!selectedGroup.value) return null
+    return summaryGraph.value?.nodes.find((n) => n.id === selectedGroup.value) ?? null
+  })
+
+  /**
+   * 当前选中范围里的文件（文件夹或图分组）。
+   * 选中单个文件时，范围是它所在的文件夹 —— 这样右侧可以显示同目录的兄弟文件。
+   */
+  const selectionFiles = computed(() => {
+    if (selectedGroup.value) {
+      const paths = new Set(selectedGroupNode.value?.files?.map((f) => f.path) ?? [])
+      return queueFiles.value.filter((f) => paths.has(f.path))
+    }
+    if (selectedFolder.value) {
+      const prefix = `${selectedFolder.value}/`
+      return queueFiles.value.filter((f) => f.path.startsWith(prefix))
+    }
+    return []
+  })
+
+  const selectionLabel = computed(() => {
+    if (selectedGroup.value) return selectedGroupNode.value?.label ?? selectedGroup.value
+    return selectedFolder.value ?? ''
+  })
+
+  /** 文件夹 / 分组里各文件第三段的摘录，给「跨文件线索」用 */
+  const crossFileNotes = computed(() =>
+    selectionFiles.value
+      .map((file) => ({
+        path: file.path,
+        text: thirdSection(pool.progress[file.path]?.output ?? '').slice(0, 240),
+      }))
+      .filter((note) => note.text),
+  )
+
   /** 点击生成按钮的条件：解析已落定、不是被停止、至少有一个成功文件 */
   const canGenerateSummary = computed(
     () =>
@@ -102,13 +149,23 @@ export function useProjectSession() {
   )
 
   const activeTitle = computed(() => {
-    if (!activeEntry.value) return '解析结果'
+    if (!activeEntry.value) {
+      if (selectedFolder.value) return selectedFolder.value
+      if (selectedGroupNode.value) return selectedGroupNode.value.label
+      return ''
+    }
     return activeProgress.value?.truncated
       ? `${activeEntry.value.path}（已截断）`
       : activeEntry.value.path
   })
 
   const emptyHint = computed(() => {
+    if (selectedFolder.value && selectionFiles.value.length === 0) {
+      return '这个文件夹里没有勾选要解析的文件。'
+    }
+    if (selectedGroup.value && selectionFiles.value.length === 0) {
+      return '这个分组里没有可解析的文件。'
+    }
     if (!started.value) {
       return '勾选文件后点「开始解析」；这里会显示当前文件的四段解释。'
     }
@@ -187,12 +244,49 @@ export function useProjectSession() {
 
   // ---------------------------------------------------------------- 解析
 
+  /** 在候选文件里挑一个优先展示的：已完成 > 解析中 > 第一个 */
+  function pickDefault(list: ProjectFileEntry[]): ProjectFileEntry | null {
+    return (
+      list.find((f) => pool.progress[f.path]?.status === 'done') ??
+      list.find((f) => pool.progress[f.path]?.status === 'running') ??
+      list[0] ??
+      null
+    )
+  }
+
   function openFile(path: string) {
     const entry = files.value.find((f) => f.path === path)
     if (!entry || entry.category === 'system') return
 
     activePath.value = path
+    selectedFolder.value = folderOf(path)
+    selectedGroup.value = null
     if (started.value && !pool.allSettled.value) pool.prioritize(path)
+  }
+
+  /** 选中目录树里的文件夹：右侧切到该文件夹下的文件，文件夹高亮 */
+  function selectFolder(node: ProjectTreeNode) {
+    if (node.type !== 'folder') return
+
+    selectedFolder.value = node.path
+    selectedGroup.value = null
+
+    const prefix = `${node.path}/`
+    const inFolder = queueFiles.value.filter((f) => f.path.startsWith(prefix))
+    activePath.value = pickDefault(inFolder)?.path ?? null
+  }
+
+  /** 选中项目图里的分组节点：右侧切到该分组下的文件，分组高亮 */
+  function selectGroup(id: string) {
+    const node = summaryGraph.value?.nodes.find((n) => n.id === id)
+    if (!node) return
+
+    selectedGroup.value = id
+    selectedFolder.value = null
+
+    const paths = new Set(node.files?.map((f) => f.path) ?? [])
+    const inGroup = queueFiles.value.filter((f) => paths.has(f.path))
+    activePath.value = pickDefault(inGroup)?.path ?? null
   }
 
   /** 返回 true 表示真的开始了（页面据此决定要不要滚到结果区） */
@@ -276,6 +370,8 @@ export function useProjectSession() {
     files.value = []
     fileHandles.clear()
     activePath.value = null
+    selectedFolder.value = null
+    selectedGroup.value = null
     started.value = false
     phase.value = 'upload'
     uploadError.value = ''
@@ -329,6 +425,12 @@ export function useProjectSession() {
     summaryHasResult,
     canGenerateSummary,
     doneCount,
+    selectedFolder,
+    selectedGroup,
+    selectedGroupNode,
+    selectionFiles,
+    selectionLabel,
+    crossFileNotes,
     activeTitle,
     emptyHint,
     // 动作
@@ -338,6 +440,8 @@ export function useProjectSession() {
     toggleFolder,
     setConfigMode,
     openFile,
+    selectFolder,
+    selectGroup,
     startParsing,
     stopParsing,
     resumeParsing,
