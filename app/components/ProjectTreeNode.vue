@@ -13,19 +13,20 @@ const props = defineProps<{
   node: ProjectTreeNode
   progress: Record<string, FileProgress>
   depth: number
+  /** 当前文件夹是否展开。展开状态由 ProjectTree 统一持有，这里只读 */
+  open: boolean
+  /** 所有文件夹的展开状态，递归往下传 */
+  openMap: Record<string, boolean>
 }>()
 
 const emit = defineEmits<{
-  (e: 'toggle-file' | 'open-file' | 'retry', path: string): void
+  (e: 'toggle-file' | 'open-file' | 'retry' | 'toggle-open', path: string): void
   (e: 'toggle-folder', node: ProjectTreeNode): void
   (e: 'config-mode', path: string, mode: ConfigMode): void
 }>()
 
 const isFile = computed(() => props.node.type === 'file')
 const isSystemFolder = computed(() => !isFile.value && allSystem(props.node))
-
-/** 系统分支默认收起，其余默认展开 */
-const open = ref(!isSystemFolder.value)
 
 const folderChecked = computed(
   () => props.node.selectableCount > 0 && props.node.selectedCount === props.node.selectableCount,
@@ -95,7 +96,7 @@ function onFileCheck() {
         type="button"
         class="w-3 shrink-0 text-[10px] text-slate-400"
         :aria-label="open ? '收起' : '展开'"
-        @click="open = !open"
+        @click="emit('toggle-open', node.path)"
       >
         {{ open ? '▾' : '▸' }}
       </button>
@@ -113,7 +114,7 @@ function onFileCheck() {
       <button
         type="button"
         class="truncate text-[13px] font-semibold text-slate-700"
-        @click="open = !open"
+        @click="emit('toggle-open', node.path)"
       >
         {{ node.name }}
       </button>
@@ -147,11 +148,14 @@ function onFileCheck() {
         :node="child"
         :progress="progress"
         :depth="depth + 1"
+        :open="openMap[child.path] ?? true"
+        :open-map="openMap"
         @toggle-file="(p) => emit('toggle-file', p)"
         @toggle-folder="(n) => emit('toggle-folder', n)"
         @config-mode="(p, m) => emit('config-mode', p, m)"
         @open-file="(p) => emit('open-file', p)"
         @retry="(p) => emit('retry', p)"
+        @toggle-open="(p) => emit('toggle-open', p)"
       />
     </ul>
 
