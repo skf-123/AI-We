@@ -12,6 +12,17 @@ export default defineNuxtConfig({
 
   vite: {
     plugins: [tailwindcss()],
+    // 这些依赖在项目页第一次渲染时才会被用到；不预打包的话，Vite 会在
+    // 运行中现发现、然后整页刷新一次，正在上传/解析的页面会被冲掉。
+    optimizeDeps: {
+      include: [
+        '@vue-flow/background',
+        '@vue-flow/controls',
+        '@vue-flow/core',
+        'dagre',
+        'markdown-it',
+      ],
+    },
   },
 
   app: {
