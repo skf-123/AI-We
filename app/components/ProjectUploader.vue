@@ -9,8 +9,8 @@ import { normalizePath, PROJECT_LIMITS, stripCommonRoot } from '~/utils/project-
  *   · 拖入：DataTransferItem.webkitGetAsEntry 递归读目录
  * 两条路都不需要解压，也不需要额外的 zip 依赖。
  *
- * 上限在这里先挡一次（100 MB / 10000 个 / 单文件 1 MB 的分类在纯函数里做），
- * 免得把浏览器拖死；真正的项目代码预算另算。
+ * 上限在这里先挡一次（整个文件夹 100 MB / 文件数 20000），免得把浏览器拖死；
+ * 用户相关文件的选中总量 1.9 MB 预算在纯函数与页面里算，和这两个上限不是一回事。
  */
 
 const emit = defineEmits<{

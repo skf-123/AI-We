@@ -19,7 +19,7 @@ export const PROJECT_LIMITS = {
   /** 整个文件夹（拖入时）的原始大小上限，防止把浏览器拖死 */
   maxTotal: 100 * 1024 * 1024,
   /** 文件数上限 */
-  maxFiles: 10_000,
+  maxFiles: 20_000,
   /** 用户相关文件选中总量的上限；依赖 / 产物不计入 */
   maxUserBytes: Math.round(1.9 * 1024 * 1024),
 } as const
