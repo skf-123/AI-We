@@ -16,6 +16,10 @@ const props = defineProps<{
   round: number
   maxRounds: number
   fallback?: boolean
+  /** 组件标题：项目侦查 / 图自检 */
+  title?: string
+  /** 失败时显示的说明 */
+  errorText?: string
 }>()
 
 const emit = defineEmits<{
@@ -26,7 +30,9 @@ const emit = defineEmits<{
 <template>
   <section class="shrink-0 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
     <div class="flex flex-wrap items-center gap-2">
-      <span class="text-[11px] font-medium text-slate-600">Agent 侦查</span>
+      <span class="text-[11px] font-medium text-slate-600">
+        {{ props.title || 'Agent 侦查' }}
+      </span>
 
       <span
         v-if="props.running"
@@ -36,7 +42,7 @@ const emit = defineEmits<{
         正在决定下一步
       </span>
       <span v-else-if="props.error" class="text-[10.5px] text-rose-600">
-        未完成，已回退到固定地图
+        {{ props.errorText || '未完成，已回退到固定地图' }}
       </span>
       <span v-else-if="props.stopped" class="text-[10.5px] text-amber-700">已停止</span>
       <span v-else-if="props.fallback" class="text-[10.5px] text-amber-700">

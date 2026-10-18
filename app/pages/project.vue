@@ -37,6 +37,13 @@ const {
   agentRounds,
   agentMaxRounds,
   stopAgent,
+  selfCheckRunning,
+  selfCheckStopped,
+  selfCheckError,
+  selfCheckSteps,
+  selfCheckRounds,
+  selfCheckMaxRounds,
+  stopSelfCheck,
   progress,
   total,
   finished,
@@ -56,7 +63,7 @@ const {
   totalBytes,
   stepIndex,
   summaryText,
-  summaryGraph,
+  displayGraph,
   summaryHasResult,
   canGenerateSummary,
   doneCount,
@@ -528,16 +535,30 @@ onBeforeUnmount(() => {
             <MarkdownBlock :text="summaryText" />
           </article>
 
-          <div v-if="summaryGraph" class="mt-4">
+          <!-- 图自检：有轨迹、可打断；失败就保留原图 -->
+          <AgentTrace
+            v-if="selfCheckRunning || selfCheckSteps.length || selfCheckError"
+            title="图自检"
+            error-text="自检未完成，保留原图"
+            :steps="selfCheckSteps"
+            :running="selfCheckRunning"
+            :stopped="selfCheckStopped"
+            :error="selfCheckError"
+            :round="selfCheckRounds"
+            :max-rounds="selfCheckMaxRounds"
+            @stop="stopSelfCheck"
+          />
+
+          <div v-if="displayGraph" class="mt-4">
             <ProjectGraph
-              :data="summaryGraph"
+              :data="displayGraph"
               :selected-group="selectedGroup"
               :active-path="activePath"
               @select-file="onGraphSelectFile"
               @select-group="onGraphSelectGroup"
             />
           </div>
-          <p v-else-if="summaryDone && !summaryGraph" class="mt-3 text-xs text-amber-700">
+          <p v-else-if="summaryDone && !displayGraph" class="mt-3 text-xs text-amber-700">
             项目图没有解析成功，上面的项目文字仍然有效。
           </p>
         </section>

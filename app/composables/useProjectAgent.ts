@@ -1,16 +1,19 @@
-import type { ProjectFileEntry } from '~/types/project'
+import type { ProjectFileEntry, ProjectGraphData } from '~/types/project'
 import { createProjectToolExecutor } from '~/utils/project-tools'
+import { sanitizeProjectGraph } from '~/utils/project-graph'
 
 /**
- * 项目侦查 Agent 的循环。
+ * 项目 Agent 的循环。一个实例只跑一种任务：
+ *   run           项目侦查，产出项目地图
+ *   runSelfCheck  图自检，产出修正后的项目图
  *
  * 服务端只做单轮模型代理；这里负责：
- *   规划循环 → 执行浏览器里的只读工具 → 把结果作为 tool 消息发回 → 直到模型给出地图
+ *   规划循环 → 执行浏览器里的只读工具 → 把结果作为 tool 消息发回 → 直到模型给出 JSON
  *
  * 边界：
- *   · 最多工具轮数 = min(需要解析的文件数, 40)
+ *   · 最多工具轮数 = min(需要解析的文件数, 40)；自检再收紧到 10
  *   · 整段对话按字符数卡在 1.4M 以内（同一个模型上下文，不是新额度）
- *   · 任何一步失败/用户停止 → 返回 null，调用方回退到原来的固定地图
+ *   · 任何一步失败/用户停止 → 返回 null，调用方回退到原来的结果
  *
  * 不碰 DOM，也不认识目录树 / 项目图组件。
  */
@@ -42,16 +45,35 @@ export interface ProjectAgentInput {
   getFile: (path: string) => File | undefined
 }
 
+export interface ProjectSelfCheckInput {
+  graph: ProjectGraphData
+  projectContext: string
+  entries: ProjectFileEntry[]
+  parseCount: number
+  readablePaths: string[]
+  getFile: (path: string) => File | undefined
+}
+
 const MAX_ROUNDS_HARD = 40
+const MAX_SELF_CHECK_ROUNDS = 10
 const MAX_CONTEXT_CHARS = 1_400_000
 const MAX_TREE_CHARS = 150_000
+const MAX_CONTEXT_TEXT = 100_000
 const MAX_READABLE_LIST = 300
 
-interface AgentMessage {
+type AgentMessage = {
   role: 'user' | 'assistant' | 'tool'
   content: string
   tool_call_id?: string
   tool_calls?: unknown[]
+}
+
+interface LoopOptions<T> {
+  mode: 'map' | 'self-check'
+  initialContent: string
+  maxRounds: number
+  executor: ReturnType<typeof createProjectToolExecutor>
+  parse: (content: string) => T | null
 }
 
 function extractJson(text: string): unknown {
@@ -126,19 +148,23 @@ export function useProjectAgent() {
   const stopped = ref(false)
   const error = ref('')
   const steps = ref<AgentStep[]>([])
-  const result = ref<ProjectAgentMapResult | null>(null)
+  const result = ref<unknown>(null)
   const rounds = ref(0)
   const maxRounds = ref(0)
 
   let controller: AbortController | null = null
 
-  async function ask(messages: AgentMessage[], final: boolean): Promise<AgentMessage> {
+  async function ask(
+    mode: 'map' | 'self-check',
+    messages: AgentMessage[],
+    final: boolean,
+  ): Promise<AgentMessage> {
     controller ??= new AbortController()
 
     const res = await fetch('/api/project/agent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'map', final, messages }),
+      body: JSON.stringify({ mode, final, messages }),
       signal: controller.signal,
     })
 
@@ -157,50 +183,18 @@ export function useProjectAgent() {
     return data.message ?? { role: 'assistant', content: '' }
   }
 
-  async function run(input: ProjectAgentInput): Promise<ProjectAgentMapResult | null> {
+  async function runLoop<T>(options: LoopOptions<T>): Promise<T | null> {
     reset()
     running.value = true
+    maxRounds.value = options.maxRounds
 
-    const executor = createProjectToolExecutor({
-      entries: input.entries,
-      readablePaths: input.readablePaths,
-      getFile: input.getFile,
-    })
-
-    const readable = input.entries.filter((entry) => input.readablePaths.includes(entry.path))
-    const readableList = readable
-      .slice(0, MAX_READABLE_LIST)
-      .map((entry) => `- ${entry.path} (${entry.size} B)`)
-      .join('\n')
-
-    const treeText =
-      input.treeText.length > MAX_TREE_CHARS
-        ? input.treeText.slice(0, MAX_TREE_CHARS) + '\n……目录树太长，已截断'
-        : input.treeText
-
-    const messages: AgentMessage[] = [
-      {
-        role: 'user',
-        content: `项目名：${input.projectName}
-需要解析的文件数：${input.parseCount}
-
-【目录树】
-${treeText}
-
-【已勾选、可读取的文件（最多列出 ${MAX_READABLE_LIST} 个，读取时只能用这些路径）】
-${readableList || '（没有可读文件）'}
-
-请开始侦查：先判断项目像什么，再按需读配置和关键文件，最后输出项目地图 JSON。`,
-      },
-    ]
-
-    maxRounds.value = Math.max(1, Math.min(input.parseCount || 1, MAX_ROUNDS_HARD))
+    const messages: AgentMessage[] = [{ role: 'user', content: options.initialContent }]
 
     try {
-      for (let round = 1; round <= maxRounds.value; round++) {
+      for (let round = 1; round <= options.maxRounds; round++) {
         if (stopped.value) return null
 
-        const message = await ask(messages, false)
+        const message = await ask(options.mode, messages, false)
         messages.push(message)
         rounds.value = round
 
@@ -226,7 +220,7 @@ ${readableList || '（没有可读文件）'}
               args = rawArgs as Record<string, unknown>
             }
 
-            const toolResult = await executor.execute(name, args)
+            const toolResult = await options.executor.execute(name, args)
             messages.push({ role: 'tool', tool_call_id: id, content: toolResult })
             steps.value.push({
               round,
@@ -239,14 +233,14 @@ ${readableList || '（没有可读文件）'}
           }
 
           if (JSON.stringify(messages).length > MAX_CONTEXT_CHARS) {
-            error.value = 'Agent 对话达到上下文上限，改用固定地图'
+            error.value = 'Agent 对话达到上下文上限，停止继续读'
             return null
           }
 
           continue
         }
 
-        const parsed = parseMapResult(extractJson(message.content), input.entries)
+        const parsed = options.parse(message.content)
         if (parsed) {
           result.value = parsed
           return parsed
@@ -255,19 +249,19 @@ ${readableList || '（没有可读文件）'}
         messages.push({
           role: 'user',
           content:
-            '请只输出最终的项目地图 JSON（summary、folders、files、readingPlan、crossFileNotes、backend），不要解释文字，不要 Markdown 代码围栏。',
+            '请只输出最终 JSON，不要解释文字，不要 Markdown 代码围栏。结构必须和系统提示里给的一致。',
         })
       }
 
-      // 工具轮数用完：强制它在已有信息上收尾
-      const finalMessage = await ask(messages, true)
-      const parsed = parseMapResult(extractJson(finalMessage.content), input.entries)
+      // 工具轮数用完：禁掉工具，让它基于已有信息收尾
+      const finalMessage = await ask(options.mode, messages, true)
+      const parsed = options.parse(finalMessage.content)
       if (parsed) {
         result.value = parsed
         return parsed
       }
 
-      error.value = 'Agent 没有给出合法的项目地图，改用固定地图'
+      error.value = 'Agent 没有给出合法的 JSON，已停止'
       return null
     } catch (err) {
       if ((err as Error)?.name === 'AbortError') {
@@ -280,6 +274,84 @@ ${readableList || '（没有可读文件）'}
       running.value = false
       controller = null
     }
+  }
+
+  async function run(input: ProjectAgentInput): Promise<ProjectAgentMapResult | null> {
+    const executor = createProjectToolExecutor({
+      entries: input.entries,
+      readablePaths: input.readablePaths,
+      getFile: input.getFile,
+    })
+
+    const readableSet = new Set(input.readablePaths)
+    const readable = input.entries.filter((entry) => readableSet.has(entry.path))
+    const readableList = readable
+      .slice(0, MAX_READABLE_LIST)
+      .map((entry) => `- ${entry.path} (${entry.size} B)`)
+      .join('\n')
+
+    const treeText =
+      input.treeText.length > MAX_TREE_CHARS
+        ? input.treeText.slice(0, MAX_TREE_CHARS) + '\n……目录树太长，已截断'
+        : input.treeText
+
+    return runLoop<ProjectAgentMapResult>({
+      mode: 'map',
+      initialContent: `项目名：${input.projectName}
+需要解析的文件数：${input.parseCount}
+
+【目录树】
+${treeText}
+
+【已勾选、可读取的文件（最多列出 ${MAX_READABLE_LIST} 个，读取时只能用这些路径）】
+${readableList || '（没有可读文件）'}
+
+请开始侦查：先判断项目像什么，再按需读配置和关键文件，最后输出项目地图 JSON。`,
+      maxRounds: Math.max(1, Math.min(input.parseCount || 1, MAX_ROUNDS_HARD)),
+      executor,
+      parse: (content) => parseMapResult(extractJson(content), input.entries),
+    })
+  }
+
+  async function runSelfCheck(input: ProjectSelfCheckInput): Promise<ProjectGraphData | null> {
+    const executor = createProjectToolExecutor({
+      entries: input.entries,
+      readablePaths: input.readablePaths,
+      getFile: input.getFile,
+    })
+
+    const readableSet = new Set(input.readablePaths)
+    const readableList = input.entries
+      .filter((entry) => readableSet.has(entry.path))
+      .slice(0, MAX_READABLE_LIST)
+      .map((entry) => `- ${entry.path}`)
+      .join('\n')
+
+    const context =
+      input.projectContext.length > MAX_CONTEXT_TEXT
+        ? input.projectContext.slice(0, MAX_CONTEXT_TEXT) + '\n……已截断'
+        : input.projectContext
+
+    return runLoop<ProjectGraphData>({
+      mode: 'self-check',
+      initialContent: `【当前项目图】
+${JSON.stringify(input.graph, null, 2)}
+
+【项目结构结论】
+${context}
+
+【已勾选、可读取的文件】
+${readableList || '（没有可读文件）'}
+
+请检查这张图：有没有文件节点浮着没有连线、有没有只有分组到分组的边、有没有写反或编造的关系。需要时读代码确认，最后输出修正后的图 JSON。`,
+      maxRounds: Math.max(1, Math.min(input.parseCount || 1, MAX_SELF_CHECK_ROUNDS)),
+      executor,
+      parse: (content) =>
+        sanitizeProjectGraph(
+          extractJson(content),
+          input.entries.map((e) => e.path),
+        ),
+    })
   }
 
   function stop() {
@@ -299,5 +371,17 @@ ${readableList || '（没有可读文件）'}
     maxRounds.value = 0
   }
 
-  return { running, stopped, error, steps, result, rounds, maxRounds, run, stop, reset }
+  return {
+    running,
+    stopped,
+    error,
+    steps,
+    result,
+    rounds,
+    maxRounds,
+    run,
+    runSelfCheck,
+    stop,
+    reset,
+  }
 }

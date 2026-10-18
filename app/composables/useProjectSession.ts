@@ -1,4 +1,9 @@
-import type { ConfigMode, ProjectFileEntry, ProjectTreeNode } from '~/types/project'
+import type {
+  ConfigMode,
+  ProjectFileEntry,
+  ProjectGraphData,
+  ProjectTreeNode,
+} from '~/types/project'
 import {
   buildTree,
   computeStats,
@@ -83,8 +88,13 @@ export function useProjectSession() {
 
   const map = useProjectMap()
   const agent = useProjectAgent()
+  const selfCheck = useProjectAgent()
   const pool = useProjectAnalysis()
   const summary = useProjectSummary()
+
+  /** 自检修正后的图；没有自检结果时用汇总原图 */
+  const selfCheckGraph = ref<ProjectGraphData | null>(null)
+  const selfCheckStarted = ref(false)
 
   /** 目录说明阶段：Agent 侦查或固定地图，任一在跑都算还没准备好 */
   const notesLoading = computed(() => map.loading.value || agent.running.value)
@@ -117,6 +127,7 @@ export function useProjectSession() {
   const summaryText = computed(() => summaryParsed.value.text)
   const summaryGraph = computed(() => summaryParsed.value.graph)
   const summaryHasResult = computed(() => summary.output.value.length > 0)
+  const displayGraph = computed(() => selfCheckGraph.value ?? summaryGraph.value)
 
   const doneFiles = computed(() =>
     queueFiles.value.filter((entry) => pool.progress[entry.path]?.status === 'done'),
@@ -424,6 +435,11 @@ export function useProjectSession() {
 
     summarySkippedCount.value = skipped
 
+    // 重新生成总览时，把上一轮的自检结果一起清掉
+    selfCheck.reset()
+    selfCheckGraph.value = null
+    selfCheckStarted.value = false
+
     await summary.run({
       projectName: projectName.value,
       projectContext: map.context(projectName.value),
@@ -432,6 +448,29 @@ export function useProjectSession() {
     })
   }
 
+  /**
+   * 图自检：汇总图出现后，再让模型检查有没有浮着的文件、只有分组级的边。
+   * 自检失败/被停止就保留原图；整个过程在页面上有轨迹、可打断。
+   */
+  async function runSelfCheck(graph: ProjectGraphData) {
+    const result = await selfCheck.runSelfCheck({
+      graph,
+      projectContext: map.context(projectName.value),
+      entries: files.value,
+      parseCount: filesToParse(files.value).length,
+      readablePaths: filesForMap(files.value).map((entry) => entry.path),
+      getFile: (path) => fileHandles.get(path),
+    })
+
+    if (result) selfCheckGraph.value = result
+  }
+
+  watch([summaryGraph, summary.done], ([graph, done]) => {
+    if (!graph || !done || !started.value || selfCheckStarted.value) return
+    selfCheckStarted.value = true
+    void runSelfCheck(graph)
+  })
+
   // ---------------------------------------------------------------- 收尾
 
   function resetAll() {
@@ -439,6 +478,9 @@ export function useProjectSession() {
     summary.stop()
 
     agent.reset()
+    selfCheck.reset()
+    selfCheckGraph.value = null
+    selfCheckStarted.value = false
     pool.reset()
     map.reset()
     summary.reset()
@@ -458,6 +500,7 @@ export function useProjectSession() {
   /** 页面卸载时调用：abort 所有在飞请求 */
   function cleanup() {
     agent.stop()
+    selfCheck.stop()
     pool.stop()
     summary.stop()
   }
@@ -489,6 +532,16 @@ export function useProjectSession() {
     agentMaxRounds: agent.maxRounds,
     agentResult: agent.result,
     stopAgent: agent.stop,
+    // 图自检
+    displayGraph,
+    selfCheckRunning: selfCheck.running,
+    selfCheckStopped: selfCheck.stopped,
+    selfCheckError: selfCheck.error,
+    selfCheckSteps: selfCheck.steps,
+    selfCheckRounds: selfCheck.rounds,
+    selfCheckMaxRounds: selfCheck.maxRounds,
+    selfCheckResult: selfCheck.result,
+    stopSelfCheck: selfCheck.stop,
     // 并发池
     progress: pool.progress,
     total: pool.total,
