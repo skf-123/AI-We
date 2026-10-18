@@ -1,6 +1,7 @@
-import type { ProjectFileEntry, ProjectGraphData } from '~/types/project'
+import type { AgentStep, ProjectFileEntry, ProjectGraphData } from '~/types/project'
 import { createProjectToolExecutor } from '~/utils/project-tools'
 import { sanitizeProjectGraph } from '~/utils/project-graph'
+import { formatStepResult } from '~/utils/agent-trace'
 
 /**
  * 项目 Agent 的循环。一个实例只跑一种任务：
@@ -17,13 +18,6 @@ import { sanitizeProjectGraph } from '~/utils/project-graph'
  *
  * 不碰 DOM，也不认识目录树 / 项目图组件。
  */
-
-export interface AgentStep {
-  round: number
-  name: string
-  args: string
-  result: string
-}
 
 export interface ProjectAgentMapResult {
   summary: string
@@ -222,11 +216,15 @@ export function useProjectAgent() {
 
             const toolResult = await options.executor.execute(name, args)
             messages.push({ role: 'tool', tool_call_id: id, content: toolResult })
+            const note = message.content.trim().slice(0, 300)
+            const argsText = JSON.stringify(args).slice(0, 300)
             steps.value.push({
               round,
               name,
-              args: JSON.stringify(args).slice(0, 300),
+              args: argsText,
               result: toolResult.slice(0, 600),
+              note: note || undefined,
+              summary: formatStepResult({ round, name, args: argsText, result: toolResult }),
             })
 
             if (stopped.value) return null

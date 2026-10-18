@@ -223,6 +223,21 @@ export function useProjectSession() {
     return '正在等待这个文件的内容…'
   })
 
+  /** 侦查收尾的产出摘要；没有结果就返回空串 */
+  const agentOutcome = computed(() => {
+    if (!map.ran.value) return ''
+
+    const noteCount = Object.keys(map.fileNotes).length
+    const parts: string[] = []
+    if (map.summary.value) parts.push('概述 1 条')
+    if (noteCount > 0) parts.push(`文件说明 ${noteCount} 条`)
+    if (map.readingPlan.value.length > 0) parts.push(`建议先读 ${map.readingPlan.value.length} 个`)
+    if (map.backend.value) {
+      parts.push(map.backend.value.hasBackend ? '后端：有' : '后端：没有')
+    }
+    return parts.join(' · ')
+  })
+
   /** 第三方库核对状态：没有可说的就返回空串 */
   const vendorNote = computed(() => {
     if (vendorReview.running.value) return 'AI 正在核对疑似第三方库…'
@@ -689,6 +704,7 @@ export function useProjectSession() {
     mapReadingPlan: map.readingPlan,
     mapBackend: map.backend,
     notesLoading,
+    agentOutcome,
     vendorReviewRunning: vendorReview.running,
     vendorNote,
     // Agent 侦查轨迹

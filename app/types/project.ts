@@ -93,6 +93,18 @@ export interface ProjectTreeNode {
   selectedCount: number
 }
 
+/** Agent 轨迹的一步：模型真实发起的工具调用与工具结果 */
+export interface AgentStep {
+  round: number
+  name: string
+  args: string
+  result: string
+  /** 模型这一轮附带的文字说明；没有就不显示，不替它编 */
+  note?: string
+  /** 从完整工具结果算出的预览，例如「读取 80 行」 */
+  summary?: string
+}
+
 /** 逐文件解析过程中，界面需要的状态 */
 export interface FileProgress {
   status: FileStatus

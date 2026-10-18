@@ -30,6 +30,7 @@ const {
   mapBackend,
   mapReadingPlan,
   notesLoading,
+  agentOutcome,
   vendorNote,
   agentRunning,
   agentStopped,
@@ -307,6 +308,7 @@ onBeforeUnmount(() => {
               :round="agentRounds"
               :max-rounds="agentMaxRounds"
               :fallback="Boolean(agentError && mapSummary)"
+              :outcome="agentOutcome"
               @stop="stopAgent"
             />
 
