@@ -87,13 +87,26 @@ const statusText = computed(() => {
   return '待解析'
 })
 
-function onFolderCheck() {
+function onFolderCheck(e: Event) {
+  const input = e.target as HTMLInputElement
   emit('toggle-folder', props.node)
+
+  // 受控 checkbox：如果这次只是弹出系统文件提示、状态并没有真的改变，
+  // 要把浏览器自己翻过去的勾选状态同步回来（取消 = 不勾）。
+  void nextTick(() => {
+    input.checked = folderChecked.value
+    input.indeterminate = folderIndeterminate.value
+  })
 }
 
-function onFileCheck() {
+function onFileCheck(e: Event) {
   if (!file.value) return
+  const input = e.target as HTMLInputElement
   emit('toggle-file', props.node.path)
+
+  void nextTick(() => {
+    if (file.value) input.checked = file.value.include
+  })
 }
 </script>
 
