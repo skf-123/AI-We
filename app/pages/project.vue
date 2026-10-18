@@ -69,6 +69,8 @@ const {
   displayGraph,
   summaryHasResult,
   canGenerateSummary,
+  canGeneratePartial,
+  summaryScopeNote,
   doneCount,
   selectedFolder,
   selectedGroup,
@@ -92,6 +94,7 @@ const {
   stopParsing,
   resumeParsing,
   generateSummary,
+  generatePartialSummary,
   resetAll,
   cleanup,
   retryFile,
@@ -189,6 +192,12 @@ async function onStart() {
   if (overBudget.value) return
   const ok = await startParsing()
   if (ok) scrollToAnalysis()
+}
+
+/** 重新生成：全部完成后用完整输入，否则用已完成文件 */
+function onRegenerate() {
+  if (allSettled.value) void generateSummary()
+  else void generatePartialSummary()
 }
 
 /** 项目图在页面下方，从图里选中后把右侧面板带回视野 */
@@ -354,7 +363,7 @@ onBeforeUnmount(() => {
                 跳过 {{ stats.skippedCount }} 个文件 · 约 {{ formatSize(stats.skippedBytes) }}
               </span>
 
-              <div class="ml-auto flex items-center gap-3">
+              <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
                 <template v-if="!started">
                   <button
                     type="button"
@@ -387,7 +396,29 @@ onBeforeUnmount(() => {
                   >
                     继续解析
                   </button>
+
+                  <button
+                    v-if="!allSettled && canGeneratePartial"
+                    type="button"
+                    class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+                    @click="generatePartialSummary"
+                  >
+                    {{ poolStopped ? '用已完成的生成总览 + 图' : '不再解析，用已完成的生成' }}
+                  </button>
+                  <span v-else-if="!allSettled && doneCount === 1" class="text-xs text-slate-500">
+                    再解析 1 个文件就可以生成项目图
+                  </span>
+                  <span v-else-if="!allSettled && doneCount === 0" class="text-xs text-slate-400">
+                    还没有成功解析的文件
+                  </span>
                 </template>
+
+                <NuxtLink
+                  to="/"
+                  class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+                >
+                  返回首页
+                </NuxtLink>
               </div>
             </div>
 
@@ -517,11 +548,11 @@ onBeforeUnmount(() => {
               只出这一张项目图；展开 / 收起不重新请求
             </span>
             <button
-              v-if="allSettled && !summaryLoading"
+              v-if="!summaryLoading && (canGenerateSummary || canGeneratePartial)"
               type="button"
               class="ml-auto text-xs text-slate-400 hover:text-slate-700 disabled:cursor-not-allowed disabled:text-slate-300"
-              :disabled="!canGenerateSummary"
-              @click="generateSummary"
+              :disabled="!(canGenerateSummary || canGeneratePartial)"
+              @click="onRegenerate"
             >
               重新生成
             </button>
@@ -529,6 +560,9 @@ onBeforeUnmount(() => {
 
           <p v-if="summarySkippedCount > 0" class="mb-3 text-[11px] text-amber-700">
             另有 {{ summarySkippedCount }} 个文件超出本次汇总的输入预算，未纳入。
+          </p>
+          <p v-if="summaryScopeNote" class="mb-3 text-[11px] text-amber-700">
+            {{ summaryScopeNote }}
           </p>
 
           <div

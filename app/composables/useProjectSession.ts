@@ -196,6 +196,28 @@ export function useProjectSession() {
       !summary.loading.value,
   )
 
+  /** 用已完成的文件生成总览：至少 2 个成功文件，不要求全部解析完 */
+  const canGeneratePartial = computed(
+    () => started.value && doneFiles.value.length >= 2 && !summary.loading.value,
+  )
+
+  /** 失败文件数（不含用户主动停止）；用于说明本次总览的覆盖范围 */
+  const failedCount = computed(
+    () =>
+      queueFiles.value.filter((entry) => {
+        const p = pool.progress[entry.path]
+        return p?.status === 'error' && p.error !== '已停止'
+      }).length,
+  )
+
+  /** 只用了部分文件时，页面上的说明；全部完成则返回空串 */
+  const summaryScopeNote = computed(() => {
+    if (!started.value || doneCount.value === pool.total.value) return ''
+
+    const unparsed = Math.max(0, pool.total.value - doneCount.value - failedCount.value)
+    return `本次只用了 ${doneCount.value} / ${pool.total.value} 个已完成文件；失败 ${failedCount.value} 个、未解析 ${unparsed} 个未纳入。`
+  })
+
   const activeTitle = computed(() => {
     if (!activeEntry.value) {
       if (selectedFolder.value) return selectedFolder.value
@@ -570,14 +592,25 @@ export function useProjectSession() {
   }
 
   /**
-   * 手动生成项目总览 + 项目图。
+   * 生成项目总览 + 项目图。
    *
    * 只发摘要：每文件第三段（截断 300 字）+ import 关系 + 项目地图，
    * 不把全文再喂一遍（快照第十一节第 30 条第 3 小节）。
    * role 总长度到预算就停止加入，剩余文件数如实告诉用户。
+   *
+   * partial = true 时用于「不再解析」：先停掉池子、保留已完成文件，
+   * 至少 2 个成功文件才生成，不要求全部解析完。
    */
-  async function generateSummary() {
-    if (!canGenerateSummary.value) return
+  async function runSummary(partial: boolean) {
+    if (summary.loading.value) return
+    if (!started.value) return
+
+    if (partial) {
+      if (doneFiles.value.length < 2) return
+      if (!pool.allSettled.value) pool.stop()
+    } else if (!canGenerateSummary.value) {
+      return
+    }
 
     phase.value = 'summary'
 
@@ -612,6 +645,15 @@ export function useProjectSession() {
       treeText: treeToText(tree.value),
       files: payloadFiles,
     })
+  }
+
+  async function generateSummary() {
+    await runSummary(false)
+  }
+
+  /** 不再解析：保留已完成文件，用它们生成总览 + 图 */
+  async function generatePartialSummary() {
+    await runSummary(true)
   }
 
   /**
@@ -752,6 +794,8 @@ export function useProjectSession() {
     summaryGraph,
     summaryHasResult,
     canGenerateSummary,
+    canGeneratePartial,
+    summaryScopeNote,
     doneCount,
     selectedFolder,
     selectedGroup,
@@ -777,6 +821,7 @@ export function useProjectSession() {
     stopParsing,
     resumeParsing,
     generateSummary,
+    generatePartialSummary,
     resetAll,
     cleanup,
     retryFile: pool.retry,
