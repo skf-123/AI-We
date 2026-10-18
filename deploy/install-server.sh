@@ -109,7 +109,7 @@ cat <<'EOF'
 ✅ 初始化完成。接下来还差三步：
 
   1. 传密钥文件（在**本地**跑，路径按你的实际情况改）：
-       scp -i ~/.ssh/ai-web-deploy .env root@47.83.180.13:/opt/ai-web/.env
+       scp -i ~/.ssh/ai-web-deploy .env root@<服务器公网IP>:/opt/ai-web/.env
 
   2. 在服务器上收紧 .env 权限并跑部署：
        chown aiweb:aiweb /opt/ai-web/.env && chmod 600 /opt/ai-web/.env
