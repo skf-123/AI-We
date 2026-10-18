@@ -398,8 +398,20 @@ export function useProjectSession() {
       )
     }
 
-    // map 返回后把文件说明贴回登记项；树是 computed，会自动重建
-    for (const entry of files.value) entry.note = map.fileNotes[entry.path]
+    // map 返回后把文件说明贴回登记项；树是 computed，会自动重建。
+    // 模型漏写说明时，补一句来源明确的提示，不替它编造用途。
+    for (const entry of files.value) {
+      const note = map.fileNotes[entry.path]
+      if (note) {
+        entry.note = note
+        continue
+      }
+
+      entry.note =
+        entry.include && entry.category !== 'system' && !isBinaryFile(entry.path)
+          ? '未识别：AI 没有返回说明'
+          : undefined
+    }
   }
 
   // ---------------------------------------------------------------- 勾选
