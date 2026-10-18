@@ -87,7 +87,7 @@ const showModeSwitch = computed(
 
 const statusText = computed(() => {
   if (!pg.value) return ''
-  if (pg.value.status === 'running') return '解析中'
+  if (pg.value.status === 'running') return `解析中 ${pg.value.percent ?? 0}%`
   if (pg.value.status === 'done') return '已完成'
   if (pg.value.status === 'error') return '失败'
   return '待解析'

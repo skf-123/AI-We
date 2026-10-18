@@ -51,6 +51,9 @@ export function useProjectAnalysis() {
 
   let queue: string[] = []
   const running = new Set<string>()
+  /** 每个文件开始解析的时间；用来算缓冲百分比 */
+  const startedAt = new Map<string, number>()
+  let ticker: ReturnType<typeof setInterval> | null = null
   /** 项目结构结论 —— 每次请求原样带上，作为前缀缓存的公共前缀 */
   let context = ''
 
@@ -69,6 +72,7 @@ export function useProjectAnalysis() {
       sources: [],
       error: '',
       truncated: false,
+      percent: 0,
     }
 
     // useAnalysis 是每个文件一个实例、状态互相独立；这里把它的 ref
@@ -88,6 +92,36 @@ export function useProjectAnalysis() {
     watcherStops.push(stop)
 
     return inst
+  }
+
+  /**
+   * 按时间走的缓冲百分比：20 秒左右到 95%，完成时再跳到 100%。
+   * 这不是真实进度，只用来让用户看到「还在动」，不要拿它判断何时结束。
+   */
+  function tickProgress() {
+    const now = Date.now()
+    let active = false
+
+    for (const path of running) {
+      const p = progress[path]
+      if (!p || p.status !== 'running') continue
+
+      const start = startedAt.get(path) ?? now
+      p.percent = Math.min(95, Math.round(((now - start) / 20_000) * 95))
+      active = true
+    }
+
+    if (!active) stopTicker()
+  }
+
+  function ensureTicker() {
+    if (ticker) return
+    ticker = setInterval(tickProgress, 200)
+  }
+
+  function stopTicker() {
+    if (ticker) clearInterval(ticker)
+    ticker = null
   }
 
   async function pump() {
@@ -125,9 +159,14 @@ export function useProjectAnalysis() {
 
       const text = await file.text()
       texts.set(path, text)
-      await inst.run(text)
 
       const p = progress[path]!
+      p.percent = 0
+      startedAt.set(path, Date.now())
+      ensureTicker()
+
+      await inst.run(text)
+
       // run() 内部已经写完，watch 还没 flush —— 这里同步读一遍，避免状态晚一拍
       p.output = inst.output.value
       p.sources = [...inst.sources.value]
@@ -140,11 +179,16 @@ export function useProjectAnalysis() {
       } else {
         p.status = p.error ? 'error' : 'done'
       }
+      p.percent = p.status === 'done' ? 100 : 0
+      startedAt.delete(path)
     } catch (err) {
       const p = progress[path]!
       p.status = 'error'
       p.error = err instanceof Error ? err.message : String(err)
+      p.percent = 0
+      startedAt.delete(path)
     } finally {
+      startedAt.delete(path)
       running.delete(path)
       runningCount.value = running.size
       recountFinished()
@@ -180,6 +224,8 @@ export function useProjectAnalysis() {
   function stop() {
     stopped.value = true
     queue = []
+    stopTicker()
+    startedAt.clear()
 
     for (const inst of Object.values(instances)) inst.stop()
 
@@ -188,6 +234,7 @@ export function useProjectAnalysis() {
       if (p && p.status === 'running') {
         p.status = 'error'
         p.error = '已停止'
+        p.percent = 0
       }
     }
 
@@ -216,6 +263,7 @@ export function useProjectAnalysis() {
     p.output = ''
     p.sources = []
     p.truncated = false
+    p.percent = 0
 
     const i = queue.indexOf(key)
     if (i !== -1) queue.splice(i, 1)
@@ -237,6 +285,9 @@ export function useProjectAnalysis() {
   }
 
   function reset() {
+    stopTicker()
+    startedAt.clear()
+
     for (const inst of Object.values(instances)) inst.stop()
     for (const stopWatcher of watcherStops) stopWatcher()
     watcherStops.length = 0

@@ -514,6 +514,7 @@ onBeforeUnmount(() => {
                 :subtitle="activeTitle"
                 :empty-hint="emptyHint"
                 fill-height
+                show-header-loader
               />
             </div>
           </div>

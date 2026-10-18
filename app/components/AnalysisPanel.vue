@@ -36,6 +36,8 @@ const props = defineProps<{
    * true：项目入口，跟随左侧目录树的高度（grid 行高由左栏决定）
    */
   fillHeight?: boolean
+  /** 项目入口：在面板顶部显示书本缓冲动画；贴代码入口仍在空态里显示 */
+  showHeaderLoader?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -224,6 +226,10 @@ defineExpose({ scrollIntoView })
     class="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:overflow-hidden"
     :class="fillHeight ? 'lg:min-h-0' : 'lg:h-[calc(100vh-200px)] lg:min-h-[420px]'"
   >
+    <div v-if="showHeaderLoader && loading" class="mb-2 flex shrink-0 justify-center">
+      <BookLoader />
+    </div>
+
     <div class="mb-3 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
       <span class="shrink-0 text-sm text-slate-500">{{ title || '解析结果' }}</span>
       <span
@@ -282,7 +288,7 @@ defineExpose({ scrollIntoView })
         正文一开始流，文字本身就在持续告诉你进度了。
       -->
       <div v-else-if="isEmpty" class="flex h-full items-center justify-center px-6 text-center">
-        <BookLoader v-if="loading" />
+        <BookLoader v-if="loading && !showHeaderLoader" />
         <p v-else class="text-sm leading-relaxed text-slate-400">
           <template v-if="emptyHint">{{ emptyHint }}</template>
           <template v-else>
