@@ -20,8 +20,8 @@ export interface ToolLabel {
 
 const TOOL_LABELS: Record<string, string> = {
   list_dir: '查看目录',
-  read_config: '读取配置',
-  read_file_slice: '读取代码',
+  read_config: '读取全文',
+  read_file_slice: '读取片段',
   grep: '搜索',
   search_knowledge: '查知识库',
 }
@@ -97,6 +97,19 @@ export function formatStepResult(step: AgentStep): string {
     default:
       return `${result.length} 字符`
   }
+}
+
+/** 一轮里调了哪些工具、各几次：list_dir ×1 · read_config ×3 */
+export function summarizeToolCalls(steps: AgentStep[]): string {
+  const counts = new Map<string, number>()
+
+  for (const step of steps) {
+    counts.set(step.name, (counts.get(step.name) ?? 0) + 1)
+  }
+
+  return [...counts.entries()]
+    .map(([name, count]) => (count > 1 ? `${name} ×${count}` : name))
+    .join(' · ')
 }
 
 /** 按轮分组；同一轮的文字说明只取第一条 */

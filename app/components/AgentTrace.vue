@@ -5,6 +5,7 @@ import {
   formatStepArgs,
   formatStepResult,
   groupTraceSteps,
+  summarizeToolCalls,
 } from '~/utils/agent-trace'
 
 /**
@@ -78,7 +79,7 @@ function stepSummary(step: AgentStep): string {
 
       <div class="ml-auto flex items-center gap-2">
         <span class="text-[10px] text-slate-400">
-          {{ props.round }} / {{ props.maxRounds }} 轮 · {{ totalCalls }} 次工具
+          {{ props.round }} / {{ props.maxRounds }} 轮 · {{ totalCalls }} 次工具调用
         </span>
 
         <div
@@ -133,9 +134,12 @@ function stepSummary(step: AgentStep): string {
       class="mt-2 max-h-64 space-y-2.5 overflow-y-auto pr-1"
     >
       <div v-for="group in rounds" :key="group.round">
-        <div class="flex items-center gap-2 text-[10.5px] text-slate-400">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] text-slate-400">
           <span class="rounded bg-white px-1.5 text-[10px]">第 {{ group.round }} 轮</span>
-          <span>{{ group.steps.length }} 个工具</span>
+          <span>{{ group.steps.length }} 次调用</span>
+          <span class="min-w-0 truncate font-mono text-[10px] text-slate-400">
+            {{ summarizeToolCalls(group.steps) }}
+          </span>
         </div>
 
         <p v-if="group.note" class="mt-0.5 text-[10.5px] leading-relaxed text-slate-500">
@@ -146,6 +150,7 @@ function stepSummary(step: AgentStep): string {
           <li v-for="(step, i) in group.steps" :key="`r${group.round}-${step.name}-${i}`">
             <div class="flex min-w-0 items-center gap-2 text-[11px]">
               <span class="shrink-0 text-slate-700">{{ describeTool(step.name).zh }}</span>
+              <span class="shrink-0 font-mono text-[10px] text-slate-400">{{ step.name }}</span>
               <span class="min-w-0 truncate text-slate-500">{{ formatStepArgs(step) }}</span>
               <span class="ml-auto shrink-0 text-[10.5px] text-slate-400">
                 {{ stepSummary(step) }}
