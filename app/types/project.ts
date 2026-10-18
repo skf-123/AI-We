@@ -14,8 +14,37 @@ import type { GraphNodeType, RagSource } from './analysis'
 /** 目录树上的三类标签 */
 export type ProjectFileCategory = 'user' | 'config' | 'system'
 
+/**
+ * 更细的文件子类。
+ * 三档 category 决定勾选与预算；subtype 只用于展示和原因文案，
+ * 这样加分类不会牵连选择逻辑。
+ */
+export type ProjectFileSubtype =
+  | 'source'
+  | 'config'
+  | 'vendor'
+  | 'dependency'
+  | 'build'
+  | 'tooling'
+  | 'minified'
+  | 'source-map'
+  | 'binary'
+  | 'lockfile'
+  | 'ide'
+  | 'docs'
+  | 'unknown'
+
 /** 配置 / 系统文件在项目里的两种角色 */
 export type ConfigMode = 'context' | 'explain'
+
+/** 第三方库识别结果：高置信度会改默认勾选，中置信度只打标签 */
+export interface VendorHint {
+  /** 库名，例如 Bootstrap / jQuery */
+  name: string
+  confidence: 'high' | 'medium'
+  /** 依据，例如「文件头是 Bootstrap v5.3.0」 */
+  evidence: string
+}
 
 /** 逐文件解析状态 */
 export type FileStatus = 'pending' | 'running' | 'done' | 'error'
@@ -28,6 +57,8 @@ export interface ProjectFileEntry {
   /** 字节数 */
   size: number
   category: ProjectFileCategory
+  /** 更细的子类：展示与原因文案用，不参与勾选判断 */
+  subtype: ProjectFileSubtype
   /** system 类文件为什么默认不勾；面向用户的说明 */
   skipReason?: string
   /** 语料未收录的语言：仍然解析，但四段里没有引用来源 */
@@ -40,6 +71,10 @@ export interface ProjectFileEntry {
   systemMode: ConfigMode
   /** 来自项目地图调用的一句话说明 */
   note?: string
+  /** 程序识别出的第三方库（高置信度会同时把 category 改成 system） */
+  vendor?: VendorHint
+  /** Agent 的建议：只展示，用户点一下才取消勾选 */
+  vendorSuggestion?: string
 }
 
 /** 目录树节点（每次 files 变化时由纯函数重算） */

@@ -24,10 +24,20 @@ export const PROJECT_LIMITS = {
   maxUserBytes: Math.round(1.9 * 1024 * 1024),
 } as const
 
-/** 依赖 / 编译产物 / IDE 目录：命中即整棵子树跳过，不经过 LLM */
-export const SYSTEM_DIRS = new Set([
+/** 依赖目录：第三方包本体 */
+const DEPENDENCY_DIRS = new Set([
   'node_modules',
   'bower_components',
+  'vendor',
+  '__pycache__',
+  'venv',
+  '.venv',
+  'Pods',
+  'DerivedData',
+])
+
+/** 构建输出目录：由源码生成，不该逐行解释 */
+const BUILD_DIRS = new Set([
   'dist',
   'build',
   'out',
@@ -35,15 +45,7 @@ export const SYSTEM_DIRS = new Set([
   'target',
   'bin',
   'obj',
-  'vendor',
   'coverage',
-  '.git',
-  '.svn',
-  '.hg',
-  '.idea',
-  '.vscode',
-  '.gradle',
-  '.mvn',
   '.next',
   '.nuxt',
   '.output',
@@ -51,12 +53,23 @@ export const SYSTEM_DIRS = new Set([
   '.parcel-cache',
   '.sass-cache',
   '.turbo',
-  '__pycache__',
-  'venv',
-  '.venv',
-  'Pods',
-  'DerivedData',
 ])
+
+/** IDE / 版本控制目录 */
+const TOOLING_DIRS = new Set(['.git', '.svn', '.hg', '.idea', '.vscode', '.gradle', '.mvn'])
+
+/**
+ * 目录规则表：命中即整棵子树跳过，不经过 LLM。
+ * 拆成三组是为了让原因文案更具体，而不是笼统写「依赖 / 产物」。
+ */
+const DIR_RULES = [
+  { dirs: DEPENDENCY_DIRS, subtype: 'dependency', label: '依赖目录' },
+  { dirs: BUILD_DIRS, subtype: 'build', label: '构建输出目录' },
+  { dirs: TOOLING_DIRS, subtype: 'tooling', label: 'IDE / 工具目录' },
+] as const
+
+/** 兼容旧引用：三组合起来的全集 */
+export const SYSTEM_DIRS = new Set([...DEPENDENCY_DIRS, ...BUILD_DIRS, ...TOOLING_DIRS])
 
 /** 锁文件：不是用户代码，也不该送给模型 */
 const LOCK_FILES = new Set([
@@ -234,63 +247,104 @@ function baseName(path: string): string {
   return parts[parts.length - 1] ?? path
 }
 
-/** 路径里是否踩中了系统目录 */
-function systemDirOf(path: string): string | null {
+interface SystemDirMatch {
+  dir: string
+  subtype: 'dependency' | 'build' | 'tooling'
+  label: string
+}
+
+/** 路径里是否踩中了系统目录；返回命中的目录与它属于哪一组 */
+function systemDirOf(path: string): SystemDirMatch | null {
   const parts = path.split('/').slice(0, -1)
   for (const part of parts) {
-    if (SYSTEM_DIRS.has(part)) return part
+    for (const rule of DIR_RULES) {
+      if (rule.dirs.has(part)) return { dir: part, subtype: rule.subtype, label: rule.label }
+    }
   }
   return null
 }
 
+/** 压缩 / 映射产物：默认不勾，但仍然是文本，可以勾选后逐行解释 */
+export function isMinifiedOrMap(path: string): boolean {
+  const lower = (path.split('/').pop() ?? path).toLowerCase()
+  return lower.endsWith('.min.js') || lower.endsWith('.min.css') || lower.endsWith('.map')
+}
+
 /**
- * 是否是无法按文本逐行解释的文件（二进制、图片、压缩/映射产物）。
- * 这类系统文件可以只作上下文，但不能切「仍需解释」。
+ * 是否是无法按文本读取的文件（二进制、图片、压缩包）。
+ *
+ * ⚠️ 压缩 / 映射产物（.min.js / .min.css / .map）**不在这里**：
+ *    它们默认不勾，但仍然是文本，用户可以勾选并切「仍需解释」。
+ *    「默认不勾」是分类规则给的（classifyFile），不是「读不了」。
  */
 export function isBinaryFile(path: string): boolean {
   const name = baseName(normalizePath(path))
-  const lower = name.toLowerCase()
-  if (lower.endsWith('.min.js') || lower.endsWith('.min.css') || lower.endsWith('.map')) return true
   return BINARY_EXTS.has(extOf(name))
 }
 
 export function classifyFile(
   path: string,
-): Pick<ProjectFileEntry, 'category' | 'skipReason' | 'unrecorded'> {
+): Pick<ProjectFileEntry, 'category' | 'subtype' | 'skipReason' | 'unrecorded'> {
   const name = baseName(path)
   const ext = extOf(name)
   const lower = name.toLowerCase()
 
   const sysDir = systemDirOf(path)
   if (sysDir) {
-    return { category: 'system', skipReason: `依赖 / 产物目录：${sysDir}`, unrecorded: false }
+    return {
+      category: 'system',
+      subtype: sysDir.subtype,
+      skipReason: `${sysDir.label}：${sysDir.dir}`,
+      unrecorded: false,
+    }
   }
 
   if (LOCK_FILES.has(name)) {
-    return { category: 'system', skipReason: '锁文件', unrecorded: false }
+    return { category: 'system', subtype: 'lockfile', skipReason: '锁文件', unrecorded: false }
   }
   if (IDE_FILES.has(name) || lower.endsWith('.iml') || lower.endsWith('.suo')) {
-    return { category: 'system', skipReason: 'IDE / 系统生成的文件', unrecorded: false }
+    return {
+      category: 'system',
+      subtype: 'ide',
+      skipReason: 'IDE / 系统生成的文件',
+      unrecorded: false,
+    }
   }
-  if (lower.endsWith('.min.js') || lower.endsWith('.min.css') || lower.endsWith('.map')) {
-    return { category: 'system', skipReason: '压缩 / 映射产物', unrecorded: false }
+  if (isMinifiedOrMap(lower)) {
+    const isMap = lower.endsWith('.map')
+    return {
+      category: 'system',
+      subtype: isMap ? 'source-map' : 'minified',
+      skipReason: isMap ? 'source map 映射文件' : '压缩产物',
+      unrecorded: false,
+    }
   }
   if (BINARY_EXTS.has(ext)) {
-    return { category: 'system', skipReason: '二进制或静态资源', unrecorded: false }
+    return {
+      category: 'system',
+      subtype: 'binary',
+      skipReason: '二进制或静态资源',
+      unrecorded: false,
+    }
   }
   if (DOC_EXTS.has(ext)) {
-    return { category: 'system', skipReason: '文档，不参与代码解析', unrecorded: false }
+    return {
+      category: 'system',
+      subtype: 'docs',
+      skipReason: '文档，不参与代码解析',
+      unrecorded: false,
+    }
   }
 
   if (CONFIG_EXTS.has(ext)) {
-    return { category: 'config', unrecorded: false }
+    return { category: 'config', subtype: 'config', unrecorded: false }
   }
   if (SOURCE_EXTS.has(ext)) {
-    return { category: 'user', unrecorded: UNRECORDED_EXTS.has(ext) }
+    return { category: 'user', subtype: 'source', unrecorded: UNRECORDED_EXTS.has(ext) }
   }
 
   // 认不出来的文本，宁可当用户代码带上（判错代价不对称：静默丢用户代码更糟）
-  return { category: 'user', unrecorded: false }
+  return { category: 'user', subtype: 'unknown', unrecorded: false }
 }
 
 /** 按路径与大小造一条登记项（内容不在这里） */
@@ -304,6 +358,7 @@ export function makeFileEntry(path: string, size: number): ProjectFileEntry {
     name,
     size,
     category: meta.category,
+    subtype: meta.subtype,
     skipReason: meta.skipReason,
     unrecorded: meta.unrecorded,
     include: meta.category !== 'system',

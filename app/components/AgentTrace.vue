@@ -20,10 +20,14 @@ const props = defineProps<{
   title?: string
   /** 失败时显示的说明 */
   errorText?: string
+  /** 是否显示「重新运行」按钮（由页面判断什么时候可以重跑） */
+  rerun?: boolean
+  /** 重新运行按钮的文案 */
+  rerunLabel?: string
 }>()
 
 const emit = defineEmits<{
-  (e: 'stop'): void
+  (e: 'stop' | 'rerun'): void
 }>()
 </script>
 
@@ -62,6 +66,14 @@ const emit = defineEmits<{
         @click="emit('stop')"
       >
         停止
+      </button>
+      <button
+        v-else-if="props.rerun"
+        type="button"
+        class="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10.5px] text-slate-600 transition hover:bg-slate-50"
+        @click="emit('rerun')"
+      >
+        {{ props.rerunLabel || '重新运行' }}
       </button>
     </div>
 

@@ -18,10 +18,17 @@ import {
   treeToText,
 } from '~/utils/project-files'
 import { parseProjectSummary } from '~/utils/project-graph'
+import {
+  detectVendor,
+  isVendorReviewCandidate,
+  shouldProbeVendor,
+  type VendorCandidate,
+} from '~/utils/project-vendor'
 import { useProjectAgent } from './useProjectAgent'
 import { useProjectMap } from './useProjectMap'
 import { useProjectAnalysis } from './useProjectAnalysis'
 import { useProjectSummary } from './useProjectSummary'
+import { useProjectVendorReview } from './useProjectVendorReview'
 
 /**
  * 项目页的状态机。
@@ -40,6 +47,9 @@ import { useProjectSummary } from './useProjectSummary'
 
 /** 汇总输入的字符预算：role 总长度到这里就停止加入，避免一次调用被撑爆 */
 export const SUMMARY_CHAR_BUDGET = 300_000
+
+/** 最多读多少个文件的头做第三方库识别，防止超大项目卡住上传 */
+const MAX_VENDOR_PROBES = 2000
 
 /** 文件所在目录；根目录文件返回 null */
 function folderOf(path: string): string | null {
@@ -91,6 +101,10 @@ export function useProjectSession() {
   const selfCheck = useProjectAgent()
   const pool = useProjectAnalysis()
   const summary = useProjectSummary()
+  const vendorReview = useProjectVendorReview()
+
+  /** 防止上一个项目的候选评审结果落到新项目上 */
+  let vendorGeneration = 0
 
   /** 自检修正后的图；没有自检结果时用汇总原图 */
   const selfCheckGraph = ref<ProjectGraphData | null>(null)
@@ -208,7 +222,108 @@ export function useProjectSession() {
     return '正在等待这个文件的内容…'
   })
 
+  /** 第三方库核对状态：没有可说的就返回空串 */
+  const vendorNote = computed(() => {
+    if (vendorReview.running.value) return 'AI 正在核对疑似第三方库…'
+    if (vendorReview.reviewed.value === 0) return ''
+
+    const suggested = files.value.filter((entry) => entry.vendorSuggestion).length
+    const parts = [`AI 已核对 ${vendorReview.reviewed.value} 个疑似文件`]
+    if (suggested > 0) parts.push(`建议不勾 ${suggested} 个`)
+    if (vendorReview.skipped.value > 0) parts.push(`另有 ${vendorReview.skipped.value} 个未核对`)
+    return parts.join(' · ')
+  })
+
   // ---------------------------------------------------------------- 上传
+
+  /** 读候选文件的前 4KB；并发 8 个，避免一次打开太多 File */
+  async function readHeaders(items: { path: string; file: File }[]): Promise<Map<string, string>> {
+    const headers = new Map<string, string>()
+    const queue = [...items]
+
+    const worker = async () => {
+      while (queue.length > 0) {
+        const item = queue.shift()
+        if (!item) break
+        try {
+          headers.set(item.path, await item.file.slice(0, 4096).text())
+        } catch {
+          headers.set(item.path, '')
+        }
+      }
+    }
+
+    await Promise.all(Array.from({ length: Math.min(8, queue.length) }, worker))
+    return headers
+  }
+
+  /**
+   * 第三方库识别：
+   *   · 高置信度：文件名和文件头都对上 → 改成系统文件、默认不勾
+   *   · 中置信度：只打「疑似第三方库」标签，仍然默认勾着
+   *   · 规则拿不准：进入候选池，交给 Agent 评审（只出建议）
+   */
+  async function detectVendorEntries(
+    items: { path: string; file: File }[],
+  ): Promise<VendorCandidate[]> {
+    const fileByPath = new Map(items.map((item) => [item.path, item.file]))
+    const probe = files.value
+      .filter(shouldProbeVendor)
+      .sort((a, b) => b.size - a.size || a.path.localeCompare(b.path))
+      .slice(0, MAX_VENDOR_PROBES)
+
+    const headers = await readHeaders(
+      probe
+        .map((entry) => {
+          const file = fileByPath.get(entry.path)
+          return file ? { path: entry.path, file } : null
+        })
+        .filter((item): item is { path: string; file: File } => item !== null),
+    )
+
+    const candidates: VendorCandidate[] = []
+
+    for (const entry of probe) {
+      const header = headers.get(entry.path) ?? ''
+      const hint = detectVendor(entry.path, header)
+
+      if (hint?.confidence === 'high') {
+        entry.category = 'system'
+        entry.subtype = 'vendor'
+        entry.include = false
+        entry.skipReason = `第三方库：${hint.name}`
+        entry.vendor = hint
+        continue
+      }
+
+      if (hint) {
+        entry.vendor = hint
+        continue
+      }
+
+      if (isVendorReviewCandidate(entry, header)) {
+        candidates.push({ path: entry.path, header, size: entry.size })
+      }
+    }
+
+    return candidates
+  }
+
+  /** 异步拿 Agent 建议；换项目或重置后丢弃旧结果 */
+  function runVendorReview(candidates: VendorCandidate[]) {
+    if (candidates.length === 0) return
+
+    const token = ++vendorGeneration
+    void vendorReview.run(candidates).then((suggestions) => {
+      if (token !== vendorGeneration) return
+
+      const byPath = new Map(files.value.map((entry) => [entry.path, entry]))
+      for (const [path, evidence] of Object.entries(suggestions)) {
+        const entry = byPath.get(path)
+        if (entry) entry.vendorSuggestion = evidence
+      }
+    })
+  }
 
   async function selectProject(payload: ProjectSelectionPayload) {
     resetAll()
@@ -216,7 +331,16 @@ export function useProjectSession() {
 
     for (const item of payload.files) fileHandles.set(item.path, item.file)
     files.value = payload.files.map((item) => makeFileEntry(item.path, item.file.size))
+
+    let candidates: VendorCandidate[] = []
+    try {
+      candidates = await detectVendorEntries(payload.files)
+    } catch {
+      /* 识别失败不影响上传与逐文件解析 */
+    }
+
     phase.value = 'review'
+    runVendorReview(candidates)
 
     await loadNotes()
   }
@@ -326,6 +450,12 @@ export function useProjectSession() {
 
     // 切成「仍需解释」就意味着要解析它
     if (mode === 'explain') entry.include = true
+  }
+
+  /** 用户点「取消勾选」时才真正执行 AI 建议；程序不自动改 */
+  function uncheckSuggested(path: string) {
+    const entry = files.value.find((item) => item.path === path)
+    if (entry) entry.include = false
   }
 
   // ---------------------------------------------------------------- 解析
@@ -465,6 +595,18 @@ export function useProjectSession() {
     if (result) selfCheckGraph.value = result
   }
 
+  /**
+   * 用户手动重新自检：总是从汇总原图重来，不在上一轮的自检结果上叠改。
+   * 失败或被停止时保留当前显示的图（如果有上一轮自检结果，它也还在）。
+   */
+  async function rerunSelfCheck() {
+    const graph = summaryGraph.value
+    if (!graph || selfCheck.running.value) return
+
+    selfCheckStarted.value = true
+    await runSelfCheck(graph)
+  }
+
   watch([summaryGraph, summary.done], ([graph, done]) => {
     if (!graph || !done || !started.value || selfCheckStarted.value) return
     selfCheckStarted.value = true
@@ -479,6 +621,8 @@ export function useProjectSession() {
 
     agent.reset()
     selfCheck.reset()
+    vendorGeneration++
+    vendorReview.reset()
     selfCheckGraph.value = null
     selfCheckStarted.value = false
     pool.reset()
@@ -501,6 +645,7 @@ export function useProjectSession() {
   function cleanup() {
     agent.stop()
     selfCheck.stop()
+    vendorReview.reset()
     pool.stop()
     summary.stop()
   }
@@ -523,6 +668,8 @@ export function useProjectSession() {
     mapReadingPlan: map.readingPlan,
     mapBackend: map.backend,
     notesLoading,
+    vendorReviewRunning: vendorReview.running,
+    vendorNote,
     // Agent 侦查轨迹
     agentRunning: agent.running,
     agentStopped: agent.stopped,
@@ -542,6 +689,7 @@ export function useProjectSession() {
     selfCheckMaxRounds: selfCheck.maxRounds,
     selfCheckResult: selfCheck.result,
     stopSelfCheck: selfCheck.stop,
+    rerunSelfCheck,
     // 并发池
     progress: pool.progress,
     total: pool.total,
@@ -584,6 +732,7 @@ export function useProjectSession() {
     includeFile,
     includeFolder,
     setFileMode,
+    uncheckSuggested,
     openFile,
     selectFolder,
     selectGroup,

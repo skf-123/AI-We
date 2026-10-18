@@ -19,10 +19,12 @@ const props = defineProps<{
   selectedFolder?: string | null
   /** 当前展示的文件（高亮） */
   activePath?: string | null
+  /** 第三方库核对状态；空串不显示 */
+  vendorNote?: string
 }>()
 
 const emit = defineEmits<{
-  (e: 'toggle-file' | 'open-file' | 'retry', path: string): void
+  (e: 'toggle-file' | 'open-file' | 'retry' | 'uncheck', path: string): void
   (e: 'toggle-folder' | 'select-folder', node: ProjectTreeNode): void
   (e: 'set-mode', path: string, mode: ConfigMode): void
 }>()
@@ -80,6 +82,9 @@ function setAllOpen(value: boolean) {
       <span class="inline-flex items-center gap-1.5">
         <span class="h-2 w-2 rounded-sm bg-slate-300" />依赖 / 产物 · 默认不勾，可手动勾选
       </span>
+      <span v-if="vendorNote" class="inline-flex items-center gap-1.5 text-sky-700">
+        <span class="h-2 w-2 rounded-sm bg-sky-400" />{{ vendorNote }}
+      </span>
       <div class="ml-auto flex items-center gap-2 text-slate-400">
         <span class="hidden sm:inline">勾选可手动取消或补勾</span>
         <span class="hidden h-3 w-px bg-slate-200 sm:inline-block" />
@@ -112,6 +117,7 @@ function setAllOpen(value: boolean) {
           @toggle-file="(p) => emit('toggle-file', p)"
           @toggle-folder="(n) => emit('toggle-folder', n)"
           @set-mode="(p, m) => emit('set-mode', p, m)"
+          @uncheck="(p) => emit('uncheck', p)"
           @open-file="(p) => emit('open-file', p)"
           @retry="(p) => emit('retry', p)"
           @toggle-open="toggleOpen"

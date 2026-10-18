@@ -30,6 +30,7 @@ const {
   mapBackend,
   mapReadingPlan,
   notesLoading,
+  vendorNote,
   agentRunning,
   agentStopped,
   agentError,
@@ -44,6 +45,7 @@ const {
   selfCheckRounds,
   selfCheckMaxRounds,
   stopSelfCheck,
+  rerunSelfCheck,
   progress,
   total,
   finished,
@@ -81,6 +83,7 @@ const {
   includeFile,
   includeFolder,
   setFileMode,
+  uncheckSuggested,
   openFile,
   selectFolder,
   selectGroup,
@@ -314,9 +317,11 @@ onBeforeUnmount(() => {
               :notes-degraded="mapDegraded"
               :selected-folder="selectedFolder"
               :active-path="activePath"
+              :vendor-note="vendorNote"
               @toggle-file="onToggleFile"
               @toggle-folder="onToggleFolder"
               @set-mode="setFileMode"
+              @uncheck="uncheckSuggested"
               @open-file="onOpenFile"
               @retry="retryFile"
               @select-folder="onSelectFolder"
@@ -537,7 +542,13 @@ onBeforeUnmount(() => {
 
           <!-- 图自检：有轨迹、可打断；失败就保留原图 -->
           <AgentTrace
-            v-if="selfCheckRunning || selfCheckSteps.length || selfCheckError"
+            v-if="
+              selfCheckRunning ||
+              selfCheckStopped ||
+              selfCheckRounds > 0 ||
+              selfCheckSteps.length ||
+              selfCheckError
+            "
             title="图自检"
             error-text="自检未完成，保留原图"
             :steps="selfCheckSteps"
@@ -546,7 +557,10 @@ onBeforeUnmount(() => {
             :error="selfCheckError"
             :round="selfCheckRounds"
             :max-rounds="selfCheckMaxRounds"
+            :rerun="!selfCheckRunning"
+            rerun-label="重新自检"
             @stop="stopSelfCheck"
+            @rerun="rerunSelfCheck"
           />
 
           <div v-if="displayGraph" class="mt-4">

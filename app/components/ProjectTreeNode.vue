@@ -24,7 +24,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'toggle-file' | 'open-file' | 'retry' | 'toggle-open', path: string): void
+  (e: 'toggle-file' | 'open-file' | 'retry' | 'toggle-open' | 'uncheck', path: string): void
   (e: 'toggle-folder' | 'select-folder', node: ProjectTreeNode): void
   (e: 'set-mode', path: string, mode: ConfigMode): void
 }>()
@@ -39,21 +39,27 @@ const folderIndeterminate = computed(
   () => props.node.selectedCount > 0 && props.node.selectedCount < props.node.selectableCount,
 )
 
-/** 只有顶层文件夹显示三类标签；容器目录（src/main/com）不写，避免一长串废话 */
-const folderCategory = computed<'user' | 'config' | 'system' | null>(() => {
+/** 只有顶层文件夹显示标签；容器目录（src/main/com）不写，避免一长串废话 */
+const folderCategory = computed<'user' | 'config' | 'system' | 'mixed' | null>(() => {
   if (isFile.value || props.depth !== 0) return null
   if (isSystemFolder.value) return 'system'
 
   const found = new Set<string>()
+  let hasSystem = false
+
   const walk = (node: ProjectTreeNode) => {
     if (node.type === 'file') {
-      if (node.file && node.file.category !== 'system') found.add(node.file.category)
+      if (!node.file) return
+      if (node.file.category === 'system') hasSystem = true
+      else found.add(node.file.category)
       return
     }
     for (const child of node.children ?? []) walk(child)
   }
   walk(props.node)
 
+  // 用户文件和系统文件混在一起：不再一律显示「用户」
+  if (found.has('user') && hasSystem) return 'mixed'
   if (found.has('user')) return 'user'
   if (found.has('config')) return 'config'
   return null
@@ -164,9 +170,18 @@ function onFileCheck(e: Event) {
           'bg-emerald-50 text-emerald-700': folderCategory === 'user',
           'bg-indigo-50 text-indigo-600': folderCategory === 'config',
           'bg-slate-100 text-slate-500': folderCategory === 'system',
+          'bg-amber-50 text-amber-700': folderCategory === 'mixed',
         }"
       >
-        {{ folderCategory === 'user' ? '用户' : folderCategory === 'config' ? '配置' : '系统' }}
+        {{
+          folderCategory === 'user'
+            ? '用户'
+            : folderCategory === 'config'
+              ? '配置'
+              : folderCategory === 'mixed'
+                ? '混合'
+                : '系统'
+        }}
       </span>
 
       <span v-if="node.note" class="hidden min-w-0 truncate text-[11.5px] text-slate-400 sm:block">
@@ -193,6 +208,7 @@ function onFileCheck(e: Event) {
         @toggle-file="(p) => emit('toggle-file', p)"
         @toggle-folder="(n) => emit('toggle-folder', n)"
         @set-mode="(p, m) => emit('set-mode', p, m)"
+        @uncheck="(p) => emit('uncheck', p)"
         @open-file="(p) => emit('open-file', p)"
         @retry="(p) => emit('retry', p)"
         @toggle-open="(p) => emit('toggle-open', p)"
@@ -245,6 +261,32 @@ function onFileCheck(e: Event) {
       <span v-if="node.note" class="hidden min-w-0 truncate text-[11.5px] text-slate-400 sm:block">
         {{ node.note }}
       </span>
+
+      <!-- 中置信度：只提示，不改勾选 -->
+      <span
+        v-if="file?.vendor && file.vendor.confidence === 'medium'"
+        class="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700"
+        :title="file.vendor.evidence"
+      >
+        疑似第三方库 · {{ file.vendor.name }}
+      </span>
+
+      <!-- Agent 建议：只展示，用户点了才取消 -->
+      <span
+        v-if="file?.vendorSuggestion"
+        class="shrink-0 rounded bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700"
+        :title="file.vendorSuggestion"
+      >
+        AI 建议不勾
+      </span>
+      <button
+        v-if="file?.vendorSuggestion && file.include"
+        type="button"
+        class="shrink-0 text-[10px] text-sky-700 underline-offset-2 hover:underline"
+        @click.stop="emit('uncheck', node.path)"
+      >
+        取消勾选
+      </button>
 
       <!-- 配置 / 系统文件：仅作上下文 / 仍需解释 -->
       <span
