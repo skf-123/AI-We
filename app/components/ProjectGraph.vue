@@ -135,6 +135,8 @@ const layout = computed(() => {
   }
 
   const display: DisplayNode[] = []
+  /** 展开的分组：分组头 + 它下面显示出来的文件 / 更多卡片 */
+  const groupChildren: { headerId: string; childIds: string[] }[] = []
 
   for (const node of props.data.nodes) {
     const isGroup = Boolean(node.files && node.files.length > 0)
@@ -158,10 +160,13 @@ const layout = computed(() => {
         },
       })
 
+      const childIds: string[] = []
       const shown = node.files!.slice(0, MAX_EXPANDED_FILES)
       for (const file of shown) {
+        const fileId = `f:${file.path}`
+        childIds.push(fileId)
         display.push({
-          id: `f:${file.path}`,
+          id: fileId,
           w: FILE_W,
           h: FILE_H,
           type: 'file',
@@ -172,12 +177,13 @@ const layout = computed(() => {
           },
         })
         // 只用于排版的隐形边，不进 Vue Flow
-        g.setEdge(headerId, `f:${file.path}`)
+        g.setEdge(headerId, fileId)
       }
 
       // 文件太多：只画前 12 个，其余关系改接到分组节点上
       if (node.files!.length > MAX_EXPANDED_FILES) {
         const moreId = `m:${node.id}`
+        childIds.push(moreId)
         display.push({
           id: moreId,
           w: FILE_W,
@@ -189,6 +195,8 @@ const layout = computed(() => {
         })
         g.setEdge(headerId, moreId)
       }
+
+      groupChildren.push({ headerId, childIds })
     } else {
       display.push({
         id: `n:${node.id}`,
@@ -229,7 +237,7 @@ const layout = computed(() => {
     return endpoint
   }
 
-  const edges = resolveGraphEdges(props.data, expanded.value)
+  const realEdges = resolveGraphEdges(props.data, expanded.value)
     .map((edge) => ({
       ...edge,
       from: remapEndpoint(edge.from),
@@ -237,7 +245,28 @@ const layout = computed(() => {
     }))
     .filter((edge) => displayIds.has(edge.from) && displayIds.has(edge.to) && edge.from !== edge.to)
 
-  for (const edge of edges) g.setEdge(edge.from, edge.to)
+  // 每个展开出来的子节点都要有连线；源码里确实没有外部关系的，补一条虚线「归属」，
+  // 只表示它属于这个分组，不冒充调用关系。
+  const connected = new Set<string>()
+  for (const edge of realEdges) {
+    connected.add(edge.from)
+    connected.add(edge.to)
+  }
+
+  const edges: { from: string; to: string; label?: string; structural: boolean }[] = realEdges.map(
+    (edge) => ({ ...edge, structural: false }),
+  )
+
+  for (const group of groupChildren) {
+    for (const childId of group.childIds) {
+      if (!connected.has(childId)) {
+        edges.push({ from: group.headerId, to: childId, label: '归属', structural: true })
+      }
+    }
+  }
+
+  // 只有真实关系参与 dagre 排版；归属线只负责可见连接
+  for (const edge of realEdges) g.setEdge(edge.from, edge.to)
 
   dagre.layout(g)
 
@@ -260,18 +289,18 @@ const layout = computed(() => {
     source: edge.from,
     target: edge.to,
     label: edge.label,
-    animated: true,
+    animated: !edge.structural,
     markerEnd: MarkerType.ArrowClosed,
-    style: { stroke: '#cbd5e1' },
-    labelStyle: { fill: '#64748b', fontSize: 10 },
+    style: edge.structural ? { stroke: '#cbd5e1', strokeDasharray: '5 4' } : { stroke: '#cbd5e1' },
+    labelStyle: { fill: edge.structural ? '#94a3b8' : '#64748b', fontSize: 10 },
     labelBgStyle: { fill: '#ffffff', fillOpacity: 0.92 },
   }))
 
-  return { nodes, edges: flowEdges }
+  return { nodes, edges: flowEdges, realEdgeCount: realEdges.length }
 })
 
 const hasGroups = computed(() => props.data.nodes.some((n) => n.files && n.files.length > 0))
-const hasEdges = computed(() => layout.value.edges.length > 0)
+const hasEdges = computed(() => layout.value.realEdgeCount > 0)
 
 // ---------------------------------------------------------------- 全屏与尺寸
 
@@ -339,6 +368,7 @@ onBeforeUnmount(() => {
         <span class="h-2 w-2 rounded-sm bg-amber-500" />概念
       </span>
       <span class="text-slate-400">只数分组节点 · 展开出的文件不另计</span>
+      <span class="hidden text-slate-400 sm:inline">虚线「归属」表示源码里没有外部调用</span>
 
       <span v-if="!hasEdges" class="text-amber-700">模型没有给出可用的关系线</span>
 
