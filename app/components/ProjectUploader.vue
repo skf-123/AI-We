@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { normalizePath, PROJECT_LIMITS, stripCommonRoot } from '~/utils/project-files'
+import { formatSize, normalizePath, PROJECT_LIMITS, stripCommonRoot } from '~/utils/project-files'
 
 /**
  * 项目入口的上传区（第一里程碑只做文件夹，zip 在第二里程碑）。
@@ -9,7 +9,7 @@ import { normalizePath, PROJECT_LIMITS, stripCommonRoot } from '~/utils/project-
  *   · 拖入：DataTransferItem.webkitGetAsEntry 递归读目录
  * 两条路都不需要解压，也不需要额外的 zip 依赖。
  *
- * 上限在这里先挡一次（整个文件夹 200 MB / 文件数 20000），免得把浏览器拖死；
+ * 上限在这里先挡一次（整个文件夹 1 GB / 文件数 20000），免得把浏览器拖死；
  * 用户相关文件的选中总量 1.9 MB 预算在纯函数与页面里算，和这两个上限不是一回事。
  */
 
@@ -135,7 +135,7 @@ function emitFiles(raw: { path: string; file: File }[]) {
   if (total > PROJECT_LIMITS.maxTotal) {
     emit(
       'error',
-      `项目太大了（${(total / 1024 / 1024).toFixed(1)} MB），上限是 ${PROJECT_LIMITS.maxTotal / 1024 / 1024} MB。`,
+      `项目太大了（${formatSize(total)}），上限是 ${formatSize(PROJECT_LIMITS.maxTotal)}。`,
     )
     return
   }
@@ -189,7 +189,8 @@ function emitFiles(raw: { path: string; file: File }[]) {
 
       <p class="mt-5 max-w-md text-xs leading-relaxed text-slate-400">
         依赖（node_modules / target / .idea 等）只登记位置，不会上传给模型。<br />
-        用户相关文件选中总量上限 1.9 MB（依赖 / 产物不计入），整个文件夹上限 200MB。<br />
+        用户相关文件选中总量上限 1.9 MB（依赖 / 产物不计入），整个文件夹上限
+        {{ formatSize(PROJECT_LIMITS.maxTotal) }}。<br />
         zip 压缩包在后续版本支持。
       </p>
 
