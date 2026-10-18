@@ -58,7 +58,7 @@ function endpointOf(raw: unknown, nodeIds: Set<string>, knownPaths: Set<string>)
  *   · id 不存在 / 路径不存在的边 → 丢
  *   · 自己连自己的边 → 丢
  *   · 重复的边 → 去重
- *   · 节点超过 12 个 → 只留前 12 个（提示词要求 5~12）
+ *   · 节点超过 12 个 → 只留前 12 个（提示词要求 2~12）
  */
 export function sanitizeProjectGraph(raw: unknown, knownPaths: string[]): ProjectGraphData | null {
   if (!raw || typeof raw !== 'object') return null
