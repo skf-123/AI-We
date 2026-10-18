@@ -119,9 +119,22 @@ const pendingInclude = ref<PendingInclude>(null)
 /** 用户相关文件的选中总量上限；系统文件勾上后也计入 */
 const userBudget = PROJECT_LIMITS.maxUserBytes
 const overBudget = computed(() => stats.value.parseBytes > userBudget)
+const uploadDialogOpen = ref(false)
 
 function onSelect(payload: ProjectSelectionPayload) {
+  uploadDialogOpen.value = false
   void selectProject(payload)
+}
+
+/** 上传失败统一用弹窗提示，不再在页面里摆一条红字 */
+function onUploadError(message: string) {
+  setUploadError(message)
+  uploadDialogOpen.value = true
+}
+
+function onCloseUploadError() {
+  uploadDialogOpen.value = false
+  setUploadError('')
 }
 
 function onOpenFile(path: string) {
@@ -257,14 +270,7 @@ onBeforeUnmount(() => {
 
       <!-- 上传 -->
       <template v-if="phase === 'upload'">
-        <ProjectUploader @select="onSelect" @error="setUploadError" />
-
-        <div
-          v-if="uploadError"
-          class="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
-        >
-          {{ uploadError }}
-        </div>
+        <ProjectUploader @select="onSelect" @error="onUploadError" />
 
         <p class="mt-4 px-1 text-xs leading-relaxed text-slate-400">
           项目不会上传到任何存储：文件只在浏览器里读取，解析结果也只留在当前页面。
@@ -643,6 +649,13 @@ onBeforeUnmount(() => {
       :loading="hintLoading"
       @confirm="onConfirmInclude"
       @cancel="onCancelInclude"
+    />
+
+    <!-- 上传失败：用弹窗提示，避免页面里的红字被忽略 -->
+    <UploadErrorDialog
+      :open="uploadDialogOpen"
+      :message="uploadError"
+      @close="onCloseUploadError"
     />
   </div>
 </template>
