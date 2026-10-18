@@ -408,9 +408,18 @@ onBeforeUnmount(() => {
                     v-if="!allSettled && canGeneratePartial"
                     type="button"
                     class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+                    :title="
+                      poolStopped
+                        ? '用已完成文件生成项目总览和思维导图'
+                        : '点击后会停止剩余解析，用已完成的文件生成'
+                    "
                     @click="generatePartialSummary"
                   >
-                    {{ poolStopped ? '用已完成的生成总览 + 图' : '不再解析，用已完成的生成' }}
+                    {{
+                      poolStopped
+                        ? '生成项目总览 + 思维导图'
+                        : `生成思维导图（用已完成的 ${doneCount} 个）`
+                    }}
                   </button>
                   <span v-else-if="!allSettled && doneCount === 1" class="text-xs text-slate-500">
                     再解析 1 个文件就可以生成项目图
