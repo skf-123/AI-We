@@ -243,6 +243,17 @@ function systemDirOf(path: string): string | null {
   return null
 }
 
+/**
+ * 是否是无法按文本逐行解释的文件（二进制、图片、压缩/映射产物）。
+ * 这类系统文件可以只作上下文，但不能切「仍需解释」。
+ */
+export function isBinaryFile(path: string): boolean {
+  const name = baseName(normalizePath(path))
+  const lower = name.toLowerCase()
+  if (lower.endsWith('.min.js') || lower.endsWith('.min.css') || lower.endsWith('.map')) return true
+  return BINARY_EXTS.has(extOf(name))
+}
+
 export function classifyFile(
   path: string,
 ): Pick<ProjectFileEntry, 'category' | 'skipReason' | 'unrecorded'> {
@@ -297,6 +308,7 @@ export function makeFileEntry(path: string, size: number): ProjectFileEntry {
     unrecorded: meta.unrecorded,
     include: meta.category !== 'system',
     configMode: 'context',
+    systemMode: 'context',
   }
 }
 
@@ -374,8 +386,8 @@ export function buildTree(
       const file = node.file!
       node.size = file.size
       node.fileCount = 1
-      node.selectableCount = file.category === 'system' ? 0 : 1
-      node.selectedCount = file.category !== 'system' && file.include ? 1 : 0
+      node.selectableCount = 1
+      node.selectedCount = file.include ? 1 : 0
       return
     }
 
@@ -403,24 +415,34 @@ export function buildTree(
   return root.children ?? []
 }
 
-/** 勾选 / 取消一个文件夹下的所有可勾选文件（就地修改） */
+/** 勾选 / 取消一个文件夹下的所有文件（系统文件也可以手动勾选） */
 export function setFolderIncluded(node: ProjectTreeNode, include: boolean): void {
   if (node.type === 'file') {
-    if (node.file && node.file.category !== 'system') node.file.include = include
+    if (node.file) node.file.include = include
     return
   }
   for (const child of node.children ?? []) setFolderIncluded(child, include)
 }
 
+/** 文件夹里还没勾选的系统文件数；用于决定勾选文件夹时要不要先弹提示 */
+export function countUncheckedSystem(node: ProjectTreeNode): number {
+  if (node.type === 'file') {
+    return node.file?.category === 'system' && !node.file.include ? 1 : 0
+  }
+  return (node.children ?? []).reduce((sum, child) => sum + countUncheckedSystem(child), 0)
+}
+
 /** 选中 / 可选的统计（底部那两行数字） */
 export interface ProjectStats {
-  /** 会进逐文件解析的源文件数（用户代码 + 切到「仍需解释」的配置） */
+  /** 会进逐文件解析的文件数（用户代码 + 需解释的配置 / 系统文本） */
   parseCount: number
-  /** 仅作上下文的配置文件数 */
+  /** 仅作上下文的文件数（配置 + 系统文件） */
   contextCount: number
-  /** 这些文件的总字节数 */
+  /** 勾选的系统文件数；用于底部说明 */
+  systemCount: number
+  /** 选中文件的总字节数；系统文件也计入 1.9MB 预算 */
   parseBytes: number
-  /** 系统文件（跳过）的数量与字节数 */
+  /** 没勾选的文件数量与字节数 */
   skippedCount: number
   skippedBytes: number
 }
@@ -429,20 +451,27 @@ export function computeStats(files: ProjectFileEntry[]): ProjectStats {
   const stats: ProjectStats = {
     parseCount: 0,
     contextCount: 0,
+    systemCount: 0,
     parseBytes: 0,
     skippedCount: 0,
     skippedBytes: 0,
   }
 
   for (const file of files) {
-    if (file.category === 'system') {
+    if (!file.include) {
       stats.skippedCount++
       stats.skippedBytes += file.size
       continue
     }
-    if (!file.include) {
-      stats.skippedCount++
-      stats.skippedBytes += file.size
+
+    if (file.category === 'system') {
+      stats.systemCount++
+      stats.parseBytes += file.size
+      if (file.systemMode === 'explain' && !isBinaryFile(file.path)) {
+        stats.parseCount++
+      } else {
+        stats.contextCount++
+      }
       continue
     }
 
@@ -462,19 +491,19 @@ export function computeStats(files: ProjectFileEntry[]): ProjectStats {
 /** 真正要送进逐文件解析的文件（按路径稳定排序） */
 export function filesToParse(files: ProjectFileEntry[]): ProjectFileEntry[] {
   return files
-    .filter(
-      (f) =>
-        f.include &&
-        f.category !== 'system' &&
-        !(f.category === 'config' && f.configMode === 'context'),
-    )
+    .filter((f) => {
+      if (!f.include) return false
+      if (f.category === 'system') return f.systemMode === 'explain' && !isBinaryFile(f.path)
+      if (f.category === 'config') return f.configMode === 'explain'
+      return true
+    })
     .sort((a, b) => a.path.localeCompare(b.path))
 }
 
-/** 送进项目地图调用的文件（用户代码 + 配置，包括仅作上下文的） */
+/** 送进项目地图调用的文件（勾选的非二进制文件，包含系统文件） */
 export function filesForMap(files: ProjectFileEntry[]): ProjectFileEntry[] {
   return files
-    .filter((f) => f.include && f.category !== 'system')
+    .filter((f) => f.include && !isBinaryFile(f.path))
     .sort((a, b) => a.path.localeCompare(b.path))
 }
 
@@ -503,11 +532,14 @@ export function treeToText(nodes: ProjectTreeNode[], depth = 0): string {
 
   for (const node of nodes) {
     if (node.type === 'file') {
+      const file = node.file
       const tag =
-        node.file?.category === 'config'
+        file?.category === 'config'
           ? '配置'
-          : node.file?.category === 'system'
-            ? '系统'
+          : file?.category === 'system'
+            ? file.include
+              ? `系统·${file.systemMode === 'explain' ? '需解释' : '仅上下文'}`
+              : '系统·默认不勾'
             : '源码'
       lines.push(`${pad}- ${node.name} [${tag}] ${formatSize(node.size)}`)
       continue
@@ -515,7 +547,8 @@ export function treeToText(nodes: ProjectTreeNode[], depth = 0): string {
 
     if (allSystem(node)) {
       const first = node.children?.[0]?.file
-      lines.push(`${pad}- ${node.name}/ [系统：${first?.skipReason ?? '依赖 / 产物'}，已跳过]`)
+      const status = node.selectedCount > 0 ? '已勾选' : '默认不勾'
+      lines.push(`${pad}- ${node.name}/ [系统：${first?.skipReason ?? '依赖 / 产物'}，${status}]`)
       continue
     }
 

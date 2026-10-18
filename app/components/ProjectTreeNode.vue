@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ProjectFileEntry, FileProgress, ProjectTreeNode, ConfigMode } from '~/types/project'
-import { allSystem, formatSize } from '~/utils/project-files'
+import { allSystem, formatSize, isBinaryFile } from '~/utils/project-files'
 
 /**
  * 目录树的单个节点（文件夹或文件），递归渲染。
@@ -26,7 +26,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'toggle-file' | 'open-file' | 'retry' | 'toggle-open', path: string): void
   (e: 'toggle-folder' | 'select-folder', node: ProjectTreeNode): void
-  (e: 'config-mode', path: string, mode: ConfigMode): void
+  (e: 'set-mode', path: string, mode: ConfigMode): void
 }>()
 
 const isFile = computed(() => props.node.type === 'file')
@@ -62,6 +62,23 @@ const folderCategory = computed<'user' | 'config' | 'system' | null>(() => {
 const file = computed<ProjectFileEntry | undefined>(() => props.node.file)
 const pg = computed<FileProgress | undefined>(() => props.progress[props.node.path])
 
+/** 当前文件的角色；配置和系统文件共用同一个切换控件 */
+const modeValue = computed<ConfigMode>(() => {
+  if (!file.value) return 'context'
+  return file.value.category === 'system' ? file.value.systemMode : file.value.configMode
+})
+
+/** 系统文件里的二进制：只能作上下文，不能逐行解释 */
+const binarySystem = computed(
+  () => file.value?.category === 'system' && isBinaryFile(file.value.path),
+)
+
+const showModeSwitch = computed(
+  () =>
+    Boolean(file.value?.include) &&
+    (file.value?.category === 'config' || file.value?.category === 'system'),
+)
+
 const statusText = computed(() => {
   if (!pg.value) return ''
   if (pg.value.status === 'running') return '解析中'
@@ -75,7 +92,7 @@ function onFolderCheck() {
 }
 
 function onFileCheck() {
-  if (!file.value || file.value.category === 'system') return
+  if (!file.value) return
   emit('toggle-file', props.node.path)
 }
 </script>
@@ -162,7 +179,7 @@ function onFileCheck() {
         :active-path="activePath"
         @toggle-file="(p) => emit('toggle-file', p)"
         @toggle-folder="(n) => emit('toggle-folder', n)"
-        @config-mode="(p, m) => emit('config-mode', p, m)"
+        @set-mode="(p, m) => emit('set-mode', p, m)"
         @open-file="(p) => emit('open-file', p)"
         @retry="(p) => emit('retry', p)"
         @toggle-open="(p) => emit('toggle-open', p)"
@@ -184,7 +201,6 @@ function onFileCheck() {
         type="checkbox"
         class="h-3.5 w-3.5 shrink-0 accent-emerald-500"
         :checked="file?.include"
-        :disabled="file?.category === 'system'"
         @change="onFileCheck"
       />
 
@@ -217,32 +233,34 @@ function onFileCheck() {
         {{ node.note }}
       </span>
 
-      <!-- 配置文件：仅作上下文 / 仍需解释 -->
+      <!-- 配置 / 系统文件：仅作上下文 / 仍需解释 -->
       <span
-        v-if="file?.category === 'config'"
+        v-if="showModeSwitch"
         class="ml-auto inline-flex shrink-0 items-center gap-0.5 rounded-md border border-slate-200 bg-slate-50 p-0.5 text-[10px]"
       >
         <button
           type="button"
           class="rounded px-1.5 py-0.5"
           :class="
-            file.configMode === 'context'
+            modeValue === 'context'
               ? 'bg-white font-semibold text-indigo-600 shadow-sm'
               : 'text-slate-400'
           "
-          @click.stop="emit('config-mode', node.path, 'context')"
+          @click.stop="emit('set-mode', node.path, 'context')"
         >
           仅作上下文
         </button>
         <button
           type="button"
-          class="rounded px-1.5 py-0.5"
+          class="rounded px-1.5 py-0.5 disabled:cursor-not-allowed disabled:text-slate-300"
           :class="
-            file.configMode === 'explain'
+            modeValue === 'explain'
               ? 'bg-white font-semibold text-indigo-600 shadow-sm'
               : 'text-slate-400'
           "
-          @click.stop="emit('config-mode', node.path, 'explain')"
+          :disabled="binarySystem"
+          :title="binarySystem ? '二进制文件无法逐行解释，只能作上下文' : '把它送进逐文件解析'"
+          @click.stop="emit('set-mode', node.path, 'explain')"
         >
           仍需解释
         </button>
@@ -285,10 +303,10 @@ function onFileCheck() {
       </button>
 
       <span
-        v-if="file?.category === 'system' && file.skipReason"
+        v-if="file?.category === 'system' && !file.include && file.skipReason"
         class="ml-auto shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700"
       >
-        跳过：{{ file.skipReason }}
+        默认不勾：{{ file.skipReason }}
       </span>
 
       <span

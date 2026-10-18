@@ -24,7 +24,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'toggle-file' | 'open-file' | 'retry', path: string): void
   (e: 'toggle-folder' | 'select-folder', node: ProjectTreeNode): void
-  (e: 'config-mode', path: string, mode: ConfigMode): void
+  (e: 'set-mode', path: string, mode: ConfigMode): void
 }>()
 
 /** 选中文件夹时顺手展开它；展开状态仍由这里统一持有 */
@@ -78,7 +78,7 @@ function setAllOpen(value: boolean) {
         <span class="h-2 w-2 rounded-sm bg-indigo-400" />配置 · 默认仅作上下文
       </span>
       <span class="inline-flex items-center gap-1.5">
-        <span class="h-2 w-2 rounded-sm bg-slate-300" />依赖 / 产物 · 只登记位置
+        <span class="h-2 w-2 rounded-sm bg-slate-300" />依赖 / 产物 · 默认不勾，可手动勾选
       </span>
       <div class="ml-auto flex items-center gap-2 text-slate-400">
         <span class="hidden sm:inline">勾选可手动取消或补勾</span>
@@ -111,7 +111,7 @@ function setAllOpen(value: boolean) {
           :active-path="activePath"
           @toggle-file="(p) => emit('toggle-file', p)"
           @toggle-folder="(n) => emit('toggle-folder', n)"
-          @config-mode="(p, m) => emit('config-mode', p, m)"
+          @set-mode="(p, m) => emit('set-mode', p, m)"
           @open-file="(p) => emit('open-file', p)"
           @retry="(p) => emit('retry', p)"
           @toggle-open="toggleOpen"

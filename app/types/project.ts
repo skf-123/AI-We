@@ -14,7 +14,7 @@ import type { GraphNodeType, RagSource } from './analysis'
 /** 目录树上的三类标签 */
 export type ProjectFileCategory = 'user' | 'config' | 'system'
 
-/** 配置文件在项目里的两种角色 */
+/** 配置 / 系统文件在项目里的两种角色 */
 export type ConfigMode = 'context' | 'explain'
 
 /** 逐文件解析状态 */
@@ -28,14 +28,16 @@ export interface ProjectFileEntry {
   /** 字节数 */
   size: number
   category: ProjectFileCategory
-  /** system 类文件为什么被跳过；面向用户的说明 */
+  /** system 类文件为什么默认不勾；面向用户的说明 */
   skipReason?: string
   /** 语料未收录的语言：仍然解析，但四段里没有引用来源 */
   unrecorded: boolean
-  /** 是否勾选（system 类恒为 false） */
+  /** 是否勾选（system 类默认不勾，但可以手动勾上） */
   include: boolean
   /** 配置文件：仅作上下文 / 仍需解释 */
   configMode: ConfigMode
+  /** 系统文件：仅作上下文 / 仍需解释（二进制只能作上下文） */
+  systemMode: ConfigMode
   /** 来自项目地图调用的一句话说明 */
   note?: string
 }

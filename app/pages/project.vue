@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ProjectTreeNode } from '~/types/project'
 import { useProjectSession, type ProjectSelectionPayload } from '~/composables/useProjectSession'
+import { useSystemIncludeHint } from '~/composables/useSystemIncludeHint'
 import { formatSize, PROJECT_LIMITS } from '~/utils/project-files'
 
 useHead({ title: '整个项目 · 麦穗 · 代码理解助手' })
@@ -59,9 +60,11 @@ const {
   emptyHint,
   selectProject,
   setUploadError,
-  toggleFile,
-  toggleFolder,
-  setConfigMode,
+  toggleFile: toggleFileState,
+  toggleFolder: toggleFolderState,
+  includeFile,
+  includeFolder,
+  setFileMode,
   openFile,
   selectFolder,
   selectGroup,
@@ -76,7 +79,21 @@ const {
 
 const analysisRef = ref<{ scrollIntoView: () => void } | null>(null)
 
-/** 用户相关文件（用户代码 + 配置）的选中总量上限 */
+/** 勾选系统文件前的 AI 提示；只负责请求与文案，不碰勾选状态 */
+const {
+  open: hintOpen,
+  loading: hintLoading,
+  text: hintText,
+  target: hintTarget,
+  ask: askHint,
+  close: closeHint,
+} = useSystemIncludeHint()
+
+type PendingInclude =
+  { kind: 'file'; path: string } | { kind: 'folder'; node: ProjectTreeNode } | null
+const pendingInclude = ref<PendingInclude>(null)
+
+/** 用户相关文件的选中总量上限；系统文件勾上后也计入 */
 const userBudget = PROJECT_LIMITS.maxUserBytes
 const overBudget = computed(() => stats.value.parseBytes > userBudget)
 
@@ -87,6 +104,50 @@ function onSelect(payload: ProjectSelectionPayload) {
 function onOpenFile(path: string) {
   openFile(path)
   scrollToAnalysis()
+}
+
+/** 勾选文件：系统文件从「不勾」到「勾」时，先问一次模型再决定 */
+function onToggleFile(path: string) {
+  const result = toggleFileState(path)
+  if (!result.needsHint || !result.entry) return
+
+  pendingInclude.value = { kind: 'file', path }
+  void askHint({
+    kind: 'file',
+    path,
+    label: result.entry.path,
+    reason: result.entry.skipReason ?? '',
+    size: result.entry.size,
+  })
+}
+
+/** 勾选文件夹：目录里还有没勾的系统文件时，先弹提示 */
+function onToggleFolder(node: ProjectTreeNode) {
+  const result = toggleFolderState(node)
+  if (!result.needsHint) return
+
+  pendingInclude.value = { kind: 'folder', node }
+  void askHint({
+    kind: 'folder',
+    path: node.path,
+    label: node.path,
+    reason: '目录里包含默认不勾的系统文件',
+    count: result.systemCount ?? 0,
+  })
+}
+
+function onConfirmInclude() {
+  const pending = pendingInclude.value
+  if (pending?.kind === 'file') includeFile(pending.path)
+  else if (pending?.kind === 'folder') includeFolder(pending.node)
+
+  pendingInclude.value = null
+  closeHint()
+}
+
+function onCancelInclude() {
+  pendingInclude.value = null
+  closeHint()
 }
 
 function onSelectFolder(node: ProjectTreeNode) {
@@ -218,9 +279,9 @@ onBeforeUnmount(() => {
               :notes-degraded="mapDegraded"
               :selected-folder="selectedFolder"
               :active-path="activePath"
-              @toggle-file="toggleFile"
-              @toggle-folder="toggleFolder"
-              @config-mode="setConfigMode"
+              @toggle-file="onToggleFile"
+              @toggle-folder="onToggleFolder"
+              @set-mode="setFileMode"
               @open-file="onOpenFile"
               @retry="retryFile"
               @select-folder="onSelectFolder"
@@ -238,8 +299,11 @@ onBeforeUnmount(() => {
               class="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-slate-100 px-4 py-3"
             >
               <span class="text-xs text-slate-500">
-                <b class="text-slate-800">{{ stats.parseCount }}</b> 个源文件 +
-                <b class="text-slate-800">{{ stats.contextCount }}</b> 个配置文件（默认仅作上下文）
+                <b class="text-slate-800">{{ stats.parseCount }}</b> 个文件会解析 +
+                <b class="text-slate-800">{{ stats.contextCount }}</b> 个仅作上下文
+                <span v-if="stats.systemCount" class="text-slate-400">
+                  · 其中系统文件 {{ stats.systemCount }} 个</span
+                >
                 <span :class="overBudget ? 'font-medium text-rose-600' : 'text-slate-400'">
                   · {{ formatSize(stats.parseBytes) }} / {{ formatSize(userBudget) }}</span
                 >
@@ -455,5 +519,15 @@ onBeforeUnmount(() => {
         麦穗团队 · 传智杯 AI Web 开发挑战赛
       </footer>
     </main>
+
+    <!-- 勾选系统文件前的 AI 提示；纯展示组件，勾选动作由页面执行 -->
+    <ConfirmIncludeDialog
+      :open="hintOpen"
+      :title="hintTarget?.label ?? ''"
+      :text="hintText"
+      :loading="hintLoading"
+      @confirm="onConfirmInclude"
+      @cancel="onCancelInclude"
+    />
   </div>
 </template>

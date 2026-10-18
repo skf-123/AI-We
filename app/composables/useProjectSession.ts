@@ -2,9 +2,11 @@ import type { ConfigMode, ProjectFileEntry, ProjectTreeNode } from '~/types/proj
 import {
   buildTree,
   computeStats,
+  countUncheckedSystem,
   extractImports,
   filesForMap,
   filesToParse,
+  isBinaryFile,
   makeFileEntry,
   setFolderIncluded,
   thirdSection,
@@ -42,6 +44,21 @@ function folderOf(path: string): string | null {
 export interface ProjectSelectionPayload {
   root: string
   files: { path: string; file: File }[]
+}
+
+/** 勾选文件的结果：系统文件从没勾到勾时，需要页面先弹出 AI 提示 */
+export interface ToggleFileResult {
+  changed: boolean
+  needsHint: boolean
+  entry?: ProjectFileEntry
+}
+
+/** 勾选文件夹的结果 */
+export interface ToggleFolderResult {
+  changed: boolean
+  needsHint: boolean
+  node?: ProjectTreeNode
+  systemCount?: number
 }
 
 export function useProjectSession() {
@@ -223,21 +240,59 @@ export function useProjectSession() {
 
   // ---------------------------------------------------------------- 勾选
 
-  function toggleFile(path: string) {
+  function toggleFile(path: string): ToggleFileResult {
     const entry = files.value.find((f) => f.path === path)
-    if (!entry || entry.category === 'system') return
+    if (!entry) return { changed: false, needsHint: false }
+
+    // 系统文件默认不勾；从「不勾」到「勾」时，先让页面弹 AI 提示
+    if (entry.category === 'system' && !entry.include) {
+      return { changed: false, needsHint: true, entry }
+    }
+
     entry.include = !entry.include
+    return { changed: true, needsHint: false }
   }
 
-  function toggleFolder(node: ProjectTreeNode) {
+  /** 用户在提示弹窗里确认后，真正把系统文件勾上 */
+  function includeFile(path: string) {
+    const entry = files.value.find((f) => f.path === path)
+    if (entry) entry.include = true
+  }
+
+  function toggleFolder(node: ProjectTreeNode): ToggleFolderResult {
     const allSelected = node.selectableCount > 0 && node.selectedCount === node.selectableCount
-    setFolderIncluded(node, !allSelected)
+    if (allSelected) {
+      setFolderIncluded(node, false)
+      return { changed: true, needsHint: false }
+    }
+
+    // 目录里还有没勾的系统文件：先让页面说明一下
+    const systemCount = countUncheckedSystem(node)
+    if (systemCount > 0) {
+      return { changed: false, needsHint: true, node, systemCount }
+    }
+
+    setFolderIncluded(node, true)
+    return { changed: true, needsHint: false }
   }
 
-  function setConfigMode(path: string, mode: ConfigMode) {
+  /** 用户在提示弹窗里确认后，真正把整个文件夹勾上 */
+  function includeFolder(node: ProjectTreeNode) {
+    setFolderIncluded(node, true)
+  }
+
+  function setFileMode(path: string, mode: ConfigMode) {
     const entry = files.value.find((f) => f.path === path)
     if (!entry) return
-    entry.configMode = mode
+
+    if (entry.category === 'system') {
+      // 二进制文件无法逐行解释，只能作上下文
+      if (mode === 'explain' && isBinaryFile(entry.path)) return
+      entry.systemMode = mode
+    } else {
+      entry.configMode = mode
+    }
+
     // 切成「仍需解释」就意味着要解析它
     if (mode === 'explain') entry.include = true
   }
@@ -438,7 +493,9 @@ export function useProjectSession() {
     setUploadError,
     toggleFile,
     toggleFolder,
-    setConfigMode,
+    includeFile,
+    includeFolder,
+    setFileMode,
     openFile,
     selectFolder,
     selectGroup,
