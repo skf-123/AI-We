@@ -24,6 +24,12 @@ step() { echo; echo "===== $* ====="; }
 
 cd "$APP_DIR"
 
+# 仓库属主是 aiweb，而 deploy.sh 以 root 运行 git。
+# git 发现目录属主和当前用户不一致会拒绝操作（dubious ownership），
+# 干净机器上第一次部署就会卡在这里。只加一次，重复跑不会累积条目。
+git config --global --get-all safe.directory | grep -qxF "$APP_DIR" ||
+	git config --global --add safe.directory "$APP_DIR"
+
 # ------------------------------------------------------------
 step "1/4 拉最新代码"
 # ------------------------------------------------------------
