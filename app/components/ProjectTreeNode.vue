@@ -262,9 +262,9 @@ function onFileCheck(e: Event) {
         {{ node.note }}
       </span>
 
-      <!-- 中置信度：只提示，不改勾选 -->
+      <!-- 中置信度：只提示，不改勾选；系统文件的原因里已经写了库名 -->
       <span
-        v-if="file?.vendor && file.vendor.confidence === 'medium'"
+        v-if="file?.vendor && file.vendor.confidence === 'medium' && file.include"
         class="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700"
         :title="file.vendor.evidence"
       >

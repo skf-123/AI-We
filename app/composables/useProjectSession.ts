@@ -19,6 +19,7 @@ import {
 } from '~/utils/project-files'
 import { parseProjectSummary } from '~/utils/project-graph'
 import {
+  composeVendorReason,
   detectVendor,
   isVendorReviewCandidate,
   shouldProbeVendor,
@@ -288,16 +289,22 @@ export function useProjectSession() {
       const hint = detectVendor(entry.path, header)
 
       if (hint?.confidence === 'high') {
+        const baseReason = entry.category === 'system' ? entry.skipReason : undefined
+
         entry.category = 'system'
-        entry.subtype = 'vendor'
+        // 压缩产物等形态保留自己的子类，库名是另一维信息
+        if (entry.subtype === 'source' || entry.subtype === 'unknown') entry.subtype = 'vendor'
         entry.include = false
-        entry.skipReason = `第三方库：${hint.name}`
+        entry.skipReason = composeVendorReason(baseReason, hint.name)
         entry.vendor = hint
         continue
       }
 
       if (hint) {
         entry.vendor = hint
+        if (entry.category === 'system') {
+          entry.skipReason = composeVendorReason(entry.skipReason, hint.name, true)
+        }
         continue
       }
 

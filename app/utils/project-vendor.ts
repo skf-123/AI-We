@@ -8,7 +8,6 @@
  */
 
 import type { ProjectFileEntry, VendorHint } from '~/types/project'
-import { isMinifiedOrMap } from './project-files'
 
 /** 已知库的文件名规则：只匹配 basename，避免把路径里的词误当成库名 */
 const KNOWN_VENDORS: { name: string; test: RegExp }[] = [
@@ -18,14 +17,30 @@ const KNOWN_VENDORS: { name: string; test: RegExp }[] = [
   { name: 'Underscore', test: /^underscore(?:\.min)?\.js$/i },
   { name: 'Axios', test: /^axios(?:\.min)?\.js$/i },
   { name: 'Vue', test: /^vue(?:\.global|\.runtime)?(?:\.prod)?(?:\.min)?\.js$/i },
+  { name: 'Vue Router', test: /^vue-router(?:\.min)?\.js$/i },
+  { name: 'Vuex', test: /^vuex(?:\.min)?\.js$/i },
+  { name: 'Pinia', test: /^pinia(?:\.min)?\.js$/i },
   { name: 'React', test: /^react(?:-dom)?(?:\.production|\.development)?(?:\.min)?\.js$/i },
+  { name: 'AngularJS', test: /^angular(?:[-.][\w.-]+)?\.js$/i },
+  { name: 'Element UI', test: /^element-ui(?:\.min)?\.js$/i },
+  { name: 'Element Plus', test: /^element-plus(?:\.min)?\.js$/i },
+  { name: 'Layui', test: /^layui(?:\.all)?(?:\.min)?\.(?:js|css)$/i },
   { name: 'Moment', test: /^moment(?:\.min)?\.js$/i },
   { name: 'Day.js', test: /^dayjs(?:\.min)?\.js$/i },
   { name: 'D3', test: /^d3(?:\.v\d+)?(?:\.min)?\.js$/i },
   { name: 'Popper', test: /^popper(?:\.min)?\.js$/i },
   { name: 'Chart.js', test: /^chart(?:\.min)?\.js$/i },
   { name: 'ECharts', test: /^echarts(?:\.min)?\.js$/i },
-  { name: 'Swiper', test: /^swiper(?:\.bundle)?(?:\.min)?\.js$/i },
+  { name: 'Swiper', test: /^swiper(?:[-.]bundle)?(?:\.min)?\.js$/i },
+  { name: 'Zepto', test: /^zepto(?:\.min)?\.js$/i },
+  { name: 'Backbone', test: /^backbone(?:\.min)?\.js$/i },
+  { name: 'Knockout', test: /^knockout(?:[-.][\w.-]+)?\.js$/i },
+  { name: 'Handlebars', test: /^handlebars(?:\.min)?\.js$/i },
+  { name: 'Socket.IO', test: /^socket\.io(?:\.min)?\.js$/i },
+  { name: 'Highlight.js', test: /^highlight(?:\.min)?\.js$/i },
+  { name: 'Prism', test: /^prism(?:\.min)?\.js$/i },
+  { name: 'Normalize.css', test: /^normalize(?:\.min)?\.css$/i },
+  { name: 'Animate.css', test: /^animate(?:\.min)?\.css$/i },
 ]
 
 /** 文件头里出现「库名 + 版本」时，说明这段代码自己报了家门 */
@@ -33,14 +48,31 @@ const HEADER_VENDORS: { name: string; test: RegExp }[] = [
   { name: 'Bootstrap', test: /bootstrap\s+v?\d+(?:\.\d+)*/i },
   { name: 'jQuery', test: /jquery\s+v?\d+(?:\.\d+)*/i },
   { name: 'Lodash', test: /lodash(?:\.js)?\s+v?\d+/i },
+  { name: 'Underscore', test: /underscore(?:\.js)?\s+v?\d+/i },
   { name: 'Axios', test: /axios\s+v?\d+/i },
   { name: 'Vue', test: /vue(?:\.js)?\s+v?\d+/i },
+  { name: 'Vue Router', test: /vue-router\s+v?\d+/i },
+  { name: 'Vuex', test: /vuex\s+v?\d+/i },
+  { name: 'Pinia', test: /pinia\s+v?\d+/i },
   { name: 'React', test: /react(?:\.js)?\s+v?\d+/i },
+  { name: 'AngularJS', test: /angular(?:js)?\s+v?\d+/i },
+  { name: 'Element UI', test: /element-ui\s+v?\d+/i },
+  { name: 'Element Plus', test: /element-plus\s+v?\d+/i },
+  { name: 'Layui', test: /layui\s+v?\d+/i },
   { name: 'Moment', test: /moment(?:\.js)?\s+v?\d+/i },
+  { name: 'Day.js', test: /dayjs\s+v?\d+/i },
   { name: 'D3', test: /d3(?:\.js)?\s+v?\d+/i },
   { name: 'Popper', test: /popper(?:\.js)?\s+v?\d+/i },
   { name: 'Chart.js', test: /chart(?:\.js)?\s+v?\d+/i },
   { name: 'ECharts', test: /echarts\s+v?\d+/i },
+  { name: 'Swiper', test: /swiper\s+v?\d+/i },
+  { name: 'Zepto', test: /zepto\s+v?\d+/i },
+  { name: 'Backbone', test: /backbone(?:\.js)?\s+v?\d+/i },
+  { name: 'Knockout', test: /knockout(?:\.js)?\s+v?\d+/i },
+  { name: 'Handlebars', test: /handlebars\s+v?\d+/i },
+  { name: 'Socket.IO', test: /socket\.io\s+v?\d+/i },
+  { name: 'Highlight.js', test: /highlight(?:\.js)?\s+v?\d+/i },
+  { name: 'Prism', test: /prism(?:\.js)?\s+v?\d+/i },
 ]
 
 const LICENSE_MARKERS = [
@@ -71,14 +103,33 @@ function pathParts(path: string): string[] {
   return path.toLowerCase().split('/').slice(0, -1)
 }
 
-/** 是否值得读文件头：代码文件且不在依赖 / 产物里，而且有理由怀疑 */
+/**
+ * 是否值得读文件头。
+ *
+ * 只看「文件形态」，不看它现在是不是用户文件：
+ * 压缩产物和用户源码一样可能带许可证头，不能因为已经被判成
+ * 压缩产物就跳过第三方库识别。
+ */
 export function shouldProbeVendor(entry: ProjectFileEntry): boolean {
-  if (entry.category !== 'user') return false
-  if (isMinifiedOrMap(entry.path)) return false
+  if (
+    entry.subtype === 'dependency' ||
+    entry.subtype === 'build' ||
+    entry.subtype === 'tooling' ||
+    entry.subtype === 'binary' ||
+    entry.subtype === 'docs' ||
+    entry.subtype === 'lockfile' ||
+    entry.subtype === 'ide' ||
+    entry.subtype === 'config' ||
+    entry.subtype === 'source-map'
+  ) {
+    return false
+  }
 
   const name = baseName(entry.path)
   if (!PROBE_EXTS.test(name)) return false
+
   if (KNOWN_VENDORS.some((row) => row.test.test(name))) return true
+  if (entry.subtype === 'minified') return true
 
   const lower = entry.path.toLowerCase()
   if (lower.includes('/static/') || lower.includes('/public/') || lower.includes('/assets/')) {
@@ -151,10 +202,24 @@ export function detectVendor(path: string, header: string): VendorHint | null {
 }
 
 /**
+ * 把库名和原有原因拼成一句话。
+ * 压缩产物、映射文件这些形态信息不能被库名盖掉，两者要同时出现。
+ */
+export function composeVendorReason(
+  baseReason: string | undefined,
+  vendorName: string,
+  suspected = false,
+): string {
+  const prefix = suspected ? `疑似第三方库：${vendorName}` : `第三方库：${vendorName}`
+  return baseReason ? `${prefix} · ${baseReason}` : prefix
+}
+
+/**
  * 规则没有结论、但值得让 Agent 看一眼的文件。
- * 只收「有许可证头」或「静态目录里的大文件」，避免把普通业务代码全送过去。
+ * 只收仍然勾着的用户文件：已经默认不勾的系统文件再给建议没有意义。
  */
 export function isVendorReviewCandidate(entry: ProjectFileEntry, header: string): boolean {
+  if (entry.category !== 'user') return false
   if (!shouldProbeVendor(entry)) return false
   if (hasLicenseMarker(header)) return true
   return isStaticPath(entry.path) && entry.size >= 8 * 1024
