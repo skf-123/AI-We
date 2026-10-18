@@ -113,17 +113,65 @@ const BINARY_EXTS = new Set([
   'jpeg',
   'gif',
   'webp',
+  'avif',
+  'heic',
+  'heif',
+  'apng',
+  'jfif',
+  'tif',
+  'tiff',
+  'psd',
+  'raw',
+  'cr2',
+  'nef',
+  'arw',
   'bmp',
   'ico',
   'svg',
   'mp4',
   'mov',
+  'm4v',
+  'webm',
+  'mkv',
+  'avi',
+  'wmv',
+  'flv',
+  '3gp',
+  'mpeg',
+  'mpg',
   'mp3',
   'wav',
+  'm4a',
+  'aac',
+  'ogg',
+  'oga',
+  'flac',
+  'opus',
+  'wma',
+  'aiff',
+  'aif',
   'woff',
   'woff2',
   'ttf',
+  'otf',
+  'ttc',
   'eot',
+  'fnt',
+  'wasm',
+  'bin',
+  'iso',
+  'dmg',
+  'pkg',
+  'msi',
+  'apk',
+  'ipa',
+  'deb',
+  'rpm',
+  'bz2',
+  'xz',
+  'zst',
+  'lz4',
+  'cab',
   'pdf',
   'xls',
   'xlsx',
@@ -135,6 +183,16 @@ const BINARY_EXTS = new Set([
   'sqlite',
   'sqlite3',
   'lock',
+])
+
+/** 浏览器 MIME 能直接判定为二进制的类型；只收确定不是文本的 */
+const BINARY_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/zip',
+  'application/x-zip-compressed',
+  'application/java-archive',
+  'application/vnd.android.package-archive',
+  'application/wasm',
 ])
 
 /** 文档：能看，但不是代码，默认跳过 */
@@ -282,8 +340,28 @@ export function isBinaryFile(path: string): boolean {
   return BINARY_EXTS.has(extOf(name))
 }
 
+/**
+ * 扩展名不认识时，用浏览器给的 MIME 兜底。
+ * 只看确定是媒体的类型；application/octet-stream 不当作二进制，
+ * 因为有些系统会给未知的文本文件也标成它。
+ */
+function isBinaryMime(mime: string): boolean {
+  const value = mime.trim().toLowerCase()
+  if (!value) return false
+  if (
+    value.startsWith('image/') ||
+    value.startsWith('video/') ||
+    value.startsWith('audio/') ||
+    value.startsWith('font/')
+  ) {
+    return true
+  }
+  return BINARY_MIME_TYPES.has(value)
+}
+
 export function classifyFile(
   path: string,
+  mime = '',
 ): Pick<ProjectFileEntry, 'category' | 'subtype' | 'skipReason' | 'unrecorded'> {
   const name = baseName(path)
   const ext = extOf(name)
@@ -343,15 +421,25 @@ export function classifyFile(
     return { category: 'user', subtype: 'source', unrecorded: UNRECORDED_EXTS.has(ext) }
   }
 
+  // 扩展名不认识时，浏览器可能还知道它是什么（avif、heic 这类新格式）
+  if (isBinaryMime(mime)) {
+    return {
+      category: 'system',
+      subtype: 'binary',
+      skipReason: '二进制或静态资源',
+      unrecorded: false,
+    }
+  }
+
   // 认不出来的文本，宁可当用户代码带上（判错代价不对称：静默丢用户代码更糟）
   return { category: 'user', subtype: 'unknown', unrecorded: false }
 }
 
-/** 按路径与大小造一条登记项（内容不在这里） */
-export function makeFileEntry(path: string, size: number): ProjectFileEntry {
+/** 按路径、大小和浏览器给出的 MIME 造一条登记项（内容不在这里） */
+export function makeFileEntry(path: string, size: number, mime = ''): ProjectFileEntry {
   const normalized = normalizePath(path)
   const name = baseName(normalized)
-  const meta = classifyFile(normalized)
+  const meta = classifyFile(normalized, mime)
 
   return {
     path: normalized,

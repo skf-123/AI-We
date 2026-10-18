@@ -251,6 +251,14 @@ function onFileCheck(e: Event) {
       </button>
 
       <span
+        v-if="file?.subtype === 'unknown'"
+        class="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500"
+        title="扩展名不在已知列表里；为了不静默漏掉用户代码，默认勾选"
+      >
+        未识别扩展名
+      </span>
+
+      <span
         v-if="file?.unrecorded"
         class="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700"
         title="知识库未收录这门语言：仍然解析，但没有引用来源"

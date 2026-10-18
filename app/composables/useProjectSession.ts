@@ -337,7 +337,9 @@ export function useProjectSession() {
     projectName.value = payload.root || '未命名项目'
 
     for (const item of payload.files) fileHandles.set(item.path, item.file)
-    files.value = payload.files.map((item) => makeFileEntry(item.path, item.file.size))
+    files.value = payload.files.map((item) =>
+      makeFileEntry(item.path, item.file.size, item.file.type),
+    )
 
     let candidates: VendorCandidate[] = []
     try {
