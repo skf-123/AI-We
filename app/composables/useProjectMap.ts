@@ -22,10 +22,39 @@ export function useProjectMap() {
   const summary = ref('')
   const folderNotes = reactive<Record<string, string>>({})
   const fileNotes = reactive<Record<string, string>>({})
+  const crossFileNotes = ref<string[]>([])
+  const readingPlan = ref<string[]>([])
+  const backend = ref<{ hasBackend: boolean; evidence: string } | null>(null)
   const loading = ref(false)
   const degraded = ref(false)
   const error = ref('')
   const ran = ref(false)
+
+  function clearNotes() {
+    for (const key of Object.keys(folderNotes)) Reflect.deleteProperty(folderNotes, key)
+    for (const key of Object.keys(fileNotes)) Reflect.deleteProperty(fileNotes, key)
+  }
+
+  /** 把 Agent 侦查的结果套到项目地图上（与固定地图共用同一套字段） */
+  function apply(result: {
+    summary: string
+    folders: { path: string; note: string }[]
+    files: { path: string; note: string }[]
+    crossFileNotes?: string[]
+    readingPlan?: string[]
+    backend?: { hasBackend: boolean; evidence: string } | null
+  }) {
+    summary.value = result.summary
+    clearNotes()
+    for (const row of result.folders) folderNotes[row.path] = row.note
+    for (const row of result.files) fileNotes[row.path] = row.note
+    crossFileNotes.value = result.crossFileNotes ?? []
+    readingPlan.value = result.readingPlan ?? []
+    backend.value = result.backend ?? null
+    ran.value = true
+    degraded.value = false
+    error.value = ''
+  }
 
   async function run(projectName: string, treeText: string, fileHeads: ProjectMapFileHead[]) {
     loading.value = true
@@ -65,9 +94,11 @@ export function useProjectMap() {
 
       summary.value = data.summary ?? ''
       degraded.value = Boolean(data.degraded)
+      crossFileNotes.value = []
+      readingPlan.value = []
+      backend.value = null
 
-      for (const key of Object.keys(folderNotes)) Reflect.deleteProperty(folderNotes, key)
-      for (const key of Object.keys(fileNotes)) Reflect.deleteProperty(fileNotes, key)
+      clearNotes()
 
       for (const row of data.folders ?? []) folderNotes[row.path] = row.note
       for (const row of data.files ?? []) fileNotes[row.path] = row.note
@@ -82,13 +113,22 @@ export function useProjectMap() {
 
   /** 逐文件请求要原样带上的项目结构结论 */
   function context(projectName: string): string {
-    return buildProjectContext(projectName, summary.value, { ...folderNotes }, { ...fileNotes })
+    return buildProjectContext(
+      projectName,
+      summary.value,
+      { ...folderNotes },
+      { ...fileNotes },
+      crossFileNotes.value,
+      backend.value,
+    )
   }
 
   function reset() {
     summary.value = ''
-    for (const key of Object.keys(folderNotes)) Reflect.deleteProperty(folderNotes, key)
-    for (const key of Object.keys(fileNotes)) Reflect.deleteProperty(fileNotes, key)
+    clearNotes()
+    crossFileNotes.value = []
+    readingPlan.value = []
+    backend.value = null
     loading.value = false
     degraded.value = false
     error.value = ''
@@ -99,11 +139,15 @@ export function useProjectMap() {
     summary,
     folderNotes,
     fileNotes,
+    crossFileNotes,
+    readingPlan,
+    backend,
     loading,
     degraded,
     error,
     ran,
     run,
+    apply,
     context,
     reset,
   }

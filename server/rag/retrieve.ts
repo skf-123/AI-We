@@ -150,6 +150,36 @@ export function cosine(a: number[], b: number[]): number {
  * 这个函数**永不抛错**：任何环节出问题都返回空数组。
  * 检索不到是正常路径，不是异常 —— 上层据此退回纯模型回答。
  */
+/**
+ * 按一段自然语言问题检索知识库。
+ *
+ * 与 retrieveDocs 的区别：retrieveDocs 会先按代码内容判断语言、只在该语言里找；
+ * 这里的问题是「查询」，没有可判定的语言，所以在全部语料里找。
+ * 只给 Agent 的 search_knowledge 工具用。
+ */
+export async function searchKnowledge(
+  query: string,
+  ragCfg: RagConfig,
+  embedCfg: EmbedConfig,
+): Promise<RetrievedDoc[]> {
+  if (!ragCfg.enabled) return []
+
+  const all = loadCorpus(embedCfg.dimensions)
+  if (all.length === 0) return []
+
+  const queryVector = await embedQuery(query, embedCfg)
+  if (!queryVector) return []
+
+  return all
+    .map(({ entry, vector }) => ({
+      ...entry,
+      score: cosine(queryVector, vector),
+    }))
+    .filter((doc) => doc.score >= ragCfg.minScore)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, ragCfg.topK)
+}
+
 export async function retrieveDocs(
   code: string,
   ragCfg: RagConfig,

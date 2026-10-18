@@ -18,12 +18,15 @@ export interface LlmRuntimeConfig {
 }
 
 export interface LlmCallOptions {
-  messages: { role: 'system' | 'user'; content: string }[]
+  messages: unknown[]
   stream: boolean
   temperature?: number
   maxTokens?: number
   /** 等响应头的上限（毫秒）。流开始后不再计时 */
   timeoutMs?: number
+  /** Function Calling 的工具定义 */
+  tools?: unknown[]
+  toolChoice?: 'auto' | 'none' | { type: 'function'; function: { name: string } }
 }
 
 /** 上游返回非 200 时，把状态码翻译成前端该看到的那一种 */
@@ -70,6 +73,8 @@ export async function callLlm(config: LlmRuntimeConfig, opts: LlmCallOptions): P
         temperature: opts.temperature ?? 0.3,
         max_tokens: opts.maxTokens ?? 8192,
         messages: opts.messages,
+        ...(opts.tools ? { tools: opts.tools } : {}),
+        ...(opts.toolChoice ? { tool_choice: opts.toolChoice } : {}),
       }),
       signal: controller.signal,
     })
@@ -112,4 +117,27 @@ export async function callLlmText(config: LlmRuntimeConfig, opts: LlmCallOptions
   } | null
 
   return data?.choices?.[0]?.message?.content ?? ''
+}
+
+export interface LlmMessage {
+  role: 'assistant'
+  content: string
+  tool_calls?: {
+    id: string
+    type: 'function'
+    function: { name: string; arguments: string }
+  }[]
+}
+
+/** 非流式调用，返回完整的 assistant 消息（含 tool_calls）。Agent 循环用 */
+export async function callLlmMessage(
+  config: LlmRuntimeConfig,
+  opts: LlmCallOptions,
+): Promise<LlmMessage> {
+  const res = await callLlm(config, { ...opts, stream: false })
+  const data = (await res.json().catch(() => null)) as {
+    choices?: { message?: LlmMessage }[]
+  } | null
+
+  return data?.choices?.[0]?.message ?? { role: 'assistant', content: '' }
 }

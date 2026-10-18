@@ -570,6 +570,8 @@ export function buildProjectContext(
   summary: string,
   folderNotes: Record<string, string>,
   fileNotes: Record<string, string>,
+  crossFileNotes: string[] = [],
+  backend: { hasBackend: boolean; evidence: string } | null = null,
 ): string {
   const folders = Object.keys(folderNotes)
     .sort()
@@ -578,15 +580,25 @@ export function buildProjectContext(
     .sort()
     .map((p) => `- ${p}：${fileNotes[p]}`)
 
+  const backendLine = backend
+    ? `后端判断：${backend.hasBackend ? '有后端' : '没有后端'}${
+        backend.evidence ? `（依据：${backend.evidence}）` : ''
+      }`
+    : ''
+
   return [
     `项目：${projectName || '（未命名）'}`,
     `概述：${summary || '（未生成）'}`,
+    ...(backendLine ? ['', backendLine] : []),
     '',
     '目录说明：',
     ...(folders.length ? folders : ['- （无）']),
     '',
     '文件说明：',
     ...(files.length ? files : ['- （无）']),
+    ...(crossFileNotes.length
+      ? ['', '跨文件线索：', ...crossFileNotes.map((note) => `- ${note}`)]
+      : []),
   ].join('\n')
 }
 

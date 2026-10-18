@@ -25,9 +25,18 @@ const {
   uploadError,
   summarySkippedCount,
   mapSummary,
-  mapLoading,
   mapDegraded,
   mapError,
+  mapBackend,
+  mapReadingPlan,
+  notesLoading,
+  agentRunning,
+  agentStopped,
+  agentError,
+  agentSteps,
+  agentRounds,
+  agentMaxRounds,
+  stopAgent,
   progress,
   total,
   finished,
@@ -255,6 +264,13 @@ onBeforeUnmount(() => {
                   {{ files.length }} 个文件 · {{ formatSize(totalBytes) }}
                   <span v-if="mapSummary"> · {{ mapSummary }}</span>
                 </p>
+                <p v-if="mapBackend" class="mt-0.5 text-[11px] text-slate-400">
+                  {{ mapBackend.hasBackend ? '有后端' : '没有后端' }}
+                  <template v-if="mapBackend.evidence"> · {{ mapBackend.evidence }}</template>
+                </p>
+                <p v-if="mapReadingPlan.length" class="mt-0.5 text-[11px] text-slate-400">
+                  建议先读：{{ mapReadingPlan.slice(0, 3).join(' → ') }}
+                </p>
               </div>
               <button
                 type="button"
@@ -272,10 +288,22 @@ onBeforeUnmount(() => {
               {{ mapError }}
             </div>
 
+            <AgentTrace
+              v-if="agentRunning || agentSteps.length || agentError"
+              :steps="agentSteps"
+              :running="agentRunning"
+              :stopped="agentStopped"
+              :error="agentError"
+              :round="agentRounds"
+              :max-rounds="agentMaxRounds"
+              :fallback="Boolean(agentError && mapSummary)"
+              @stop="stopAgent"
+            />
+
             <ProjectTree
               :nodes="tree"
               :progress="progress"
-              :loading-notes="mapLoading"
+              :loading-notes="notesLoading"
               :notes-degraded="mapDegraded"
               :selected-folder="selectedFolder"
               :active-path="activePath"
@@ -317,10 +345,10 @@ onBeforeUnmount(() => {
                   <button
                     type="button"
                     class="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300"
-                    :disabled="queueFiles.length === 0 || mapLoading || overBudget"
+                    :disabled="queueFiles.length === 0 || notesLoading || overBudget"
                     @click="onStart"
                   >
-                    {{ mapLoading ? '正在生成目录说明…' : '开始解析 →' }}
+                    {{ notesLoading ? 'Agent 正在侦查项目…' : '开始解析 →' }}
                   </button>
                 </template>
 

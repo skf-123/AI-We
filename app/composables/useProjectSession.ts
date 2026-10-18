@@ -13,6 +13,7 @@ import {
   treeToText,
 } from '~/utils/project-files'
 import { parseProjectSummary } from '~/utils/project-graph'
+import { useProjectAgent } from './useProjectAgent'
 import { useProjectMap } from './useProjectMap'
 import { useProjectAnalysis } from './useProjectAnalysis'
 import { useProjectSummary } from './useProjectSummary'
@@ -81,8 +82,12 @@ export function useProjectSession() {
   const fileHandles = new Map<string, File>()
 
   const map = useProjectMap()
+  const agent = useProjectAgent()
   const pool = useProjectAnalysis()
   const summary = useProjectSummary()
+
+  /** 目录说明阶段：Agent 侦查或固定地图，任一在跑都算还没准备好 */
+  const notesLoading = computed(() => map.loading.value || agent.running.value)
 
   // ---------------------------------------------------------------- 派生
 
@@ -219,20 +224,35 @@ export function useProjectSession() {
    * 最多发 300 个文件的头部 —— 再多的项目，说明留白好过把一次调用撑爆。
    */
   async function loadNotes() {
-    const selected = filesForMap(files.value).slice(0, 300)
+    const selected = filesForMap(files.value)
+    const readablePaths = selected.map((entry) => entry.path)
 
-    const heads = await Promise.all(
-      selected.map(async (entry) => {
-        const file = fileHandles.get(entry.path)
-        return file ? { path: entry.path, head: await readHead(file) } : null
-      }),
-    )
+    // 先让 Agent 自己决定看什么；失败或超预算时回退到原来的固定地图
+    const agentResult = await agent.run({
+      projectName: projectName.value,
+      entries: files.value,
+      treeText: treeToText(tree.value),
+      parseCount: filesToParse(files.value).length,
+      readablePaths,
+      getFile: (path) => fileHandles.get(path),
+    })
 
-    await map.run(
-      projectName.value,
-      treeToText(tree.value),
-      heads.filter((h): h is { path: string; head: string } => h !== null),
-    )
+    if (agentResult) {
+      map.apply(agentResult)
+    } else {
+      const heads = await Promise.all(
+        selected.slice(0, 300).map(async (entry) => {
+          const file = fileHandles.get(entry.path)
+          return file ? { path: entry.path, head: await readHead(file) } : null
+        }),
+      )
+
+      await map.run(
+        projectName.value,
+        treeToText(tree.value),
+        heads.filter((h): h is { path: string; head: string } => h !== null),
+      )
+    }
 
     // map 返回后把文件说明贴回登记项；树是 computed，会自动重建
     for (const entry of files.value) entry.note = map.fileNotes[entry.path]
@@ -418,6 +438,7 @@ export function useProjectSession() {
     pool.stop()
     summary.stop()
 
+    agent.reset()
     pool.reset()
     map.reset()
     summary.reset()
@@ -436,6 +457,7 @@ export function useProjectSession() {
 
   /** 页面卸载时调用：abort 所有在飞请求 */
   function cleanup() {
+    agent.stop()
     pool.stop()
     summary.stop()
   }
@@ -454,6 +476,19 @@ export function useProjectSession() {
     mapLoading: map.loading,
     mapDegraded: map.degraded,
     mapError: map.error,
+    mapCrossFileNotes: map.crossFileNotes,
+    mapReadingPlan: map.readingPlan,
+    mapBackend: map.backend,
+    notesLoading,
+    // Agent 侦查轨迹
+    agentRunning: agent.running,
+    agentStopped: agent.stopped,
+    agentError: agent.error,
+    agentSteps: agent.steps,
+    agentRounds: agent.rounds,
+    agentMaxRounds: agent.maxRounds,
+    agentResult: agent.result,
+    stopAgent: agent.stop,
     // 并发池
     progress: pool.progress,
     total: pool.total,
