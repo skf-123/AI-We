@@ -246,6 +246,13 @@ onBeforeUnmount(() => {
           </div>
           <span v-if="i < STEPS.length - 1" class="mx-3 hidden h-px w-8 bg-slate-200 sm:block" />
         </template>
+
+        <NuxtLink
+          to="/"
+          class="ml-auto rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 transition hover:bg-slate-50"
+        >
+          返回首页
+        </NuxtLink>
       </div>
 
       <!-- 上传 -->
