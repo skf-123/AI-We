@@ -279,11 +279,16 @@ onBeforeUnmount(() => {
 
       <!-- 目录树 + 逐文件结果 -->
       <template v-else>
+        <!--
+          桌面端左栏目录树的最大高度与解析结果面板原来的最大高度一致：
+          树达到上限后在卡片内部滚动，右侧跟着同一高度走。
+          否则目录树越长，整页和右侧空白就被一起拉得越高。
+        -->
         <div class="grid gap-4 lg:grid-cols-2 lg:items-stretch">
           <section
-            class="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+            class="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:flex lg:flex-col"
           >
-            <div class="flex items-start gap-3 border-b border-slate-100 px-4 py-3.5">
+            <div class="flex shrink-0 items-start gap-3 border-b border-slate-100 px-4 py-3.5">
               <div
                 class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-sm font-bold text-white"
               >
@@ -316,7 +321,7 @@ onBeforeUnmount(() => {
 
             <div
               v-if="mapError"
-              class="border-b border-amber-100 bg-amber-50 px-4 py-2 text-[11.5px] text-amber-700"
+              class="shrink-0 border-b border-amber-100 bg-amber-50 px-4 py-2 text-[11.5px] text-amber-700"
             >
               {{ mapError }}
             </div>
@@ -353,14 +358,14 @@ onBeforeUnmount(() => {
 
             <div
               v-if="overBudget"
-              class="border-t border-rose-100 bg-rose-50 px-4 py-2.5 text-[11.5px] leading-relaxed text-rose-700"
+              class="shrink-0 border-t border-rose-100 bg-rose-50 px-4 py-2.5 text-[11.5px] leading-relaxed text-rose-700"
             >
               选中的用户相关文件共 {{ formatSize(stats.parseBytes) }}，超过
               {{ formatSize(userBudget) }} 上限。请取消一些文件后再开始解析。
             </div>
 
             <div
-              class="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-slate-100 px-4 py-3"
+              class="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-t border-slate-100 px-4 py-3"
             >
               <span class="text-xs text-slate-500">
                 <b class="text-slate-800">{{ stats.parseCount }}</b> 个文件会解析 +
@@ -444,7 +449,7 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
-            <p class="px-4 pb-3 text-[11px] text-slate-400">解析结果只保存在当前页面，刷新会丢。</p>
+            <p class="shrink-0 px-4 pb-3 text-[11px] text-slate-400">解析结果只保存在当前页面，刷新会丢。</p>
           </section>
 
           <div class="relative min-w-0 lg:min-h-0">

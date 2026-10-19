@@ -69,9 +69,9 @@ function setAllOpen(value: boolean) {
 </script>
 
 <template>
-  <div>
+  <div class="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
     <div
-      class="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5 text-[11px] text-slate-500"
+      class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5 text-[11px] text-slate-500"
     >
       <span class="inline-flex items-center gap-1.5">
         <span class="h-2 w-2 rounded-sm bg-emerald-500" />用户代码 · 读内容
@@ -97,7 +97,9 @@ function setAllOpen(value: boolean) {
       </div>
     </div>
 
-    <div class="px-2 py-2">
+    <div
+      class="px-2 py-2 lg:min-h-0 lg:max-h-[calc(100dvh-200px)] lg:flex-1 lg:overflow-y-auto lg:overscroll-contain"
+    >
       <p v-if="loadingNotes" class="px-2 py-1 text-[11.5px] text-slate-400">正在生成目录说明…</p>
       <p v-else-if="notesDegraded" class="px-2 py-1 text-[11.5px] text-amber-700">
         目录说明没生成成功，不影响下面的逐文件解析。
