@@ -80,6 +80,9 @@
   display: inline-block;
   width: 84px;
   height: 76px;
+  /* 等比放大 20%。每条边、每道线都是按 84×76 写的固定像素，
+     逐项改数既容易漏又容易把比例改歪；整体缩放只动渲染，内部比例原样保留。 */
+  transform: scale(1.2);
   perspective: 370px;
   perspective-origin: 50% 26%;
   vertical-align: middle;
