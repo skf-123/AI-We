@@ -39,6 +39,13 @@ const props = defineProps<{
    * 不带它，问「你上面说的第二点」会得到另一套解释。
    */
   explanation?: string
+  /**
+   * 空状态里那句“模型能看到多少代码”。
+   *
+   * 贴代码入口说“你贴的完整代码”，项目模式说“当前文件的代码”；
+   * 两个入口的上下文不一样，不能共用一句“本页面”。
+   */
+  scopeHint?: string
 }>()
 
 const emit = defineEmits<{
@@ -564,6 +571,11 @@ watch(
               {{ p }}
             </button>
           </div>
+
+          <!-- 第一次打开时说明“能看到多少代码”，开始对话后随空状态一起消失 -->
+          <p v-if="scopeHint" class="text-[11px] leading-4 text-slate-400">
+            {{ scopeHint }}
+          </p>
         </div>
 
         <div v-else class="space-y-2.5">

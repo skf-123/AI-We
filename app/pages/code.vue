@@ -162,6 +162,7 @@ function clearAll() {
       :range="askRange"
       :code="code"
       :explanation="output"
+      scope-hint="模型能看到你贴的完整代码，问题不必只限于选中的几行。"
       @close="closeAsk"
     />
 

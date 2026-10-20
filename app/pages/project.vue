@@ -706,6 +706,7 @@ onBeforeUnmount(() => {
       :range="askRange"
       :code="activeFileText"
       :explanation="activeExplanation"
+      scope-hint="模型能看到当前文件的代码，问题不必只限于选中的几行。"
       @close="closeAsk"
     />
   </div>
