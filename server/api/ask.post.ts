@@ -25,10 +25,23 @@ const HistoryItemSchema = z.object({
 })
 
 const RequestSchema = z.object({
-  /** 整段原始代码 —— 追问要有上下文，否则"这两行"指什么就说不清 */
-  code: z.string().trim().min(1, '缺少代码上下文').max(20000),
+  /**
+   * 代码上下文 —— 追问要有它，否则"这两行"指什么就说不清。
+   *
+   * 上限与项目解析的 FILE_MAX 对齐（50,000）：项目模式传的是当前文件，
+   * 解析时看到的也是这个长度；这里若仍卡 20,000，2 万到 5 万字符的文件
+   * 就会出现"能解析、不能问"。
+   */
+  code: z.string().trim().min(1, '缺少代码上下文').max(50000),
   /** 用户在解析结果里选中的那一小段 */
   selection: z.string().trim().max(2000).default(''),
+  /**
+   * 用户刚看过的那份四段解析。
+   *
+   * 可选：贴代码和项目模式都会带上。模型看不到主链路生成过什么，
+   * 不带它的话，用户问"你上面说的第二点"会得到另一套说法。
+   */
+  explanation: z.string().trim().max(20000).default(''),
   question: z.string().trim().min(1, '请先写一个问题').max(500, '问题太长了，请精简一下'),
   /**
    * 之前问过的，让它可以接着往下答。
@@ -43,6 +56,9 @@ const RequestSchema = z.object({
 const SYSTEM_PROMPT = `你是一位极其耐心的编程导师，正在辅导一个「自学编程、但看不懂别人代码」的人。
 
 他刚才看了你对整段代码的讲解，现在**选中了其中一小段**来追问。
+
+消息里可能附上他刚看过的那份讲解。回答要与那份讲解的说法保持一致；
+他追问的是其中哪句话，就贴着那句话解释，不要另起一套说法。
 
 # 怎么回答
 
@@ -82,7 +98,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { code, selection, question } = parsed.data
+  const { code, selection, explanation, question } = parsed.data
 
   // ---- 2.5 历史按**长度**裁（不是按条数）----
   // 从最近往前累加到预算为止。注意顺序：schema 那层只管"接不接受这个请求"，
@@ -97,7 +113,11 @@ export default defineEventHandler(async (event) => {
     ? `\n\n# 他选中的那一小段\n\n\`\`\`\n${selection}\n\`\`\``
     : '\n\n（他没有选中具体哪一段，问题针对整段代码。）'
 
-  const userMessage = `# 完整代码\n\n\`\`\`\n${code}\n\`\`\`${focus}\n\n# 他的问题\n\n${question}`
+  // 刚看过的那份解析单独摆一段。它是用户"还不懂"的直接对象，
+  // 带上之后追问才能接住"你上面说的第二点"。
+  const read = explanation ? `\n\n# 他刚看过的解析\n\n${explanation}` : ''
+
+  const userMessage = `# 完整代码\n\n\`\`\`\n${code}\n\`\`\`${focus}${read}\n\n# 他的问题\n\n${question}`
 
   // ---- 4. 调用上游 ----
   let upstream: Response

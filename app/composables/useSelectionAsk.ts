@@ -42,11 +42,6 @@ export function useSelectionAsk() {
     range.value = payload.range
   }
 
-  function openAsk() {
-    if (!selection.value) return
-    open.value = true
-  }
-
   /**
    * 关掉气泡并清空选区。
    *
@@ -59,5 +54,5 @@ export function useSelectionAsk() {
     range.value = null
   }
 
-  return { open, selection, range, setSelection, openAsk, close }
+  return { open, selection, range, setSelection, close }
 }

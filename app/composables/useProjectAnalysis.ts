@@ -45,8 +45,14 @@ export function useProjectAnalysis() {
 
   const instances: Record<string, ReturnType<typeof useAnalysis>> = {}
   const watcherStops: (() => void)[] = []
-  /** 已读到的文件原文：汇总调用抽第三段 / import 时用，不再读一遍盘 */
-  const texts = new Map<string, string>()
+  /**
+   * 已读到的文件原文：汇总调用抽第三段 / import / 项目模式追问时用，不再读一遍盘。
+   *
+   * 用 shallowReactive 而不是普通 Map：追问的代码上下文是 computed(textOf(...))，
+   * 普通 Map 的 set 不会触发重新计算，解析完成后上层仍拿到空字符串。
+   * 值是字符串，不需要深层代理。
+   */
+  const texts = shallowReactive(new Map<string, string>())
   const handles = new Map<string, File>()
 
   let queue: string[] = []

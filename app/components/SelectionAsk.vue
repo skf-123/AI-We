@@ -32,6 +32,13 @@ const props = defineProps<{
   range: Range | null
   /** 整段原始代码 —— 追问得有上下文，"这两行"才指得清 */
   code: string
+  /**
+   * 用户刚看过的那份四段解析。
+   *
+   * 追问是"看完还没懂"时的补充，最该对齐的就是他刚读到的说法；
+   * 不带它，问「你上面说的第二点」会得到另一套解释。
+   */
+  explanation?: string
 }>()
 
 const emit = defineEmits<{
@@ -300,6 +307,7 @@ async function ask(text: string) {
       body: JSON.stringify({
         code: props.code,
         selection: props.selection,
+        explanation: props.explanation ?? '',
         question: text,
         history,
       }),
@@ -475,6 +483,20 @@ watch(
       @click="emit('update:open', true)"
     >
       提问
+    </button>
+
+    <!--
+      手机上的固定入口。贴着选区的小浮标会被浏览器原生的选中菜单压住，
+      手指也难点中；这个按钮固定在视口右下角，页面滚到哪都在同一位置。
+      小屏只显示它（浮标由 CSS 隐藏），桌面仍用上面那个浮标。
+    -->
+    <button
+      v-if="!open && selection"
+      type="button"
+      class="fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-50 rounded-full bg-emerald-600 px-4 py-3 text-[13.5px] font-medium whitespace-nowrap text-white shadow-lg transition active:bg-emerald-700 lg:hidden"
+      @click="emit('update:open', true)"
+    >
+      追问选中内容
     </button>
 
     <!-- 第二步：点了按钮才展开的问答面板 -->

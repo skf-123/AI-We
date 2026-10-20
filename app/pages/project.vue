@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ProjectTreeNode } from '~/types/project'
 import { useProjectSession, type ProjectSelectionPayload } from '~/composables/useProjectSession'
+import { useSelectionAsk } from '~/composables/useSelectionAsk'
 import { useSystemIncludeHint } from '~/composables/useSystemIncludeHint'
 import { formatSize, PROJECT_LIMITS } from '~/utils/project-files'
 
@@ -48,6 +49,7 @@ const {
   stopSelfCheck,
   rerunSelfCheck,
   progress,
+  textOf,
   total,
   finished,
   runningCount,
@@ -101,6 +103,36 @@ const {
 } = useProjectSession()
 
 const analysisRef = ref<{ scrollIntoView: () => void } | null>(null)
+
+/**
+ * 项目模式追问：与贴代码页共用同一份页面状态。
+ * 只接“当前文件的四段解析”，项目总览和项目图没有单一文件上下文，不接。
+ */
+const {
+  open: askOpen,
+  selection: askSelection,
+  range: askRange,
+  setSelection,
+  close: closeAsk,
+} = useSelectionAsk()
+
+/**
+ * 追问的代码上下文 = 当前文件原文。
+ *
+ * 与服务端 project/analyze 的 FILE_MAX 对齐：解析时看到多少，追问就带多少，
+ * 否则两万到五万字符的文件会出现“能解析、不能问”。
+ */
+const ASK_CODE_MAX = 50_000
+const activeFileText = computed(() => {
+  const path = activePath.value
+  return path ? textOf(path).slice(0, ASK_CODE_MAX) : ''
+})
+
+/** 当前文件刚生成的解析；带上它，回答才能和用户刚读到的说法一致 */
+const activeExplanation = computed(() => activeProgress.value?.output ?? '')
+
+// 切文件就清掉追问：旧 Range 指着上一份正文，留着会定位错，也会拖住旧 DOM。
+watch(activePath, () => closeAsk())
 
 /** 勾选系统文件前的 AI 提示；只负责请求与文案，不碰勾选状态 */
 const {
@@ -519,6 +551,7 @@ onBeforeUnmount(() => {
                 :subtitle="activeTitle"
                 :empty-hint="emptyHint"
                 fill-height
+                @selection="setSelection"
               />
             </div>
           </div>
@@ -661,6 +694,19 @@ onBeforeUnmount(() => {
       :open="uploadDialogOpen"
       :message="uploadError"
       @close="onCloseUploadError"
+    />
+
+    <!--
+      当前文件的就地追问。选区来自右侧四段解析面板；
+      代码上下文是当前文件原文，解析正文也一并带上。
+    -->
+    <SelectionAsk
+      v-model:open="askOpen"
+      :selection="askSelection"
+      :range="askRange"
+      :code="activeFileText"
+      :explanation="activeExplanation"
+      @close="closeAsk"
     />
   </div>
 </template>

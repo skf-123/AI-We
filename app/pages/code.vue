@@ -58,7 +58,6 @@ const {
   selection: askSelection,
   range: askRange,
   setSelection,
-  openAsk,
   close: closeAsk,
 } = useSelectionAsk()
 
@@ -156,27 +155,13 @@ function clearAll() {
     <!-- 知识框架图 -->
     <GraphPanel ref="graphPanelRef" :data="graphData" :loading="loading" />
 
-    <!--
-      手机端的固定追问入口。选过内容就出现，位置不跟选区走 ——
-      原来那个贴着选区的小浮标会被浏览器原生的选中菜单压住；
-      而这个按钮固定在视口右下角，分析结果再长、页面滚到哪都够得着。
-      桌面端（≥lg）不显示，仍用鼠标选完就地浮出的「提问」。
-    -->
-    <button
-      v-if="askSelection && !askOpen"
-      type="button"
-      class="fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-50 rounded-full bg-emerald-600 px-4 py-3 text-[13.5px] font-medium whitespace-nowrap text-white shadow-lg transition active:bg-emerald-700 lg:hidden"
-      @click="openAsk"
-    >
-      追问选中内容
-    </button>
-
-    <!-- 追问气泡（Teleport 到 body，不受面板 overflow 裁剪） -->
+    <!-- 追问气泡（Teleport 到 body，不受面板 overflow 裁剪；手机固定入口也在组件里） -->
     <SelectionAsk
       v-model:open="askOpen"
       :selection="askSelection"
       :range="askRange"
       :code="code"
+      :explanation="output"
       @close="closeAsk"
     />
 

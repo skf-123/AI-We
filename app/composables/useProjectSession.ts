@@ -771,6 +771,8 @@ export function useProjectSession() {
     rerunSelfCheck,
     // 并发池
     progress: pool.progress,
+    /** 当前会话里某个文件的原文（已解析过才有）。项目模式追问拿它当代码上下文 */
+    textOf: pool.textOf,
     total: pool.total,
     finished: pool.finished,
     runningCount: pool.runningCount,
