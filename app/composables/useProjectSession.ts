@@ -642,7 +642,7 @@ export function useProjectSession() {
     await summary.run({
       projectName: projectName.value,
       projectContext: map.context(projectName.value),
-      treeText: treeToText(tree.value),
+      treeText: treeToText(tree.value, 0, true),
       files: payloadFiles,
     })
   }

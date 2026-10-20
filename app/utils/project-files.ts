@@ -669,8 +669,12 @@ export function allSystem(node: ProjectTreeNode): boolean {
  * 目录树的文本版，给项目地图调用。
  * 整棵都是系统文件的分支只登记一行、不展开 —— 它们的任务不是被理解，
  * 只是让模型知道「这里有东西、已经跳过了」。
+ *
+ * markInclude 只给汇总调用用：用户可能在解析完以后取消勾选，再重新生成
+ * 总览和图；标出「未勾选」，模型才知道这些文件不属于本次汇总范围。
+ * 项目地图仍然用不带标记的完整目录树。
  */
-export function treeToText(nodes: ProjectTreeNode[], depth = 0): string {
+export function treeToText(nodes: ProjectTreeNode[], depth = 0, markInclude = false): string {
   const pad = '  '.repeat(depth)
   const lines: string[] = []
 
@@ -685,7 +689,8 @@ export function treeToText(nodes: ProjectTreeNode[], depth = 0): string {
               ? `系统·${file.systemMode === 'explain' ? '需解释' : '仅上下文'}`
               : '系统·默认不勾'
             : '源码'
-      lines.push(`${pad}- ${node.name} [${tag}] ${formatSize(node.size)}`)
+      const unchecked = markInclude && file && !file.include ? '·未勾选' : ''
+      lines.push(`${pad}- ${node.name} [${tag}${unchecked}] ${formatSize(node.size)}`)
       continue
     }
 
@@ -697,7 +702,9 @@ export function treeToText(nodes: ProjectTreeNode[], depth = 0): string {
     }
 
     lines.push(`${pad}- ${node.name}/ (${node.fileCount} 个文件)`)
-    lines.push(...treeToText(node.children ?? [], depth + 1))
+    // 注意：treeToText 返回的是字符串，不能再展开（spread）—— 展开会把每个字符
+    // 当成一行，目录树文本会被拆成逐字一行的乱码。整段 push 进去即可。
+    lines.push(treeToText(node.children ?? [], depth + 1, markInclude))
   }
 
   return lines.join('\n')
