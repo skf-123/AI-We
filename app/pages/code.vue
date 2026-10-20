@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useAnalysis } from '~/composables/useAnalysis'
+import { useSelectionAsk, type SelectionPayload } from '~/composables/useSelectionAsk'
 import { parseGraphData } from '~/utils/analysis-sections'
 import { resolveLines } from '~/utils/locate-lines'
 
@@ -48,24 +49,28 @@ const graphData = computed(() => parseGraphData(output.value))
 /** 左栏要高亮的代码行号（1 起）。由「在解析结果里选中一段」驱动 */
 const highlightLines = ref<number[]>([])
 
-/** 追问气泡：选中了什么、选区在哪（Range）、面板展开了没有 */
-const askOpen = ref(false)
-const askSelection = ref('')
 /**
- * 选区的 Range 副本 —— 气泡靠它算位置，而且滚动时要重算。
- * 不用"快照矩形"是因为它一旦算出来就定死了，滚动后就和选区脱开。
+ * 追问的页面级状态：选中了什么、气泡开没开。
+ * 对话、请求、流式仍由 SelectionAsk 自己持有；这里只放页面之间共用的那部分。
  */
-const askRange = ref<Range | null>(null)
+const {
+  open: askOpen,
+  selection: askSelection,
+  range: askRange,
+  setSelection,
+  openAsk,
+  close: closeAsk,
+} = useSelectionAsk()
 
 /**
  * 右栏把"选中了什么"抛上来，这里做两件事：
  *
  *   1. 换算成原始代码的行号、让左栏亮起来 —— 换算需要**原始代码**，
  *      而代码只有页面手上有，所以这一步留在页面，面板不必认识左栏。
- *   2. 记下选区，让追问气泡浮出来 —— 只是点一下（没选中东西）就清空，
+ *   2. 把选区交给 useSelectionAsk —— 只是点一下（没选中东西）就清空，
  *      相当于"点空白处取消选中"。
  */
-function onSelection(payload: { text: string; anchorLines: number[] | null; range: Range | null }) {
+function onSelection(payload: SelectionPayload) {
   const hit = resolveLines(payload.text, payload.anchorLines, code.value)
   highlightLines.value = hit.lines
 
@@ -73,52 +78,14 @@ function onSelection(payload: { text: string; anchorLines: number[] | null; rang
     nextTick(() => codePaneRef.value?.focusLines(hit.lines))
   }
 
-  // 点空白（没选中任何东西）→ 关掉气泡。这一条不受下面那条影响。
-  if (!payload.text) {
-    askOpen.value = false
-    askSelection.value = ''
-    askRange.value = null
-    return
-  }
-
-  // **面板开着的时候，新选区不理会。**
-  //
-  // 用户正在问，这时他顺手又划了一段（可能是想确认、也可能是去找别的东西），
-  // 不该把面板从他拖到的位置拽走。所以"开着的面板"和"没打开的气泡"状态要分开：
-  // 左栏高亮照常跟着新选区走（那是另一回事），但气泡自己的选区与位置冻住不动。
-  if (askOpen.value) return
-
-  askSelection.value = payload.text
-  askRange.value = payload.range
-}
-
-/**
- * 关掉追问气泡时，把选区也一并清掉。
- * 否则那个小「提问」按钮会立刻又冒出来 —— 用户刚说了"不用"，
- * 还杵着一个按钮在等他，很别扭。要再问就重新选一次。
- */
-function closeAsk() {
-  askOpen.value = false
-  askSelection.value = ''
-  askRange.value = null
-}
-
-/**
- * 手机上标题栏那个「追问」按钮：选区早已存在 askSelection / askRange 里，
- * 这里只负责把气泡打开。和右下角小浮标打开的是同一个面板。
- */
-function openAsk() {
-  if (!askSelection.value) return
-  askOpen.value = true
+  setSelection(payload)
 }
 
 async function analyze() {
   if (loading.value || !code.value.trim()) return
 
   highlightLines.value = []
-  askOpen.value = false
-  askSelection.value = ''
-  askRange.value = null
+  closeAsk()
 
   // 小屏是上下堆叠布局：输入区在上、结果区在下，点完按钮结果还在屏幕外，
   // 用户会以为"点了没反应"。桌面端是左右两栏、结果就在旁边，不需要滚。
@@ -134,9 +101,7 @@ function clearAll() {
   code.value = ''
   reset()
   highlightLines.value = []
-  askOpen.value = false
-  askSelection.value = ''
-  askRange.value = null
+  closeAsk()
 }
 </script>
 
