@@ -23,6 +23,7 @@ const {
   files,
   started,
   phase,
+  preparing,
   uploadError,
   summarySkippedCount,
   mapSummary,
@@ -302,7 +303,7 @@ onBeforeUnmount(() => {
 
       <!-- 上传 -->
       <template v-if="phase === 'upload'">
-        <ProjectUploader @select="onSelect" @error="onUploadError" />
+        <ProjectUploader :busy="preparing" @select="onSelect" @error="onUploadError" />
 
         <p class="mt-4 px-1 text-xs leading-relaxed text-slate-400">
           项目不会上传到任何存储：文件只在浏览器里读取，解析结果也只留在当前页面。

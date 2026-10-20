@@ -86,6 +86,13 @@ export function useProjectSession() {
   const activePath = ref<string | null>(null)
   const started = ref(false)
   const phase = ref<'upload' | 'review' | 'parsing' | 'summary'>('upload')
+  /**
+   * 选完文件夹到目录树出现之间的准备状态。
+   *
+   * 这段在做同步建登记、读文件头识别第三方库；手机上文件一多就要几秒。
+   * 上传区靠它显示转圈，否则用户看到的是“点了没反应”。
+   */
+  const preparing = ref(false)
   const uploadError = ref('')
   /** 因预算未纳入汇总的文件数（0 表示全部纳入） */
   const summarySkippedCount = ref(0)
@@ -370,25 +377,34 @@ export function useProjectSession() {
   }
 
   async function selectProject(payload: ProjectSelectionPayload) {
-    resetAll()
-    projectName.value = payload.root || '未命名项目'
-
-    for (const item of payload.files) fileHandles.set(item.path, item.file)
-    files.value = payload.files.map((item) =>
-      makeFileEntry(item.path, item.file.size, item.file.type),
-    )
-
-    let candidates: VendorCandidate[] = []
+    preparing.value = true
     try {
-      candidates = await detectVendorEntries(payload.files)
-    } catch {
-      /* 识别失败不影响上传与逐文件解析 */
+      // 先让“正在读取文件夹”这一帧画出来，再做同步建树与第三方库识别。
+      // 少了这一步，主线程会被占住，转圈动画根本不动。
+      await nextTick()
+
+      resetAll()
+      projectName.value = payload.root || '未命名项目'
+
+      for (const item of payload.files) fileHandles.set(item.path, item.file)
+      files.value = payload.files.map((item) =>
+        makeFileEntry(item.path, item.file.size, item.file.type),
+      )
+
+      let candidates: VendorCandidate[] = []
+      try {
+        candidates = await detectVendorEntries(payload.files)
+      } catch {
+        /* 识别失败不影响上传与逐文件解析 */
+      }
+
+      phase.value = 'review'
+      runVendorReview(candidates)
+
+      await loadNotes()
+    } finally {
+      preparing.value = false
     }
-
-    phase.value = 'review'
-    runVendorReview(candidates)
-
-    await loadNotes()
   }
 
   function setUploadError(message: string) {
@@ -735,6 +751,7 @@ export function useProjectSession() {
     activePath,
     started,
     phase,
+    preparing,
     uploadError,
     summarySkippedCount,
     // 地图
