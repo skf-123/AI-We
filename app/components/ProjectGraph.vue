@@ -263,6 +263,16 @@ const layout = computed(() => {
         edges.push({ from: group.headerId, to: childId, label: '归属', structural: true })
       }
     }
+
+    // 子文件都有真实边时，上面的循环一条归属线也不会画，组头就单独悬浮着。
+    // 组头自己没有真实边时，补一条到第一个子文件；只画一条，避免十几条线糊成一片。
+    if (!connected.has(group.headerId) && group.childIds.length > 0) {
+      const first = group.childIds[0]
+      const exists = edges.some((e) => e.from === group.headerId && e.to === first)
+      if (!exists) {
+        edges.push({ from: group.headerId, to: first, label: '归属', structural: true })
+      }
+    }
   }
 
   // 只有真实关系参与 dagre 排版；归属线只负责可见连接
