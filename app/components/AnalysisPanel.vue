@@ -151,6 +151,49 @@ function onBodyMouseUp() {
   })
 }
 
+/**
+ * 触屏上的选中走的是另一条事件路径。
+ *
+ * 长按选中、拖动选择手柄时，浏览器只发 `selectionchange`，**不发 `mouseup`** ——
+ * 所以只挂 mouseup 的版本在手机上根本等不到，那个「提问」按钮永远不出现。
+ * 这里补上 selectionchange，并且**忽略空选区**：
+ * 用户去点按钮时选区会先被浏览器清掉，若这时把状态一并清空，
+ * 按钮会在点击落下前消失。空选区也交给 mouseup 那条路径去清（桌面点空白处）。
+ */
+let selectionTimer: ReturnType<typeof setTimeout> | null = null
+
+function emitSelectionFromDom() {
+  const box = outputBoxRef.value
+  const sel = window.getSelection()
+  if (!box || !sel || sel.rangeCount === 0) return
+
+  const range = sel.getRangeAt(0)
+  if (!box.contains(range.commonAncestorContainer)) return
+
+  const text = sel.toString().trim()
+  if (!text) return
+
+  emit('selection', {
+    text,
+    anchorLines: anchorLinesOf(range),
+    range: range.cloneRange(),
+  })
+}
+
+function onSelectionChange() {
+  if (selectionTimer) clearTimeout(selectionTimer)
+  selectionTimer = setTimeout(emitSelectionFromDom, 250)
+}
+
+onMounted(() => {
+  document.addEventListener('selectionchange', onSelectionChange)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('selectionchange', onSelectionChange)
+  if (selectionTimer) clearTimeout(selectionTimer)
+})
+
 // 新一轮解析开始，把上一轮开着的小卡收掉
 watch(
   () => props.loading,

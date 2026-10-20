@@ -49,6 +49,18 @@ const emit = defineEmits<{
 const vw = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
 const bubbleW = computed(() => (vw.value < 640 ? 300 : 380))
 
+/**
+ * 触屏（手指）还是鼠标。
+ * 触屏上那个小浮标要放大到能点中，定位时用的宽高估值也得跟着变；
+ * 否则按钮放大了、夹取还按 64×26 算，会有一截跑到屏幕外。
+ */
+const coarse = ref(false)
+
+function updatePointer() {
+  if (typeof window === 'undefined') return
+  coarse.value = window.matchMedia('(pointer: coarse)').matches
+}
+
 /** 预设问题。产品卖点是"零提示词"，所以不能让用户到这里卡在"我该问什么" */
 const PRESETS = ['这几行在干什么？', '为什么这么写？', '有什么风险？']
 
@@ -244,8 +256,8 @@ const triggerStyle = computed(() => {
   const a = anchorRect.value
   if (!a || typeof window === 'undefined') return {}
 
-  const W = 64
-  const H = 26 // 按钮高度（估）
+  const W = coarse.value ? 76 : 64
+  const H = coarse.value ? 44 : 26 // 按钮高度（估）
   const left = clamp(a.right + 6, 8, Math.max(8, window.innerWidth - W - 8))
 
   // 和面板一致：以**选区顶边**为参照，优先放在它上方
@@ -386,9 +398,11 @@ watch(
 
 function onResize() {
   vw.value = window.innerWidth
+  updatePointer()
 }
 
 onMounted(() => {
+  updatePointer()
   window.addEventListener('keydown', onGlobalKeydown)
   window.addEventListener('resize', onResize)
 })
@@ -637,6 +651,30 @@ watch(
 .ask-trigger:hover {
   background: #ecfdf5;
   border-color: #6ee7b7;
+}
+
+/*
+ * 触屏上放大到能点中。26px 高是给鼠标的，手指按 40px 以下很容易点偏；
+ * 定位估值（triggerStyle 里的 W / H）与这里保持同一档。
+ */
+@media (pointer: coarse) {
+  .ask-trigger {
+    min-width: 76px;
+    min-height: 44px;
+    padding: 0 0.75rem;
+    font-size: 13.5px;
+  }
+}
+
+/*
+ * 手机上由页面右下角那个固定的「追问选中内容」接管。
+ * 小浮标贴着选区，正好落在原生选中菜单附近：既容易被菜单压住，手指也难点准。
+ * ≥1024 的触屏（平板、触屏笔记本）没有那个固定按钮，浮标继续用，并保持上面放大的尺寸。
+ */
+@media (pointer: coarse) and (max-width: 1023px) {
+  .ask-trigger {
+    display: none;
+  }
 }
 
 .ask-bubble {
