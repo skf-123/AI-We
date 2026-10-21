@@ -1,4 +1,9 @@
-import type { AgentStep, ProjectFileEntry, ProjectGraphData } from '~/types/project'
+import type {
+  AgentStep,
+  CrossFileEvidence,
+  ProjectFileEntry,
+  ProjectGraphData,
+} from '~/types/project'
 import { createProjectToolExecutor } from '~/utils/project-tools'
 import { sanitizeProjectGraph } from '~/utils/project-graph'
 import { formatStepResult } from '~/utils/agent-trace'
@@ -25,6 +30,8 @@ export interface ProjectAgentMapResult {
   files: { path: string; note: string }[]
   readingPlan: string[]
   crossFileNotes: string[]
+  /** 可选：每条线索对应的原文行；旧输出没有这个字段也照常工作 */
+  crossFileEvidence: CrossFileEvidence[]
   backend: { hasBackend: boolean; evidence: string } | null
 }
 
@@ -90,6 +97,7 @@ function parseMapResult(raw: unknown, entries: ProjectFileEntry[]): ProjectAgent
     files?: unknown
     readingPlan?: unknown
     crossFileNotes?: unknown
+    crossFileEvidence?: unknown
     backend?: unknown
   }
 
@@ -122,6 +130,30 @@ function parseMapResult(raw: unknown, entries: ProjectFileEntry[]): ProjectAgent
         .slice(0, 20)
     : []
 
+  const evidenceRows = Array.isArray(data.crossFileEvidence) ? data.crossFileEvidence : []
+  const perNote = new Map<number, number>()
+  const crossFileEvidence: CrossFileEvidence[] = []
+
+  for (const rawRow of evidenceRows) {
+    if (crossFileEvidence.length >= 20) break
+
+    const row = rawRow as { note?: unknown; path?: unknown; line?: unknown; quote?: unknown }
+    const note = Number(row?.note)
+    const line = Number(row?.line)
+    if (!Number.isInteger(note) || note < 1 || note > crossFileNotes.length) continue
+    if (typeof row?.path !== 'string' || !known.has(row.path.trim())) continue
+    if (!Number.isInteger(line) || line < 1) continue
+    if (typeof row?.quote !== 'string') continue
+
+    const quote = row.quote.trim().slice(0, 300)
+    if (!quote) continue
+
+    const used = perNote.get(note) ?? 0
+    if (used >= 2) continue
+    perNote.set(note, used + 1)
+    crossFileEvidence.push({ note, path: row.path.trim(), line, quote })
+  }
+
   const backendRow = data.backend as { hasBackend?: unknown; evidence?: unknown } | undefined
   const backend =
     backendRow && typeof backendRow === 'object'
@@ -134,7 +166,7 @@ function parseMapResult(raw: unknown, entries: ProjectFileEntry[]): ProjectAgent
 
   if (!summary && folders.length === 0 && files.length === 0) return null
 
-  return { summary, folders, files, readingPlan, crossFileNotes, backend }
+  return { summary, folders, files, readingPlan, crossFileNotes, crossFileEvidence, backend }
 }
 
 export function useProjectAgent() {

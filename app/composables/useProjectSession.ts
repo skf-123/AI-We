@@ -16,6 +16,7 @@ import {
   setFolderIncluded,
   thirdSection,
   treeToText,
+  verifyEvidence,
 } from '~/utils/project-files'
 import { parseProjectSummary } from '~/utils/project-graph'
 import {
@@ -25,7 +26,7 @@ import {
   shouldProbeVendor,
   type VendorCandidate,
 } from '~/utils/project-vendor'
-import { useProjectAgent } from './useProjectAgent'
+import { useProjectAgent, type ProjectAgentMapResult } from './useProjectAgent'
 import { useProjectMap } from './useProjectMap'
 import { useProjectAnalysis } from './useProjectAnalysis'
 import { useProjectSummary } from './useProjectSummary'
@@ -445,6 +446,32 @@ export function useProjectSession() {
   }
 
   /**
+   * 核对地图 Agent 带回的引文：只把真实文件里能对上的带进项目结构结论。
+   *
+   * 读文件放在这里，是因为 File 句柄只在这个会话里；纯比对在 utils，
+   * 这样规则可以脱离浏览器单独测。
+   */
+  async function verifyAgentEvidence(
+    result: ProjectAgentMapResult,
+  ): Promise<ProjectAgentMapResult> {
+    const evidence = result.crossFileEvidence ?? []
+    if (evidence.length === 0) return result
+
+    const texts = new Map<string, string>()
+    for (const path of new Set(evidence.map((item) => item.path))) {
+      const file = fileHandles.get(path)
+      if (!file || file.size > 1_000_000) continue
+      try {
+        texts.set(path, await file.text())
+      } catch {
+        /* 读不到就跳过这条证据，不影响地图本身 */
+      }
+    }
+
+    return { ...result, crossFileEvidence: verifyEvidence(evidence, texts) }
+  }
+
+  /**
    * 项目地图：只发目录树 + 每个文件头部几行。
    * 最多发 300 个文件的头部 —— 再多的项目，说明留白好过把一次调用撑爆。
    */
@@ -463,7 +490,7 @@ export function useProjectSession() {
     })
 
     if (agentResult) {
-      map.apply(agentResult)
+      map.apply(await verifyAgentEvidence(agentResult))
     } else {
       const heads = await Promise.all(
         selected.slice(0, 300).map(async (entry) => {

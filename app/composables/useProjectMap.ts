@@ -1,3 +1,4 @@
+import type { CrossFileEvidence } from '~/types/project'
 import { buildProjectContext } from '~/utils/project-files'
 
 /**
@@ -23,6 +24,7 @@ export function useProjectMap() {
   const folderNotes = reactive<Record<string, string>>({})
   const fileNotes = reactive<Record<string, string>>({})
   const crossFileNotes = ref<string[]>([])
+  const crossFileEvidence = ref<CrossFileEvidence[]>([])
   const readingPlan = ref<string[]>([])
   const backend = ref<{ hasBackend: boolean; evidence: string } | null>(null)
   const loading = ref(false)
@@ -41,6 +43,7 @@ export function useProjectMap() {
     folders: { path: string; note: string }[]
     files: { path: string; note: string }[]
     crossFileNotes?: string[]
+    crossFileEvidence?: CrossFileEvidence[]
     readingPlan?: string[]
     backend?: { hasBackend: boolean; evidence: string } | null
   }) {
@@ -49,6 +52,7 @@ export function useProjectMap() {
     for (const row of result.folders) folderNotes[row.path] = row.note
     for (const row of result.files) fileNotes[row.path] = row.note
     crossFileNotes.value = result.crossFileNotes ?? []
+    crossFileEvidence.value = result.crossFileEvidence ?? []
     readingPlan.value = result.readingPlan ?? []
     backend.value = result.backend ?? null
     ran.value = true
@@ -95,6 +99,7 @@ export function useProjectMap() {
       summary.value = data.summary ?? ''
       degraded.value = Boolean(data.degraded)
       crossFileNotes.value = []
+      crossFileEvidence.value = []
       readingPlan.value = []
       backend.value = null
 
@@ -120,6 +125,7 @@ export function useProjectMap() {
       { ...fileNotes },
       crossFileNotes.value,
       backend.value,
+      crossFileEvidence.value,
     )
   }
 
@@ -127,6 +133,7 @@ export function useProjectMap() {
     summary.value = ''
     clearNotes()
     crossFileNotes.value = []
+    crossFileEvidence.value = []
     readingPlan.value = []
     backend.value = null
     loading.value = false
@@ -140,6 +147,7 @@ export function useProjectMap() {
     folderNotes,
     fileNotes,
     crossFileNotes,
+    crossFileEvidence,
     readingPlan,
     backend,
     loading,

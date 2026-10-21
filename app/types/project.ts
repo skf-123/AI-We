@@ -46,6 +46,22 @@ export interface VendorHint {
   evidence: string
 }
 
+/**
+ * 地图 Agent 给出的跨文件证据。
+ *
+ * note 指向 crossFileNotes 的第几条（1 起）；path / line / quote 指向真实文件里的那一行。
+ * 进入逐文件请求前，前端会拿真实文件核对引文；核对不过的不会带进公共前缀。
+ */
+export interface CrossFileEvidence {
+  /** crossFileNotes 里第几条（1 起） */
+  note: number
+  path: string
+  /** 1 起行号 */
+  line: number
+  /** 原文行；核对后会替换成真实那一行 */
+  quote: string
+}
+
 /** 逐文件解析状态 */
 export type FileStatus = 'pending' | 'running' | 'done' | 'error'
 

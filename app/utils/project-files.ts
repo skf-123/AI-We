@@ -6,7 +6,7 @@
  * 的路径清单跑，不需要真开浏览器。
  */
 
-import type { ProjectFileEntry, ProjectTreeNode } from '~/types/project'
+import type { CrossFileEvidence, ProjectFileEntry, ProjectTreeNode } from '~/types/project'
 
 /**
  * 输入侧上限（快照第十一节第 30 条第 5 小节）。
@@ -723,6 +723,7 @@ export function buildProjectContext(
   fileNotes: Record<string, string>,
   crossFileNotes: string[] = [],
   backend: { hasBackend: boolean; evidence: string } | null = null,
+  crossFileEvidence: CrossFileEvidence[] = [],
 ): string {
   const folders = Object.keys(folderNotes)
     .sort()
@@ -730,6 +731,22 @@ export function buildProjectContext(
   const files = Object.keys(fileNotes)
     .sort()
     .map((p) => `- ${p}：${fileNotes[p]}`)
+
+  const evidenceByNote = new Map<number, CrossFileEvidence[]>()
+  for (const item of crossFileEvidence) {
+    const list = evidenceByNote.get(item.note) ?? []
+    list.push(item)
+    evidenceByNote.set(item.note, list)
+  }
+
+  const noteLines = crossFileNotes.flatMap((note, index) => {
+    const rows = evidenceByNote.get(index + 1) ?? []
+    if (rows.length === 0) return [`- ${note}`, '  （未核实：没有找到原文证据）']
+    return [
+      `- ${note}`,
+      ...rows.map((item) => `  证据：${item.path}:${item.line}  ${item.quote}`),
+    ]
+  })
 
   const backendLine = backend
     ? `后端判断：${backend.hasBackend ? '有后端' : '没有后端'}${
@@ -747,10 +764,56 @@ export function buildProjectContext(
     '',
     '文件说明：',
     ...(files.length ? files : ['- （无）']),
-    ...(crossFileNotes.length
-      ? ['', '跨文件线索：', ...crossFileNotes.map((note) => `- ${note}`)]
-      : []),
+    ...(crossFileNotes.length ? ['', '跨文件线索：', ...noteLines] : []),
   ].join('\n')
+}
+
+/**
+ * 用真实文件内容核对地图 Agent 带回的引文。
+ *
+ * 只保留行号有效、引文能对上的；返回时把 quote 换成真实那一行，
+ * 避免模型复述时多一个字少一个字。读文件由调用方负责，这里保持纯函数。
+ */
+export function verifyEvidence(
+  evidence: CrossFileEvidence[],
+  texts: Map<string, string>,
+): CrossFileEvidence[] {
+  const normalize = (value: string) => value.replace(/\s+/g, ' ').trim()
+  const verified: CrossFileEvidence[] = []
+
+  for (const item of evidence) {
+    const text = texts.get(item.path)
+    if (typeof text !== 'string') continue
+
+    const lines = text.replace(/\r\n/g, '\n').split('\n')
+    const quote = normalize(item.quote.replace(/^\d+:\s*/, ''))
+    if (!quote) continue
+
+    // 先看模型报的行，再在 ±2 行内找：模型数错一两行很常见，
+    // 但只接受足够长的行，避免「}」这种短行被邻近匹配到。
+    let found: { line: number; text: string } | null = null
+    for (const offset of [0, -1, 1, -2, 2]) {
+      const lineNumber = item.line + offset
+      if (lineNumber < 1) continue
+
+      const actual = lines[lineNumber - 1]
+      if (typeof actual !== 'string') continue
+
+      const line = actual.trim()
+      const normalized = normalize(line)
+      if (!normalized) continue
+      if (offset !== 0 && normalized.length < 8) continue
+      if (!normalized.includes(quote) && !quote.includes(normalized)) continue
+
+      found = { line: lineNumber, text: line }
+      break
+    }
+
+    if (!found) continue
+    verified.push({ ...item, line: found.line, quote: found.text.slice(0, 300) })
+  }
+
+  return verified
 }
 
 /** 从流式输出里取第三段（整段整体作用），汇总调用只带这一段，不重发全文 */

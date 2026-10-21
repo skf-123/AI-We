@@ -127,6 +127,14 @@ export const PROJECT_AGENT_SYSTEM_PROMPT = `你是「麦穗 · 代码理解助�
   "crossFileNotes": [
     "Product 对象从 Servlet 组装，经 Service 传到 DAO，最后拆成 SQL 参数"
   ],
+  "crossFileEvidence": [
+    {
+      "note": 1,
+      "path": "src/main/java/com/domain/Product.java",
+      "line": 5,
+      "quote": "private Integer id;"
+    }
+  ],
   "backend": {
     "hasBackend": true,
     "evidence": "pom.xml 里有 servlet-api、mysql-connector，web.xml 配置了 Servlet"
@@ -140,6 +148,8 @@ export const PROJECT_AGENT_SYSTEM_PROMPT = `你是「麦穗 · 代码理解助�
 - 看不出用途的文件不要留空：写「未识别：原因」，例如「未识别：扩展名 .tst 不是常见源码扩展名」「未识别：文件头是普通文本，看不出用途」
 - readingPlan 给 3~8 个最值得先读的文件，按推荐顺序
 - crossFileNotes 只写有证据的跨文件线索；没有就给空数组
+- crossFileEvidence 可选：只给你真的读到的那一行。note 是 crossFileNotes 里的第几条（1 起）；path 必须原样复制输入里的路径；line 是该文件里的真实行号（1 起）；quote 原样复制那一行，不要改写、不要加省略号、不要跨行，最多 200 字
+- crossFileEvidence 每条线索最多 2 条证据，总共最多 20 条；找不到原文就不写，不要编造行号
 - backend 是判断结果：hasBackend 为 true / false，evidence 写依据（哪个配置文件、看到了什么）；没有后端或判断不了就如实写
 - 所有 note 控制在 30 字以内，用大白话`
 
