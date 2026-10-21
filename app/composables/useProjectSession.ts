@@ -114,6 +114,13 @@ export function useProjectSession() {
   /** 防止上一个项目的候选评审结果落到新项目上 */
   let vendorGeneration = 0
 
+  /**
+   * 第三方库检查的完成情况。
+   * probed = 实际看过文件名 / 文件头的文件数；total = 按规则该看的文件数。
+   * 检查完成时一定有值，所以图例里任何时候都能说清「这次查了没有」。
+   */
+  const vendorCheck = ref<{ probed: number; total: number; failed: boolean } | null>(null)
+
   /** 自检修正后的图；没有自检结果时用汇总原图 */
   const selfCheckGraph = ref<ProjectGraphData | null>(null)
   const selfCheckStarted = ref(false)
@@ -267,16 +274,34 @@ export function useProjectSession() {
     return parts.join(' · ')
   })
 
-  /** 第三方库核对状态：没有可说的就返回空串 */
+  /**
+   * 第三方库检查状态。
+   *
+   * 检查完成（目录树出现之前就完成）后一定有话说：没有疑似文件时也要
+   * 报「已检查 N 个 · 没有需要 AI 复核的疑似文件」，否则这个能力在
+   * 没触发的项目里完全看不见。失败要和「查了没有」分开，不能把没跑成
+   * 显示成未发现。
+   */
   const vendorNote = computed(() => {
+    if (vendorCheck.value?.failed) return '第三方库检查没完成，不影响解析'
+    if (vendorReview.failed.value) return 'AI 复核没跑完，只显示规则识别的结果'
     if (vendorReview.running.value) return 'AI 正在核对疑似第三方库…'
-    if (vendorReview.reviewed.value === 0) return ''
 
-    const suggested = files.value.filter((entry) => entry.vendorSuggestion).length
-    const parts = [`AI 已核对 ${vendorReview.reviewed.value} 个疑似文件`]
-    if (suggested > 0) parts.push(`建议不勾 ${suggested} 个`)
-    if (vendorReview.skipped.value > 0) parts.push(`另有 ${vendorReview.skipped.value} 个未核对`)
-    return parts.join(' · ')
+    if (vendorReview.reviewed.value > 0) {
+      const suggested = files.value.filter((entry) => entry.vendorSuggestion).length
+      const parts = [`AI 已核对 ${vendorReview.reviewed.value} 个疑似第三方库文件`]
+      if (suggested > 0) parts.push(`建议不勾 ${suggested} 个`)
+      if (vendorReview.skipped.value > 0) parts.push(`另有 ${vendorReview.skipped.value} 个未核对`)
+      return parts.join(' · ')
+    }
+
+    const checked = vendorCheck.value
+    if (!checked) return ''
+    if (checked.probed === 0) return '没有需要 AI 复核的疑似第三方库文件'
+
+    const rest = checked.total - checked.probed
+    const suffix = rest > 0 ? `（另有 ${rest} 个未检查）` : ''
+    return `已看 ${checked.probed} 个文件的文件名和文件头${suffix} · 没有需要 AI 复核的疑似第三方库文件`
   })
 
   // ---------------------------------------------------------------- 上传
@@ -310,12 +335,12 @@ export function useProjectSession() {
    */
   async function detectVendorEntries(
     items: { path: string; file: File }[],
-  ): Promise<VendorCandidate[]> {
+  ): Promise<{ candidates: VendorCandidate[]; probed: number; total: number }> {
     const fileByPath = new Map(items.map((item) => [item.path, item.file]))
-    const probe = files.value
+    const shouldProbe = files.value
       .filter(shouldProbeVendor)
       .sort((a, b) => b.size - a.size || a.path.localeCompare(b.path))
-      .slice(0, MAX_VENDOR_PROBES)
+    const probe = shouldProbe.slice(0, MAX_VENDOR_PROBES)
 
     const headers = await readHeaders(
       probe
@@ -357,7 +382,7 @@ export function useProjectSession() {
       }
     }
 
-    return candidates
+    return { candidates, probed: probe.length, total: shouldProbe.length }
   }
 
   /** 异步拿 Agent 建议；换项目或重置后丢弃旧结果 */
@@ -393,9 +418,12 @@ export function useProjectSession() {
 
       let candidates: VendorCandidate[] = []
       try {
-        candidates = await detectVendorEntries(payload.files)
+        const checked = await detectVendorEntries(payload.files)
+        candidates = checked.candidates
+        vendorCheck.value = { probed: checked.probed, total: checked.total, failed: false }
       } catch {
-        /* 识别失败不影响上传与逐文件解析 */
+        // 识别失败不影响上传与逐文件解析；图例里如实说没检查完
+        vendorCheck.value = { probed: 0, total: 0, failed: true }
       }
 
       phase.value = 'review'
@@ -717,6 +745,7 @@ export function useProjectSession() {
     selfCheck.reset()
     vendorGeneration++
     vendorReview.reset()
+    vendorCheck.value = null
     selfCheckGraph.value = null
     selfCheckStarted.value = false
     pool.reset()

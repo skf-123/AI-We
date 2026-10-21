@@ -18,6 +18,8 @@ export function useProjectVendorReview() {
   const running = ref(false)
   const reviewed = ref(0)
   const skipped = ref(0)
+  /** 请求失败或没拿到合法响应；用来避免把「没跑成」显示成「已核对」 */
+  const failed = ref(false)
 
   let controller: AbortController | null = null
   let generation = 0
@@ -30,7 +32,6 @@ export function useProjectVendorReview() {
     const cap = vendorReviewCap(candidates.length)
     const picked = pickVendorCandidates(candidates, cap)
 
-    reviewed.value = picked.length
     skipped.value = Math.max(0, candidates.length - picked.length)
     running.value = true
     controller = new AbortController()
@@ -49,11 +50,19 @@ export function useProjectVendorReview() {
         signal: controller.signal,
       })
 
-      if (!res.ok || current !== generation) return {}
+      if (current !== generation) return {}
+
+      if (!res.ok) {
+        failed.value = true
+        return {}
+      }
 
       const data = (await res.json()) as {
         suggestions?: { path?: unknown; evidence?: unknown }[]
       }
+      // 只有真的拿到成功响应才算核对过：
+      // 失败时不能让图例显示「AI 已核对 N 个」
+      reviewed.value = picked.length
       const allowed = new Set(picked.map((item) => item.path))
       const result: Record<string, string> = {}
 
@@ -66,7 +75,9 @@ export function useProjectVendorReview() {
       }
 
       return result
-    } catch {
+    } catch (err) {
+      // reset() 主动 abort 不算失败：换项目或页面卸载时本来就会中断
+      if (current === generation && (err as Error)?.name !== 'AbortError') failed.value = true
       return {}
     } finally {
       if (current === generation) {
@@ -83,7 +94,8 @@ export function useProjectVendorReview() {
     running.value = false
     reviewed.value = 0
     skipped.value = 0
+    failed.value = false
   }
 
-  return { running, reviewed, skipped, run, reset }
+  return { running, reviewed, skipped, failed, run, reset }
 }
