@@ -1,3 +1,5 @@
+import { stripOutputTruncation } from '#shared/stream-meta'
+
 /**
  * 全部文件解析完之后的一次汇总调用。
  *
@@ -22,6 +24,8 @@ export function useProjectSummary() {
   const output = ref('')
   const loading = ref(false)
   const done = ref(false)
+  /** 输出撞到模型上限（正文或图可能不完整） */
+  const outputTruncated = ref(false)
   const error = ref('')
 
   let controller: AbortController | null = null
@@ -33,6 +37,7 @@ export function useProjectSummary() {
     // 否则一次失败就会把一份已经生成好的总览冲掉。
     error.value = ''
     done.value = false
+    outputTruncated.value = false
     loading.value = true
 
     controller = new AbortController()
@@ -65,6 +70,12 @@ export function useProjectSummary() {
         const { done: finished, value } = await reader.read()
         if (finished) break
         streamed += decoder.decode(value, { stream: true })
+
+        // 撞到输出上限时服务端会在末尾追加不可见标记；
+        // 去掉它再显示，同时记下「正文或图可能不完整」
+        const stripped = stripOutputTruncation(streamed)
+        streamed = stripped.text
+        if (stripped.truncated) outputTruncated.value = true
         // 第一次赋值就替换掉旧结果，之后逐步增长
         output.value = streamed
       }
@@ -92,7 +103,8 @@ export function useProjectSummary() {
     output.value = ''
     error.value = ''
     done.value = false
+    outputTruncated.value = false
   }
 
-  return { output, loading, done, error, run, stop, reset }
+  return { output, loading, done, outputTruncated, error, run, stop, reset }
 }

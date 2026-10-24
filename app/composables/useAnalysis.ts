@@ -1,3 +1,4 @@
+import { stripOutputTruncation } from '#shared/stream-meta'
 import type { RagSource } from '~/types/analysis'
 
 /**
@@ -35,6 +36,8 @@ export function useAnalysis(options: UseAnalysisOptions = {}) {
   const done = ref(false)
   /** 服务端是否因为超长截断过（X-Project-Truncated），贴代码入口恒为 false */
   const truncated = ref(false)
+  /** 输出是否撞到模型上限（流末尾的标记），和输入截断是两回事 */
+  const outputTruncated = ref(false)
 
   let controller: AbortController | null = null
 
@@ -49,6 +52,7 @@ export function useAnalysis(options: UseAnalysisOptions = {}) {
     errorMsg.value = ''
     sources.value = []
     truncated.value = false
+    outputTruncated.value = false
     loading.value = true
     done.value = false
 
@@ -92,11 +96,19 @@ export function useAnalysis(options: UseAnalysisOptions = {}) {
       // 逐块读取，读一块、显示一块 —— 这就是打字机效果的来源
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
+      let streamed = ''
 
       while (true) {
         const { done: finished, value } = await reader.read()
         if (finished) break
-        output.value += decoder.decode(value, { stream: true })
+        streamed += decoder.decode(value, { stream: true })
+
+        // 服务端在撞到输出上限时会在流末尾追加一个不可见标记；
+        // 去掉它，只把正文显示出来，同时记下「这次输出不完整」
+        const stripped = stripOutputTruncation(streamed)
+        streamed = stripped.text
+        if (stripped.truncated) outputTruncated.value = true
+        output.value = streamed
       }
 
       done.value = true
@@ -126,7 +138,8 @@ export function useAnalysis(options: UseAnalysisOptions = {}) {
     done.value = false
     sources.value = []
     truncated.value = false
+    outputTruncated.value = false
   }
 
-  return { output, sources, errorMsg, loading, done, truncated, run, stop, reset }
+  return { output, sources, errorMsg, loading, done, truncated, outputTruncated, run, stop, reset }
 }

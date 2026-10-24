@@ -355,6 +355,14 @@ function onFileCheck(e: Event) {
         已截断
       </span>
 
+      <span
+        v-if="pg?.outputTruncated"
+        class="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700"
+        title="模型输出到达上限，后面的内容没有讲完"
+      >
+        输出超限
+      </span>
+
       <button
         v-if="pg?.status === 'error'"
         type="button"

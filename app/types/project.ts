@@ -129,6 +129,8 @@ export interface FileProgress {
   error: string
   /** 服务端截断过这个文件（超过 50000 字符） */
   truncated: boolean
+  /** 模型输出撞到上限，后面的内容没有讲完 */
+  outputTruncated: boolean
   /** 解析中的缓冲百分比；按时间走，不是真实进度 */
   percent: number
 }

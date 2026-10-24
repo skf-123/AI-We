@@ -60,6 +60,7 @@ const {
   summaryOutput,
   summaryLoading,
   summaryDone,
+  summaryOutputTruncated,
   summaryError,
   tree,
   stats,
@@ -551,6 +552,7 @@ onBeforeUnmount(() => {
                 :graph-ready="false"
                 :subtitle="activeTitle"
                 :empty-hint="emptyHint"
+                :output-truncated="activeProgress?.outputTruncated ?? false"
                 fill-height
                 @selection="setSelection"
               />
@@ -625,6 +627,9 @@ onBeforeUnmount(() => {
           <p v-if="summaryScopeNote" class="mb-3 text-[11px] text-amber-700">
             {{ summaryScopeNote }}
           </p>
+          <p v-if="summaryOutputTruncated" class="mb-3 text-[11px] text-amber-700">
+            这次汇总输出到达上限，正文或项目图可能没有讲完。
+          </p>
 
           <div
             v-if="summaryError"
@@ -670,7 +675,11 @@ onBeforeUnmount(() => {
             />
           </div>
           <p v-else-if="summaryDone && !displayGraph" class="mt-3 text-xs text-amber-700">
-            项目图没有解析成功，上面的项目文字仍然有效。
+            {{
+              summaryOutputTruncated
+                ? '项目图内容太长，被输出上限截断；上面的项目文字仍然有效。'
+                : '项目图没有解析成功，上面的项目文字仍然有效。'
+            }}
           </p>
         </section>
       </template>

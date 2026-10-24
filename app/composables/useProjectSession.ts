@@ -239,9 +239,14 @@ export function useProjectSession() {
       if (selectedGroupNode.value) return selectedGroupNode.value.label
       return ''
     }
-    return activeProgress.value?.truncated
-      ? `${activeEntry.value.path}（已截断）`
-      : activeEntry.value.path
+    const path = activeEntry.value.path
+    const inputTruncated = activeProgress.value?.truncated
+    const outputTruncated = activeProgress.value?.outputTruncated
+
+    if (inputTruncated && outputTruncated) return `${path}（已截断 · 输出超限）`
+    if (outputTruncated) return `${path}（输出超限）`
+    if (inputTruncated) return `${path}（已截断）`
+    return path
   })
 
   const emptyHint = computed(() => {
@@ -856,6 +861,7 @@ export function useProjectSession() {
     summaryOutput: summary.output,
     summaryLoading: summary.loading,
     summaryDone: summary.done,
+    summaryOutputTruncated: summary.outputTruncated,
     summaryError: summary.error,
     // 派生
     tree,

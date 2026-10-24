@@ -78,13 +78,14 @@ export function useProjectAnalysis() {
       sources: [],
       error: '',
       truncated: false,
+      outputTruncated: false,
       percent: 0,
     }
 
     // useAnalysis 是每个文件一个实例、状态互相独立；这里把它的 ref
     // 镜像到 progress，目录树和右侧面板都只读 progress，不认识 composable。
     const stop = watch(
-      [inst.output, inst.sources, inst.errorMsg, inst.truncated],
+      [inst.output, inst.sources, inst.errorMsg, inst.truncated, inst.outputTruncated],
       () => {
         const p = progress[path]
         if (!p) return
@@ -92,6 +93,7 @@ export function useProjectAnalysis() {
         p.sources = [...inst.sources.value]
         p.error = inst.errorMsg.value
         p.truncated = inst.truncated.value
+        p.outputTruncated = inst.outputTruncated.value
       },
       { immediate: true },
     )
@@ -177,6 +179,7 @@ export function useProjectAnalysis() {
       p.output = inst.output.value
       p.sources = [...inst.sources.value]
       p.truncated = inst.truncated.value
+      p.outputTruncated = inst.outputTruncated.value
       p.error = inst.errorMsg.value
 
       if (stopped.value) {
@@ -269,6 +272,7 @@ export function useProjectAnalysis() {
     p.output = ''
     p.sources = []
     p.truncated = false
+    p.outputTruncated = false
     p.percent = 0
 
     const i = queue.indexOf(key)

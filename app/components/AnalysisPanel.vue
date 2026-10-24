@@ -30,6 +30,8 @@ const props = defineProps<{
   title?: string
   /** 标题下面那一行补充信息；项目入口显示当前文件路径 */
   subtitle?: string
+  /** 模型输出撞到上限，后面的内容没有讲完 */
+  outputTruncated?: boolean
   /**
    * 高度模式。
    * false：贴代码入口，锁一屏高度（桌面端）
@@ -345,6 +347,18 @@ defineExpose({ scrollIntoView })
           <h2 class="mb-2 text-sm font-semibold text-emerald-700">{{ s.title }}</h2>
           <MarkdownBlock :text="s.body" :terms="terms" @term="onTerm" @cite="onCite" />
         </article>
+
+        <!--
+          输出撞到模型上限时的提示。
+          它和「输入超过 5 万字符」是两件事：那个是没看到后半段文件，
+          这个是看到了但模型没写完。放在四段之后，不打断正在读的正文。
+        -->
+        <p
+          v-if="outputTruncated"
+          class="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs leading-relaxed text-amber-700"
+        >
+          输出到达上限，后面的内容没有讲完。可以重试，或者把文件拆小一点再看。
+        </p>
 
         <!-- 知识库检索到的引用来源，紧跟在四段解释之后 -->
         <SourceList v-if="sources.length" ref="sourceListRef" :sources="sources" />
