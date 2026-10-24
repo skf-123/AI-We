@@ -90,7 +90,8 @@ export default defineEventHandler(async (event) => {
       ],
       stream: true,
       temperature: 0.3,
-      maxTokens: 8192,
+      // 四段讲解的输出上限；提示词要求 1800~3500 字，1 万给长文件留余量
+      maxTokens: 10_000,
       timeoutMs: 120_000,
     },
   )
