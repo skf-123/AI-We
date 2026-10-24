@@ -64,7 +64,8 @@ export default defineEventHandler(async (event) => {
       ],
       stream: true,
       temperature: 0.3,
-      maxTokens: 8192,
+      // 正文和图共用这一次输出；187 个文件时 8192 会在图 JSON 中途截断
+      maxTokens: 80_000,
       timeoutMs: 120_000,
     },
   )
