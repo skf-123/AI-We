@@ -62,6 +62,11 @@ const {
   summaryDone,
   summaryOutputTruncated,
   summaryError,
+  runGraphOnly,
+  canRunGraphOnly,
+  canShowGraphOnly,
+  graphOnlyLoading,
+  graphOnlyError,
   tree,
   stats,
   queueFiles,
@@ -619,6 +624,28 @@ onBeforeUnmount(() => {
             >
               重新生成
             </button>
+            <button
+              v-if="canShowGraphOnly"
+              type="button"
+              class="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              :disabled="!canRunGraphOnly"
+              :title="
+                displayGraph
+                  ? '只重画图，不改正文；沿用上次汇总的文件'
+                  : '只生成项目图，不改正文'
+              "
+              @click="runGraphOnly"
+            >
+              {{
+                graphOnlyLoading
+                  ? '图生成中…'
+                  : displayGraph
+                    ? '重新生成图'
+                    : graphOnlyError || (summaryDone && !displayGraph)
+                      ? '重试生成图'
+                      : '生成项目图'
+              }}
+            </button>
           </div>
 
           <p v-if="summarySkippedCount > 0" class="mb-3 text-[11px] text-amber-700">
@@ -629,6 +656,9 @@ onBeforeUnmount(() => {
           </p>
           <p v-if="summaryOutputTruncated" class="mb-3 text-[11px] text-amber-700">
             这次汇总输出到达上限，正文或项目图可能没有讲完。
+          </p>
+          <p v-if="graphOnlyError" class="mb-3 text-[11px] text-rose-600">
+            {{ displayGraph ? '这次图没生成成功，仍显示上一次的图。' : '' }}{{ graphOnlyError }}
           </p>
 
           <div
@@ -674,6 +704,9 @@ onBeforeUnmount(() => {
               @select-group="onGraphSelectGroup"
             />
           </div>
+          <p v-else-if="graphOnlyLoading" class="mt-3 text-xs text-slate-500">
+            图生成中…
+          </p>
           <p v-else-if="summaryDone && !displayGraph" class="mt-3 text-xs text-amber-700">
             {{
               summaryOutputTruncated

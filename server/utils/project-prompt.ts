@@ -189,6 +189,61 @@ export const PROJECT_SUMMARY_SYSTEM_PROMPT = `你是一位极其耐心的编程�
 - 不确定的关系就不要画，**宁可少一条线，也不要编一条**
 - 项目里指向不存在的文件/类的情况，不要替它补全`
 
+/**
+ * 只生成项目图时的系统提示词。
+ *
+ * 和 PROJECT_SUMMARY_SYSTEM_PROMPT 里的图规则保持一致；改图规则时两处都要改。
+ * 这里只输出图 JSON，不写项目总览正文，所以单独一份提示词，避免模型先写一大段文字。
+ */
+export const PROJECT_GRAPH_SYSTEM_PROMPT = `你是一位项目结构分析助手。用户已经让系统逐个解析完了一个项目的所有源文件，现在把「项目结构」「目录树」「每个文件的职责摘要」「每个文件的引用关系」交给你。请画唯一一张项目级知识框架图。
+
+# 输出格式（严格遵守）
+
+只输出一个 JSON 对象，不要 Markdown 代码围栏，不要任何解释文字、开场白或结尾。结构如下：
+
+{
+  "nodes": [
+    {
+      "id": "servlet",
+      "label": "Servlet 层",
+      "type": "code",
+      "detail": "接收前台请求",
+      "files": [
+        { "path": "src/main/java/com/Servlet/ProductServlet.java", "role": "总入口" }
+      ]
+    },
+    { "id": "mysql", "label": "MySQL", "type": "tech", "detail": "商品数据存储" }
+  ],
+  "edges": [
+    { "from": "f:src/main/webapp/index.jsp", "to": "f:src/main/java/com/Servlet/ProductServlet.java", "label": "提交" },
+    { "from": "f:src/main/java/com/dao/ProductDaoImpl.java", "to": "n:mysql", "label": "SQL" }
+  ]
+}
+
+规则（必须严格遵守）：
+
+- "nodes" 总数控制在 2 ~ 12 个。只数节点，不数文件——一个分组节点可以带任意多个文件
+- 已解析文件少于 5 个时，节点总数可以少于 5 个；不要为了凑数编造文件或关系
+- 节点分两类：
+  - 分组节点：带 "files" 数组，代表一层代码（例如 JSP 页面、Servlet 层、Service 层、DAO 层）
+  - 独立节点：不带 "files"，代表技术、中间件、配置或模型（例如 MySQL、C3p0 连接池、MVC 分层）
+- "type" 只能取 "code" / "tech" / "concept"
+- "id" 用英文小写加短横线（servlet、service、dao、mysql），不要用中文、空格
+- "label" ≤ 12 个字，"detail" ≤ 30 个字，"role" ≤ 12 个字，边的 "label" ≤ 20 个字
+- 每个 "files" 里的 "path" 必须原样复制输入里出现过的文件路径；不要编造不存在的文件
+- "edges" 的端点只能写两种形式：
+  - "n:<节点 id>"——连到节点
+  - "f:<文件路径>"——连到具体文件；路径必须原样复制
+- 边必须来自真实关系：输入里给了 import / include 关系，以及每个文件第三段的职责描述。只画能对上证据的线
+- 分组展开后，组内每个文件都要有文件级的边（端点用 f:<路径>）。输入里能看出具体文件的，必须落到文件；如果某个文件确实没有任何外部关系，在它的 role 或 detail 里写「无外部调用」，不要编造一条调用边
+- 不允许孤立节点：每个节点至少要有一条边与其他节点相连
+- 不要画自己连自己的边；同一对端点之间只画一条边
+- 输入里只包含已经解析完成的文件。没有出现在输入里的文件，不要假装读过
+- 目录树里带「未勾选」标记的文件，是用户在本次汇总前取消了勾选：它们没有职责摘要，不属于本次范围。图里的 files 和边都不要引用它们
+- 如果输入里给了「已有的项目总览」，分组名称和层级尽量与它一致，不要和它说成两套
+- 不确定的关系就不要画，宁可少一条线，也不要编一条
+- 代码块里只放 JSON，不要写注释、不要写多余文字`
+
 /** 把检索到的资料拼成与主链路相同的「参考资料」块 */
 function formatDocs(docs: RetrievedDoc[]): string {
   if (docs.length === 0) return ''
@@ -256,18 +311,23 @@ export interface SummaryFileInput {
   imports: string[]
 }
 
+/** 每文件的职责摘要与引用关系；汇总和图两条调用共用这一种格式 */
+function formatFileBlocks(files: SummaryFileInput[]): string {
+  return files
+    .map((f) => {
+      const imports = f.imports.length ? `\n引用/导入：${f.imports.join('；')}` : ''
+      return `### ${f.path}\n职责摘要：${f.role.trim() || '（无）'}${imports}`
+    })
+    .join('\n\n')
+}
+
 /** 汇总调用的用户消息：项目地图 + 每文件第三段（截断）+ 引用关系，不重发全文 */
 export function buildProjectSummaryPrompt(
   projectContext: string,
   files: SummaryFileInput[],
   treeText: string,
 ): string {
-  const fileBlocks = files
-    .map((f) => {
-      const imports = f.imports.length ? `\n引用/导入：${f.imports.join('；')}` : ''
-      return `### ${f.path}\n职责摘要：${f.role.trim() || '（无）'}${imports}`
-    })
-    .join('\n\n')
+  const fileBlocks = formatFileBlocks(files)
 
   return `【项目结构结论】
 ${projectContext}
@@ -277,4 +337,25 @@ ${treeText}
 
 【各个文件的职责摘要与引用关系】
 ${fileBlocks}`
+}
+
+/** 只生成项目图时的用户消息：和汇总用同一份输入；可带已有的项目总览，用来对齐分层 */
+export function buildProjectGraphPrompt(
+  projectContext: string,
+  files: SummaryFileInput[],
+  treeText: string,
+  summaryText = '',
+): string {
+  const textBlock = summaryText.trim()
+    ? `\n\n【已有的项目总览】\n${summaryText.trim()}`
+    : ''
+
+  return `【项目结构结论】
+${projectContext}
+
+【目录树】
+${treeText}
+
+【各个文件的职责摘要与引用关系】
+${formatFileBlocks(files)}${textBlock}`
 }

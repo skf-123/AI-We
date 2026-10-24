@@ -17,7 +17,7 @@ export const PROJECT_TEXT_TITLE = '一、整个项目是什么'
 export const PROJECT_GRAPH_TITLE = '二、项目知识框架图'
 
 /** 从汇总输出里抠出图 JSON（流式过程中不完整时返回 null） */
-function extractGraphJson(rest: string): unknown {
+export function extractGraphJson(rest: string): unknown {
   const fenced = rest.match(/```(?:json)?\s*([\s\S]*?)```/)
   const candidate = (fenced ? fenced[1] : rest).trim()
   const trimmed = fenced ? candidate : candidate.slice(0, candidate.lastIndexOf('}') + 1)

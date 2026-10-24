@@ -29,6 +29,7 @@ import {
 import { useProjectAgent, type ProjectAgentMapResult } from './useProjectAgent'
 import { useProjectMap } from './useProjectMap'
 import { useProjectAnalysis } from './useProjectAnalysis'
+import { useProjectGraph, type ProjectGraphPayload } from './useProjectGraph'
 import { useProjectSummary } from './useProjectSummary'
 import { useProjectVendorReview } from './useProjectVendorReview'
 
@@ -42,7 +43,8 @@ import { useProjectVendorReview } from './useProjectVendorReview'
  *   useProjectSession
  *     ├─ useProjectMap        目录说明 + 项目结构结论
  *     ├─ useProjectAnalysis   逐文件并发池
- *     └─ useProjectSummary    手动触发的一次汇总调用
+ *     ├─ useProjectSummary    手动触发的一次汇总调用
+ *     └─ useProjectGraph      只生成项目图的独立请求
  *
  * 这个 composable 不碰 DOM：滚动、beforeunload、文件全屏都留在页面。
  */
@@ -110,6 +112,7 @@ export function useProjectSession() {
   const selfCheck = useProjectAgent()
   const pool = useProjectAnalysis()
   const summary = useProjectSummary()
+  const graph = useProjectGraph()
   const vendorReview = useProjectVendorReview()
 
   /** 防止上一个项目的候选评审结果落到新项目上 */
@@ -125,6 +128,12 @@ export function useProjectSession() {
   /** 自检修正后的图；没有自检结果时用汇总原图 */
   const selfCheckGraph = ref<ProjectGraphData | null>(null)
   const selfCheckStarted = ref(false)
+  /** 用户单独重画出来的图；优先于汇总原图，但排在自检结果之后 */
+  const graphOverride = ref<ProjectGraphData | null>(null)
+  /** 上一次汇总时冻结的输入；重画图沿用它，保证图和正文用的是同一批文件 */
+  const lastSummaryInput = ref<
+    (Omit<ProjectGraphPayload, 'text'> & { skipped: number }) | null
+  >(null)
 
   /** 目录说明阶段：Agent 侦查或固定地图，任一在跑都算还没准备好 */
   const notesLoading = computed(() => map.loading.value || agent.running.value)
@@ -157,7 +166,9 @@ export function useProjectSession() {
   const summaryText = computed(() => summaryParsed.value.text)
   const summaryGraph = computed(() => summaryParsed.value.graph)
   const summaryHasResult = computed(() => summary.output.value.length > 0)
-  const displayGraph = computed(() => selfCheckGraph.value ?? summaryGraph.value)
+  const displayGraph = computed(
+    () => selfCheckGraph.value ?? graphOverride.value ?? summaryGraph.value,
+  )
 
   const doneFiles = computed(() =>
     queueFiles.value.filter((entry) => pool.progress[entry.path]?.status === 'done'),
@@ -208,11 +219,31 @@ export function useProjectSession() {
       pool.allSettled.value &&
       !pool.stopped.value &&
       doneFiles.value.length > 0 &&
-      !summary.loading.value,
+      !summary.loading.value &&
+      !graph.loading.value,
   )
 
   /** 用已完成的文件生成总览：至少 2 个成功文件，不要求全部解析完 */
   const canGeneratePartial = computed(
+    () =>
+      started.value &&
+      doneFiles.value.length >= 2 &&
+      !summary.loading.value &&
+      !graph.loading.value,
+  )
+
+  /** 只重画图：至少 2 个成功文件；汇总和图都没有在跑 */
+  const canRunGraphOnly = computed(
+    () =>
+      started.value &&
+      doneFiles.value.length >= 2 &&
+      !summary.loading.value &&
+      !graph.loading.value &&
+      !selfCheck.running.value,
+  )
+
+  /** 按钮本身什么时候出现；跑到一半也要显示，好让用户看到「图生成中」 */
+  const canShowGraphOnly = computed(
     () => started.value && doneFiles.value.length >= 2 && !summary.loading.value,
   )
 
@@ -668,6 +699,38 @@ export function useProjectSession() {
   }
 
   /**
+   * 把当前已完成文件拼成汇总和图共用的输入。
+   * role 总长度到预算就停止加入，剩余文件数如实返回。
+   */
+  function buildSummaryInput(): Omit<ProjectGraphPayload, 'text'> & { skipped: number } {
+    const payloadFiles: ProjectGraphPayload['files'] = []
+    let used = 0
+    let skipped = 0
+
+    for (const entry of doneFiles.value) {
+      const role = thirdSection(pool.progress[entry.path]?.output ?? '').slice(0, 300)
+      if (used + role.length > SUMMARY_CHAR_BUDGET) {
+        skipped++
+        continue
+      }
+      used += role.length
+      payloadFiles.push({
+        path: entry.path,
+        role,
+        imports: extractImports(pool.textOf(entry.path)),
+      })
+    }
+
+    return {
+      projectName: projectName.value,
+      projectContext: map.context(projectName.value),
+      treeText: treeToText(tree.value, 0, true),
+      files: payloadFiles,
+      skipped,
+    }
+  }
+
+  /**
    * 生成项目总览 + 项目图。
    *
    * 只发摘要：每文件第三段（截断 300 字）+ import 关系 + 项目地图，
@@ -690,37 +753,58 @@ export function useProjectSession() {
 
     phase.value = 'summary'
 
-    const payloadFiles: { path: string; role: string; imports: string[] }[] = []
-    let used = 0
-    let skipped = 0
+    const input = buildSummaryInput()
+    summarySkippedCount.value = input.skipped
 
-    for (const entry of doneFiles.value) {
-      const role = thirdSection(pool.progress[entry.path]?.output ?? '').slice(0, 300)
-      if (used + role.length > SUMMARY_CHAR_BUDGET) {
-        skipped++
-        continue
-      }
-      used += role.length
-      payloadFiles.push({
-        path: entry.path,
-        role,
-        imports: extractImports(pool.textOf(entry.path)),
-      })
+    // 冻结这一次的输入，供「只重画图」复用；两次调用用同一批文件
+    lastSummaryInput.value = {
+      projectName: input.projectName,
+      projectContext: input.projectContext,
+      treeText: input.treeText,
+      files: input.files.map((f) => ({ ...f, imports: [...f.imports] })),
+      skipped: input.skipped,
     }
 
-    summarySkippedCount.value = skipped
-
-    // 重新生成总览时，把上一轮的自检结果一起清掉
+    // 重新生成总览时，上一轮单独重画的图和自检结果都不再适用
+    graphOverride.value = null
     selfCheck.reset()
     selfCheckGraph.value = null
     selfCheckStarted.value = false
 
     await summary.run({
-      projectName: projectName.value,
-      projectContext: map.context(projectName.value),
-      treeText: treeToText(tree.value, 0, true),
-      files: payloadFiles,
+      projectName: input.projectName,
+      projectContext: input.projectContext,
+      treeText: input.treeText,
+      files: input.files,
     })
+  }
+
+  /**
+   * 只重画项目图。
+   * 沿用上一次汇总冻结的输入；没有冻结输入时用当前已完成文件。
+   * 成功后替换图，并重新跑图自检；失败时保留旧图。
+   */
+  async function runGraphOnly() {
+    if (!canRunGraphOnly.value) return
+
+    const frozen = lastSummaryInput.value
+    const input: ProjectGraphPayload = frozen
+      ? { ...frozen, text: summaryText.value }
+      : { ...buildSummaryInput(), text: summaryText.value }
+
+    const next = await graph.run(
+      input,
+      files.value.map((entry) => entry.path),
+    )
+    if (!next) return
+
+    selfCheck.reset()
+    selfCheckGraph.value = null
+    selfCheckStarted.value = false
+
+    graphOverride.value = next
+    selfCheckStarted.value = true
+    void runSelfCheck(next)
   }
 
   async function generateSummary() {
@@ -772,6 +856,7 @@ export function useProjectSession() {
   function resetAll() {
     pool.stop()
     summary.stop()
+    graph.stop()
 
     agent.reset()
     selfCheck.reset()
@@ -780,9 +865,12 @@ export function useProjectSession() {
     vendorCheck.value = null
     selfCheckGraph.value = null
     selfCheckStarted.value = false
+    graphOverride.value = null
+    lastSummaryInput.value = null
     pool.reset()
     map.reset()
     summary.reset()
+    graph.reset()
 
     files.value = []
     fileHandles.clear()
@@ -863,6 +951,14 @@ export function useProjectSession() {
     summaryDone: summary.done,
     summaryOutputTruncated: summary.outputTruncated,
     summaryError: summary.error,
+    // 只重画图
+    runGraphOnly,
+    canRunGraphOnly,
+    canShowGraphOnly,
+    graphOnlyLoading: graph.loading,
+    graphOnlyDone: graph.done,
+    graphOnlyError: graph.error,
+    graphOnlyTruncated: graph.truncated,
     // 派生
     tree,
     stats,
