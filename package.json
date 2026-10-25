@@ -13,6 +13,7 @@
     "cache:probe": "node --env-file=.env scripts/parallel-cache-probe.mjs",
     "cdp:verify": "node scripts/cdp-verify.mjs",
     "cdp:concurrency": "node scripts/cdp-concurrency.mjs",
+    "usage:report": "node scripts/usage-report.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
