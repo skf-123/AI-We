@@ -921,12 +921,13 @@ export function useProjectSession() {
 
     const candidateScan = scanCandidateEdges(candidateSources)
     const candidateReport = compareGraphToCandidates(graph, candidateScan)
+    const parseCount = filesToParse(files.value).length
 
     const result = await selfCheck.runSelfCheck({
       graph,
       projectContext: map.context(projectName.value),
       entries: files.value,
-      parseCount: filesToParse(files.value).length,
+      parseCount,
       readablePaths: filesForMap(files.value).map((entry) => entry.path),
       getFile: (path) => fileHandles.get(path),
       suspicions: candidateReport.suspicions,
@@ -940,7 +941,6 @@ export function useProjectSession() {
               unresolved: candidateScan.unresolved.length,
             }
           : undefined,
-      maxToolCalls: 12,
     })
 
     if (result) {

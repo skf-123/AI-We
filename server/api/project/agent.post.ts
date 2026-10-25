@@ -16,18 +16,18 @@ import {
  * （tool_calls 或最终 JSON）。客户端执行工具后再发下一轮。
  *
  * 上下文预算：整段对话按字符数卡在 150 万以内（约 45 万 token），给模型输出留余量。
- * 消息条数另设 500 的上限：40 轮、每轮最多 10 个工具调用时最坏约 441 条；
+ * 消息条数另设 10000 的上限：100 轮、每轮最多 20 个工具调用时最坏约 2100 条；
  * 旧的 60 条会在十几轮时误伤正常侦查。
  */
 
 const MAX_TOTAL_CHARS = 1_500_000
-const MAX_MESSAGES = 500
+const MAX_MESSAGES = 10_000
 
 const MessageSchema = z.object({
   role: z.enum(['user', 'assistant', 'tool']),
   content: z.string().max(200_000).default(''),
   tool_call_id: z.string().max(200).optional(),
-  tool_calls: z.array(z.unknown()).max(10).optional(),
+  tool_calls: z.array(z.unknown()).max(20).optional(),
 })
 
 const RequestSchema = z.object({

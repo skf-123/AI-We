@@ -68,8 +68,8 @@ export interface ProjectSelfCheckInput {
   maxToolCalls?: number
 }
 
-const MAX_ROUNDS_HARD = 40
-const MAX_SELF_CHECK_ROUNDS = 10
+const MAX_ROUNDS_HARD = 100
+const MAX_SELF_CHECK_ROUNDS = 100
 const MAX_CONTEXT_CHARS = 1_400_000
 const MAX_TREE_CHARS = 150_000
 const MAX_CONTEXT_TEXT = 100_000
