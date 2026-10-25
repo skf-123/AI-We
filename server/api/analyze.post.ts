@@ -87,7 +87,8 @@ export default defineEventHandler(async (event) => {
         model: config.llmModel,
         stream: true,
         temperature: 0.3, // 偏低：解释类任务要稳定、少发挥
-        max_tokens: 8192,
+        // 五段讲解的输出上限；10 万低于模型单次最大输出 393,216，只是上限
+        max_tokens: 100_000,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: buildUserPrompt(parsed.data.code, docs) },

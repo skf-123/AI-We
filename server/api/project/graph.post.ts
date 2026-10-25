@@ -74,7 +74,8 @@ export default defineEventHandler(async (event) => {
       ],
       stream: true,
       temperature: 0.3,
-      maxTokens: 80_000,
+      // 和汇总那次保持一致；30 万低于模型单次最大输出 393,216，只是上限
+      maxTokens: 300_000,
       // 只覆盖等响应头；流开始后由生成过程决定
       timeoutMs: 120_000,
     },

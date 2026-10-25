@@ -132,7 +132,8 @@ export default defineEventHandler(async (event) => {
         model: config.llmModel,
         stream: true,
         temperature: 0.3, // 偏低：解释类任务要稳定、少发挥
-        max_tokens: 2048, // 追问要短 —— 限制比主链路小一个数量级，这也是它更快的原因
+        // 追问的输出上限；5,000 约 8,300 汉字，对三五句话足够，只是上限
+        max_tokens: 5_000,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           // 之前问过的轮次原样带上，让它能接着上下文答
