@@ -19,6 +19,8 @@ interface UsageSession {
   id: string
   name: string
   savedAt: string
+  startedAt: string | null
+  endedAt: string | null
   calls: number
   total: number
 }
@@ -75,7 +77,7 @@ const FEATURES: Record<string, { label: string; detail: string; limit: string }>
     label: '项目模式 · 图自检 Agent',
     detail: '图生成后检查浮着的节点、分组到分组的边、写反或编造的关系；可读文件确认',
     limit:
-      '最多 min(待解析文件数, 10) 轮；工具调用 ≤12 次；每轮输出 ≤50,000 token；上下文 1.4M / 1.5M 字符；超时 90 秒/轮',
+      '最多 min(待解析文件数, 10) 轮；整段工具调用 ≤12 次（每轮最多 10 个）；每轮输出 ≤50,000 token；上下文 1.4M / 1.5M 字符；超时 90 秒/轮',
   },
   'project/map': {
     label: '项目模式 · 固定地图回退',
@@ -242,6 +244,12 @@ function num(value: number): string {
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleString('zh-CN')
 }
+
+function formatRange(session: UsageSession): string {
+  const start = session.startedAt ? formatTime(session.startedAt) : '—'
+  const end = session.endedAt ? formatTime(session.endedAt) : '—'
+  return `${start} → ${end}`
+}
 </script>
 
 <template>
@@ -281,7 +289,7 @@ function formatTime(iso: string): string {
             >
               <option value="">当前（未保留）</option>
               <option v-for="session in sessions" :key="session.id" :value="session.id">
-                {{ session.name }} · {{ formatTime(session.savedAt) }} · {{ session.calls }} 次
+                {{ session.name }} · {{ formatRange(session) }} · {{ session.calls }} 次
               </option>
             </select>
           </label>
@@ -329,6 +337,9 @@ function formatTime(iso: string): string {
         <p class="mt-2 text-[11px] text-slate-500">
           当前未保留：{{ current.calls }} 次调用 · {{ num(current.total) }} token
           <template v-if="selectedSession"> · 正在看：{{ selectedSession.name }}</template>
+        </p>
+        <p v-if="selectedSession" class="mt-1 text-[11px] text-slate-500">
+          这段记录的时间段：{{ formatRange(selectedSession) }}
         </p>
         <p v-if="notice" class="mt-1 text-[11px] text-emerald-700">{{ notice }}</p>
       </div>

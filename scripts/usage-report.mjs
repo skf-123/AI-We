@@ -91,7 +91,12 @@ function printTable(file, label) {
     { 功能: '总计', 调用次数: 0, 输入token: 0, 输出token: 0, 合计token: 0, 平均耗时ms: 0, 缺usage: 0 },
   )
 
+  const times = rows.map((row) => row.ts).filter(Boolean)
+  const start = times[0] ? new Date(times[0]).toLocaleString('zh-CN') : '—'
+  const end = times.at(-1) ? new Date(times.at(-1)).toLocaleString('zh-CN') : '—'
+
   console.log(`日志：${file}`)
+  console.log(`时间段：${start} → ${end}`)
   console.table([...table, total])
   const last = rows[rows.length - 1]
   console.log(`最近一次：${last.ts ?? '(无时间)'} · ${last.feature ?? ''}`)
@@ -109,9 +114,12 @@ function listSessions() {
       const id = basename(file, '.jsonl')
       const filePath = join(sessionsDir, file)
       const rows = readRows(filePath)
+      const times = rows.map((row) => row.ts).filter(Boolean)
       return {
         编号: id,
         名称: id.length > 16 ? id.slice(16) : id,
+        开始时间: times[0] ? new Date(times[0]).toLocaleString('zh-CN') : '—',
+        结束时间: times.at(-1) ? new Date(times.at(-1)).toLocaleString('zh-CN') : '—',
         保留时间: statSync(filePath).mtime.toLocaleString('zh-CN'),
         调用次数: rows.length,
         合计token: rows.reduce((sum, row) => sum + (Number(row.total) || 0), 0),

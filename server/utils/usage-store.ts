@@ -32,6 +32,10 @@ export interface UsageSession {
   id: string
   name: string
   savedAt: string
+  /** 这份记录里第一条调用的时间 */
+  startedAt: string | null
+  /** 最后一条调用的时间 */
+  endedAt: string | null
   calls: number
   total: number
 }
@@ -101,6 +105,16 @@ function sessionName(id: string): string {
   return id.length > 16 ? id.slice(16) : id
 }
 
+function timeRange(rows: UsageRow[]): { startedAt: string | null; endedAt: string | null } {
+  const times = rows
+    .map((row) => row.ts)
+    .filter((ts): ts is string => typeof ts === 'string' && ts.length > 0)
+  return {
+    startedAt: times[0] ?? null,
+    endedAt: times.at(-1) ?? null,
+  }
+}
+
 export function readCurrentRows(): UsageRow[] {
   return readRows(LIVE_FILE)
 }
@@ -119,6 +133,7 @@ export function listSessions(): UsageSession[] {
           id,
           name: sessionName(id),
           savedAt: statSync(filePath).mtime.toISOString(),
+          ...timeRange(rows),
           calls: rows.length,
           total,
         }
@@ -161,6 +176,7 @@ export function saveSession(name: string): UsageSession {
     id,
     name: sessionName(id),
     savedAt: statSync(file).mtime.toISOString(),
+    ...timeRange(rows),
     calls: rows.length,
     total: summarizeUsage(rows).reduce((sum, item) => sum + item.total, 0),
   }
