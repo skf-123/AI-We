@@ -711,6 +711,46 @@ export function treeToText(nodes: ProjectTreeNode[], depth = 0, markInclude = fa
 }
 
 /**
+ * 同名文件的最短区分后缀。
+ *
+ * 目录树只显示文件名时，hello-vite/index.html 和根目录 index.html 看起来是同一个。
+ * 这里只给重名文件返回一段父路径：父目录最后一段足够区分就用它，不够就用完整父路径；
+ * 根目录文件写「根目录」。不同名的文件不返回，不改它们的行。
+ */
+export function buildPathHints(paths: string[]): Map<string, string> {
+  const groups = new Map<string, string[]>()
+  for (const path of paths) {
+    const name = path.split('/').pop() ?? path
+    const list = groups.get(name) ?? []
+    list.push(path)
+    groups.set(name, list)
+  }
+
+  const hints = new Map<string, string>()
+  for (const list of groups.values()) {
+    if (list.length < 2) continue
+
+    const parents = list.map((path) => path.split('/').slice(0, -1))
+    const lastSegments = parents.map((parent) => parent[parent.length - 1] ?? '根目录')
+    const lastCount = new Map<string, number>()
+    for (const seg of lastSegments) lastCount.set(seg, (lastCount.get(seg) ?? 0) + 1)
+
+    for (let i = 0; i < list.length; i++) {
+      const parent = parents[i]!
+      if (parent.length === 0) {
+        hints.set(list[i]!, '根目录')
+        continue
+      }
+
+      const last = parent[parent.length - 1]!
+      hints.set(list[i]!, (lastCount.get(last) ?? 0) > 1 ? parent.join('/') : last)
+    }
+  }
+
+  return hints
+}
+
+/**
  * 项目结构结论 —— 逐文件请求的公共前缀。
  *
  * ⚠️ 这个字符串一经生成就不再变：每次逐文件请求原样带上，前半段逐字节相同，

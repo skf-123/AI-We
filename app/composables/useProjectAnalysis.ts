@@ -62,6 +62,18 @@ export function useProjectAnalysis() {
   let ticker: ReturnType<typeof setInterval> | null = null
   /** 项目结构结论 —— 每次请求原样带上，作为前缀缓存的公共前缀 */
   let context = ''
+  /** 等「增量解析全部落定」的调用方；allSettled 时统一 resolve */
+  const settleWaiters: (() => void)[] = []
+
+  function resolveSettledWaiters() {
+    const waiters = settleWaiters.splice(0)
+    for (const resolve of waiters) resolve()
+  }
+
+  function waitUntilSettled(): Promise<void> {
+    if (allSettled.value) return Promise.resolve()
+    return new Promise((resolve) => settleWaiters.push(resolve))
+  }
 
   function ensure(path: string) {
     const existing = instances[path]
@@ -148,6 +160,7 @@ export function useProjectAnalysis() {
 
     if (!stopped.value && running.size === 0 && queue.length === 0 && total.value > 0) {
       allSettled.value = true
+      resolveSettledWaiters()
     }
   }
 
@@ -229,6 +242,50 @@ export function useProjectAnalysis() {
     await pump()
   }
 
+  /**
+   * 只解析新增的文件，保留已有结果。
+   *
+   * 第一次解析之后，用户可能又勾了几个没解析过的文件；这里只把这几条加进队列，
+   * 不清空 done、不重跑旧文件。返回的 Promise 在这批新增文件全部落定后 resolve。
+   */
+  async function startAdditional(files: ProjectSourceFile[], projectContext: string) {
+    if (projectContext) context = projectContext
+
+    let added = 0
+
+    for (const item of files) {
+      const path = normalizePath(item.path)
+      handles.set(path, item.file)
+
+      const p = progress[path]
+      if (p?.status === 'done') continue
+      if (!p) {
+        ensure(path)
+      } else if (p.status === 'error') {
+        resetProgressForRetry(path)
+      }
+
+      // 已经在跑的等它跑完；已经在队列里的不重复入队
+      if (progress[path]?.status === 'running') continue
+      if (queue.includes(path)) continue
+
+      queue.push(path)
+      added++
+    }
+
+    if (added === 0 && running.size === 0 && queue.length === 0) {
+      allSettled.value = total.value > 0
+      if (allSettled.value) resolveSettledWaiters()
+      return
+    }
+
+    total.value = handles.size
+    stopped.value = false
+    allSettled.value = false
+    void pump()
+    return waitUntilSettled()
+  }
+
   /** 停止：一次掐掉所有在飞 + 清空队列，且不触发汇总 */
   function stop() {
     stopped.value = true
@@ -250,6 +307,7 @@ export function useProjectAnalysis() {
     running.clear()
     runningCount.value = 0
     allSettled.value = false
+    resolveSettledWaiters()
     recountFinished()
   }
 
@@ -261,11 +319,21 @@ export function useProjectAnalysis() {
     void pump()
   }
 
-  /** 单文件重试：把失败项重新放回队首 */
-  function retry(path: string) {
-    const key = normalizePath(path)
+  /** 停止之后只继续指定的这一批（增量解析用），不把旧文件一起拉起来 */
+  function resumePaths(paths: string[]) {
+    stopped.value = false
+    allSettled.value = false
+    const target = new Set(paths.map(normalizePath))
+    queue = [...target].filter(
+      (path) => progress[path]?.status !== 'done' && !running.has(path),
+    )
+    void pump()
+  }
+
+  /** 把一条失败/停止的记录改回 pending；增量解析和单文件重试共用 */
+  function resetProgressForRetry(key: string) {
     const p = progress[key]
-    if (!p || p.status !== 'error') return
+    if (!p) return
 
     p.status = 'pending'
     p.error = ''
@@ -274,6 +342,15 @@ export function useProjectAnalysis() {
     p.truncated = false
     p.outputTruncated = false
     p.percent = 0
+  }
+
+  /** 单文件重试：把失败项重新放回队首 */
+  function retry(path: string) {
+    const key = normalizePath(path)
+    const p = progress[key]
+    if (!p || p.status !== 'error') return
+
+    resetProgressForRetry(key)
 
     const i = queue.indexOf(key)
     if (i !== -1) queue.splice(i, 1)
@@ -316,6 +393,7 @@ export function useProjectAnalysis() {
     runningCount.value = 0
     allSettled.value = false
     stopped.value = false
+    resolveSettledWaiters()
   }
 
   function textOf(path: string): string {
@@ -331,8 +409,10 @@ export function useProjectAnalysis() {
     limit,
     stopped,
     start,
+    startAdditional,
     stop,
     resume,
+    resumePaths,
     retry,
     prioritize,
     reset,

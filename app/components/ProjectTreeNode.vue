@@ -21,6 +21,8 @@ const props = defineProps<{
   selectedFolder?: string | null
   /** 当前展示的文件 */
   activePath?: string | null
+  /** 同名文件的父路径后缀；不同名文件没有这个键 */
+  pathHints?: Map<string, string>
 }>()
 
 const emit = defineEmits<{
@@ -67,6 +69,13 @@ const folderCategory = computed<'user' | 'config' | 'system' | 'mixed' | null>((
 
 const file = computed<ProjectFileEntry | undefined>(() => props.node.file)
 const pg = computed<FileProgress | undefined>(() => props.progress[props.node.path])
+
+/** 同名文件的父路径后缀；文件夹结尾补一个斜杠，根目录不加 */
+const pathHintText = computed(() => {
+  const hint = props.pathHints?.get(props.node.path)
+  if (!hint) return ''
+  return hint === '根目录' ? hint : `${hint}/`
+})
 
 /** 当前文件的角色；配置和系统文件共用同一个切换控件 */
 const modeValue = computed<ConfigMode>(() => {
@@ -205,6 +214,7 @@ function onFileCheck(e: Event) {
         :open-map="openMap"
         :selected-folder="selectedFolder"
         :active-path="activePath"
+        :path-hints="pathHints"
         @toggle-file="(p) => emit('toggle-file', p)"
         @toggle-folder="(n) => emit('toggle-folder', n)"
         @set-mode="(p, m) => emit('set-mode', p, m)"
@@ -249,6 +259,14 @@ function onFileCheck(e: Event) {
       >
         {{ node.name }}
       </button>
+
+      <span
+        v-if="pathHints?.get(node.path)"
+        class="min-w-0 max-w-[45%] truncate text-[11px] text-slate-400"
+        :title="node.path"
+      >
+        · {{ pathHintText }}
+      </span>
 
       <span
         v-if="file?.subtype === 'unknown'"

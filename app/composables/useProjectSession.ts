@@ -134,6 +134,10 @@ export function useProjectSession() {
   const lastSummaryInput = ref<
     (Omit<ProjectGraphPayload, 'text'> & { skipped: number }) | null
   >(null)
+  /** 是否正在补解析新增文件；和首次解析区分开 */
+  const parsingAdditional = ref(false)
+  /** 这次补解析涉及的路径；停止后「继续解析」只续这一批 */
+  const activeParsingPaths = ref<string[]>([])
 
   /** 目录说明阶段：Agent 侦查或固定地图，任一在跑都算还没准备好 */
   const notesLoading = computed(() => map.loading.value || agent.running.value)
@@ -174,6 +178,12 @@ export function useProjectSession() {
     queueFiles.value.filter((entry) => pool.progress[entry.path]?.status === 'done'),
   )
   const doneCount = computed(() => doneFiles.value.length)
+
+  /** 当前勾选里从来没有解析记录的文件；这是「新增」的准确口径 */
+  const newSelected = computed(() =>
+    queueFiles.value.filter((entry) => !pool.progress[entry.path]),
+  )
+  const newSelectedCount = computed(() => newSelected.value.length)
 
   /** 项目图里当前选中的分组节点 */
   const selectedGroupNode = computed(() => {
@@ -232,14 +242,13 @@ export function useProjectSession() {
       !graph.loading.value,
   )
 
-  /** 只重画图：至少 2 个成功文件；汇总和图都没有在跑 */
+  /** 只重画图：至少 2 个成功文件；汇总和图都没有在跑。图自检在跑时不挡，点了会先停自检 */
   const canRunGraphOnly = computed(
     () =>
       started.value &&
       doneFiles.value.length >= 2 &&
       !summary.loading.value &&
-      !graph.loading.value &&
-      !selfCheck.running.value,
+      !graph.loading.value,
   )
 
   /** 按钮本身什么时候出现；跑到一半也要显示，好让用户看到「图生成中」 */
@@ -256,12 +265,31 @@ export function useProjectSession() {
       }).length,
   )
 
-  /** 只用了部分文件时，页面上的说明；全部完成则返回空串 */
-  const summaryScopeNote = computed(() => {
-    if (!started.value || doneCount.value === pool.total.value) return ''
+  /**
+   * 汇总主按钮现在该做什么。
+   * 有新增未解析文件时先解析新增；解析完再由用户点生成，不自动跑。
+   */
+  const summaryAction = computed<
+    'parse-new' | 'parsing-new' | 'generate' | 'retry-failed' | 'blocked'
+  >(() => {
+    if (parsingAdditional.value) return 'parsing-new'
+    if (newSelectedCount.value > 0) return 'parse-new'
+    if (doneFiles.value.length > 0) return 'generate'
+    if (failedCount.value > 0) return 'retry-failed'
+    return 'blocked'
+  })
 
-    const unparsed = Math.max(0, pool.total.value - doneCount.value - failedCount.value)
-    return `本次只用了 ${doneCount.value} / ${pool.total.value} 个已完成文件；失败 ${failedCount.value} 个、未解析 ${unparsed} 个未纳入。`
+  /** 当前勾选里已完成 / 待解析 / 失败的数量说明；全完成则不显示 */
+  const summaryScopeNote = computed(() => {
+    if (!started.value) return ''
+
+    const totalSelected = queueFiles.value.length
+    if (totalSelected === 0) return ''
+
+    const unparsed = Math.max(0, totalSelected - doneCount.value - failedCount.value)
+    if (unparsed === 0 && failedCount.value === 0) return ''
+
+    return `当前选中 ${totalSelected} 个：已完成 ${doneCount.value} 个、待解析 ${unparsed} 个、失败 ${failedCount.value} 个。`
   })
 
   const activeTitle = computed(() => {
@@ -683,10 +711,41 @@ export function useProjectSession() {
     started.value = true
     phase.value = 'parsing'
     activePath.value = activePath.value ?? sources[0]!.path
+    parsingAdditional.value = false
+    activeParsingPaths.value = []
 
     await pool.start(sources, map.context(projectName.value))
 
     return true
+  }
+
+  /** 只解析当前勾选里新增的、从来没解析过的文件；旧结果不动，也不自动汇总 */
+  async function parseNewSelected(): Promise<void> {
+    if (parsingAdditional.value) return
+
+    const sources = newSelected.value
+      .map((entry) => ({ path: entry.path, file: fileHandles.get(entry.path) }))
+      .filter((item): item is { path: string; file: File } => Boolean(item.file))
+
+    if (sources.length === 0) return
+
+    parsingAdditional.value = true
+    activeParsingPaths.value = sources.map((item) => item.path)
+    activePath.value = activePath.value ?? sources[0]!.path
+
+    try {
+      await pool.startAdditional(sources, map.context(projectName.value))
+    } finally {
+      parsingAdditional.value = false
+    }
+  }
+
+  /** 重试当前勾选里失败的文件；由用户点，不自动触发 */
+  function retryFailedSelected() {
+    for (const entry of queueFiles.value) {
+      const p = pool.progress[entry.path]
+      if (p?.status === 'error' && p.error !== '已停止') pool.retry(entry.path)
+    }
   }
 
   function stopParsing() {
@@ -695,7 +754,8 @@ export function useProjectSession() {
 
   function resumeParsing() {
     phase.value = 'parsing'
-    pool.resume()
+    if (activeParsingPaths.value.length > 0) pool.resumePaths(activeParsingPaths.value)
+    else pool.resume()
   }
 
   /**
@@ -741,15 +801,26 @@ export function useProjectSession() {
    * 至少 2 个成功文件才生成，不要求全部解析完。
    */
   async function runSummary(partial: boolean) {
-    if (summary.loading.value) return
+    if (summary.loading.value || parsingAdditional.value) return
     if (!started.value) return
 
+    const hasNew = newSelectedCount.value > 0
+
     if (partial) {
-      if (doneFiles.value.length < 2) return
+      if (doneFiles.value.length < 2 && !hasNew) return
       if (!pool.allSettled.value) pool.stop()
-    } else if (!canGenerateSummary.value) {
+    } else if (!hasNew && !canGenerateSummary.value) {
       return
     }
+
+    // 同一个按钮：先把当前勾选里新增的文件补解析，再用全部已完成文件生成
+    if (hasNew) {
+      await parseNewSelected()
+      if (pool.stopped.value) return
+      if (doneFiles.value.length === 0) return
+    }
+
+    if (partial && doneFiles.value.length < 2) return
 
     phase.value = 'summary'
 
@@ -786,6 +857,9 @@ export function useProjectSession() {
    */
   async function runGraphOnly() {
     if (!canRunGraphOnly.value) return
+
+    // 用户点重画图就是要换一张图；图自检还在跑时先停掉它，别让两条线抢同一张图
+    if (selfCheck.running.value) selfCheck.stop()
 
     const frozen = lastSummaryInput.value
     const input: ProjectGraphPayload = frozen
@@ -867,6 +941,8 @@ export function useProjectSession() {
     selfCheckStarted.value = false
     graphOverride.value = null
     lastSummaryInput.value = null
+    parsingAdditional.value = false
+    activeParsingPaths.value = []
     pool.reset()
     map.reset()
     summary.reset()
@@ -973,6 +1049,10 @@ export function useProjectSession() {
     canGenerateSummary,
     canGeneratePartial,
     summaryScopeNote,
+    summaryAction,
+    newSelectedCount,
+    failedCount,
+    parsingAdditional,
     doneCount,
     selectedFolder,
     selectedGroup,
@@ -997,6 +1077,8 @@ export function useProjectSession() {
     startParsing,
     stopParsing,
     resumeParsing,
+    parseNewSelected,
+    retryFailedSelected,
     generateSummary,
     generatePartialSummary,
     resetAll,

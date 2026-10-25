@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ConfigMode, FileProgress, ProjectTreeNode } from '~/types/project'
-import { allSystem } from '~/utils/project-files'
+import { allSystem, buildPathHints } from '~/utils/project-files'
 
 /**
  * 目录树的外壳：图例 + 递归节点 + 说明状态。
@@ -36,6 +36,21 @@ function onSelectFolder(node: ProjectTreeNode) {
 }
 
 const openMap = reactive<Record<string, boolean>>({})
+
+/** 同名文件才显示父路径后缀；不同名的不显示 */
+function collectFilePaths(nodes: ProjectTreeNode[]): string[] {
+  const paths: string[] = []
+  const walk = (list: ProjectTreeNode[]) => {
+    for (const node of list) {
+      if (node.type === 'file') paths.push(node.path)
+      else walk(node.children ?? [])
+    }
+  }
+  walk(nodes)
+  return paths
+}
+
+const pathHints = computed(() => buildPathHints(collectFilePaths(props.nodes)))
 
 /** 新出现的文件夹给默认值：系统分支收起，其余展开。已有的不覆盖用户操作 */
 function initOpen(nodes: ProjectTreeNode[]) {
@@ -116,6 +131,7 @@ function setAllOpen(value: boolean) {
           :open-map="openMap"
           :selected-folder="selectedFolder"
           :active-path="activePath"
+          :path-hints="pathHints"
           @toggle-file="(p) => emit('toggle-file', p)"
           @toggle-folder="(n) => emit('toggle-folder', n)"
           @set-mode="(p, m) => emit('set-mode', p, m)"

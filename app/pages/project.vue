@@ -62,6 +62,10 @@ const {
   summaryDone,
   summaryOutputTruncated,
   summaryError,
+  summaryAction,
+  newSelectedCount,
+  failedCount,
+  retryFailedSelected,
   runGraphOnly,
   canRunGraphOnly,
   canShowGraphOnly,
@@ -77,7 +81,6 @@ const {
   summaryText,
   displayGraph,
   summaryHasResult,
-  canGenerateSummary,
   canGeneratePartial,
   summaryScopeNote,
   doneCount,
@@ -246,7 +249,26 @@ async function onStart() {
   if (ok) scrollToAnalysis()
 }
 
-/** 重新生成：全部完成后用完整输入，否则用已完成文件 */
+/** 主按钮只保留「生成 / 重新生成」两种说法；新增解析放到提示里，不再塞进按钮名 */
+const summaryPrimaryLabel = computed(() => {
+  if (summaryAction.value === 'parsing-new') return '正在解析新增文件…'
+  if (summaryAction.value === 'retry-failed' || summaryAction.value === 'blocked')
+    return '没有可生成的文件'
+  return '生成总览 + 思维导图 →'
+})
+
+const regenerateLabel = computed(() => {
+  if (summaryAction.value === 'parsing-new') return '正在解析新增文件…'
+  if (summaryAction.value === 'retry-failed' || summaryAction.value === 'blocked')
+    return '没有可生成的文件'
+  return '重新生成总览 + 思维导图 →'
+})
+
+const canRunSummaryPrimary = computed(
+  () => summaryAction.value === 'parse-new' || summaryAction.value === 'generate',
+)
+
+/** 重新生成：全部完成后用完整输入，否则用已完成文件；新增文件由 runSummary 先补解析 */
 function onRegenerate() {
   if (allSettled.value) void generateSummary()
   else void generatePartialSummary()
@@ -455,20 +477,27 @@ onBeforeUnmount(() => {
                   </button>
 
                   <button
-                    v-if="!allSettled && canGeneratePartial"
+                    v-if="!summaryLoading && (summaryHasResult || !allSettled)"
                     type="button"
-                    class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
-                    :title="
-                      poolStopped
-                        ? '用已完成文件生成项目总览和思维导图'
-                        : '点击后会停止剩余解析，用已完成的文件生成'
+                    class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    :disabled="
+                      summaryHasResult ? !canRunSummaryPrimary : !canGeneratePartial
                     "
-                    @click="generatePartialSummary"
+                    :title="
+                      summaryHasResult
+                        ? '重新生成项目总览和思维导图；有新增文件会先解析新增'
+                        : poolStopped
+                          ? '用已完成文件生成项目总览和思维导图'
+                          : '点击后会停止剩余解析，用已完成的文件生成'
+                    "
+                    @click="summaryHasResult ? onRegenerate() : generatePartialSummary()"
                   >
                     {{
-                      poolStopped
-                        ? '生成项目总览 + 思维导图'
-                        : `生成思维导图（用已完成的 ${doneCount} 个）`
+                      summaryHasResult
+                        ? regenerateLabel
+                        : poolStopped
+                          ? '生成项目总览 + 思维导图'
+                          : `生成思维导图（用已完成的 ${doneCount} 个）`
                     }}
                   </button>
                   <span v-else-if="!allSettled && doneCount === 1" class="text-xs text-slate-500">
@@ -572,24 +601,43 @@ onBeforeUnmount(() => {
         >
           <div class="min-w-0">
             <p class="text-sm font-semibold text-emerald-800">
-              {{ doneCount > 0 ? '全部文件已解析完' : '没有成功解析的文件' }}
+              {{
+                newSelectedCount > 0
+                  ? '有新增文件还没解析'
+                  : doneCount > 0
+                    ? '全部文件已解析完'
+                    : '没有成功解析的文件'
+              }}
             </p>
             <p class="mt-0.5 text-xs text-emerald-700/80">
-              <template v-if="doneCount > 0">
-                将基于已完成的 {{ doneCount }} /
-                {{ total }} 个文件，生成一段项目总览和唯一一张项目图。
+              <template v-if="newSelectedCount > 0">
+                当前勾选：已完成 {{ doneCount }} 个、新增 {{ newSelectedCount }} 个待解析。
+                点下面的按钮会先解析新增的，再生成；不想解析就取消勾选新增文件。
+              </template>
+              <template v-else-if="doneCount > 0">
+                将基于已完成的 {{ doneCount }} 个文件，生成一段项目总览和唯一一张项目图。
               </template>
               <template v-else> 可以先重试失败的文件，再生成项目总览。 </template>
             </p>
           </div>
-          <button
-            type="button"
-            class="ml-auto rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-            :disabled="!canGenerateSummary"
-            @click="generateSummary"
-          >
-            生成项目总览 + 项目图 →
-          </button>
+          <div class="ml-auto flex flex-wrap items-center gap-3">
+            <button
+              v-if="newSelectedCount === 0 && failedCount > 0 && doneCount === 0"
+              type="button"
+              class="text-xs text-rose-600 underline-offset-2 hover:underline"
+              @click="retryFailedSelected"
+            >
+              重试失败的 {{ failedCount }} 个文件
+            </button>
+            <button
+              type="button"
+              class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              :disabled="!canRunSummaryPrimary"
+              @click="generateSummary"
+            >
+              {{ summaryPrimaryLabel }}
+            </button>
+          </div>
         </section>
 
         <!-- 项目总览 -->
@@ -616,34 +664,31 @@ onBeforeUnmount(() => {
               只出这一张项目图；展开 / 收起不重新请求
             </span>
             <button
-              v-if="!summaryLoading && (canGenerateSummary || canGeneratePartial)"
-              type="button"
-              class="ml-auto text-xs text-slate-400 hover:text-slate-700 disabled:cursor-not-allowed disabled:text-slate-300"
-              :disabled="!(canGenerateSummary || canGeneratePartial)"
-              @click="onRegenerate"
-            >
-              重新生成
-            </button>
-            <button
               v-if="canShowGraphOnly"
               type="button"
-              class="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
-              :disabled="!canRunGraphOnly"
+              class="ml-auto rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              :disabled="!canRunGraphOnly || newSelectedCount > 0"
               :title="
-                displayGraph
-                  ? '只重画图，不改正文；沿用上次汇总的文件'
-                  : '只生成项目图，不改正文'
+                newSelectedCount > 0
+                  ? '只重画图使用上次汇总的文件，不包含新增；请先解析新增文件'
+                  : graphOnlyLoading
+                    ? '项目图正在生成'
+                    : selfCheckRunning
+                      ? '图自检正在跑；点它会先停止自检，再只重画项目图'
+                      : displayGraph
+                        ? '只重画项目图，项目总览正文保持不变；沿用上次汇总的文件；想以任选节点生图，请点「重新生成总览 + 思维导图」'
+                        : '图生成失败时，重画项目图；沿用上次汇总的文件，新图再失败仍保留原图；想以任选节点生图，请点「重新生成总览 + 思维导图」'
               "
               @click="runGraphOnly"
             >
               {{
                 graphOnlyLoading
-                  ? '图生成中…'
+                  ? '项目图生成中…'
                   : displayGraph
-                    ? '重新生成图'
+                    ? '只重画项目图'
                     : graphOnlyError || (summaryDone && !displayGraph)
-                      ? '重试生成图'
-                      : '生成项目图'
+                      ? '重画项目图'
+                      : '只生成项目图'
               }}
             </button>
           </div>
@@ -653,6 +698,14 @@ onBeforeUnmount(() => {
           </p>
           <p v-if="summaryScopeNote" class="mb-3 text-[11px] text-amber-700">
             {{ summaryScopeNote }}
+            <button
+              v-if="!summaryLoading && failedCount > 0 && doneCount === 0"
+              type="button"
+              class="ml-2 underline underline-offset-2 hover:text-amber-900"
+              @click="retryFailedSelected"
+            >
+              重试失败的 {{ failedCount }} 个
+            </button>
           </p>
           <p v-if="summaryOutputTruncated" class="mb-3 text-[11px] text-amber-700">
             这次汇总输出到达上限，正文或项目图可能没有讲完。
