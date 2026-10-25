@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { OUTPUT_TRUNCATED_MARKER } from '#shared/stream-meta'
 import { RAG_INSTRUCTION } from '../../utils/prompt'
-import { toTextStream } from '../../utils/stream'
+import { toLoggedTextStream } from '../../utils/stream'
 import { callLlm } from '../../utils/llm'
 import { PROJECT_FILE_SYSTEM_PROMPT, buildProjectFilePrompt } from '../../utils/project-prompt'
 import { retrieveDocs } from '../../rag/retrieve'
@@ -78,6 +78,7 @@ export default defineEventHandler(async (event) => {
   const userPrompt = buildProjectFilePrompt(projectContext, filePath, code, docs)
 
   // ---- 上游调用（callLlm 内部处理 429 / 超时 / 非 200）----
+  const startedAt = Date.now()
   const upstream = await callLlm(
     {
       apiKey: config.llmApiKey,
@@ -112,9 +113,11 @@ export default defineEventHandler(async (event) => {
   }
 
   return new Response(
-    toTextStream(upstream.body as ReadableStream<Uint8Array>, {
-      truncatedMarker: OUTPUT_TRUNCATED_MARKER,
-    }) as unknown as ReadableStream,
+    toLoggedTextStream(
+      upstream.body as ReadableStream<Uint8Array>,
+      { truncatedMarker: OUTPUT_TRUNCATED_MARKER },
+      { feature: 'project/analyze', model: config.llmModel, startedAt },
+    ) as unknown as ReadableStream,
     {
       headers,
     },

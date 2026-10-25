@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { OUTPUT_TRUNCATED_MARKER } from '#shared/stream-meta'
-import { toTextStream } from '../../utils/stream'
+import { toLoggedTextStream } from '../../utils/stream'
 import { callLlm } from '../../utils/llm'
 import {
   PROJECT_SUMMARY_SYSTEM_PROMPT,
@@ -52,6 +52,7 @@ export default defineEventHandler(async (event) => {
     parsed.data.treeText,
   )
 
+  const startedAt = Date.now()
   const upstream = await callLlm(
     {
       apiKey: config.llmApiKey,
@@ -73,9 +74,11 @@ export default defineEventHandler(async (event) => {
   )
 
   return new Response(
-    toTextStream(upstream.body as ReadableStream<Uint8Array>, {
-      truncatedMarker: OUTPUT_TRUNCATED_MARKER,
-    }) as unknown as ReadableStream,
+    toLoggedTextStream(
+      upstream.body as ReadableStream<Uint8Array>,
+      { truncatedMarker: OUTPUT_TRUNCATED_MARKER },
+      { feature: 'project/summary', model: config.llmModel, startedAt },
+    ) as unknown as ReadableStream,
     {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',

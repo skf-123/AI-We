@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { OUTPUT_TRUNCATED_MARKER, stripOutputTruncation } from '#shared/stream-meta'
 import { callLlm } from '../../utils/llm'
-import { toTextStream } from '../../utils/stream'
+import { toLoggedTextStream } from '../../utils/stream'
 import {
   PROJECT_GRAPH_SYSTEM_PROMPT,
   buildProjectGraphPrompt,
@@ -61,6 +61,7 @@ export default defineEventHandler(async (event) => {
     parsed.data.text,
   )
 
+  const startedAt = Date.now()
   const upstream = await callLlm(
     {
       apiKey: config.llmApiKey,
@@ -83,9 +84,10 @@ export default defineEventHandler(async (event) => {
 
   let content = ''
   try {
-    for await (const chunk of toTextStream(
+    for await (const chunk of toLoggedTextStream(
       upstream.body as ReadableStream<Uint8Array>,
       { truncatedMarker: OUTPUT_TRUNCATED_MARKER },
+      { feature: 'project/graph', model: config.llmModel, startedAt },
     )) {
       content += chunk
     }

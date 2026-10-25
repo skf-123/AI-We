@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { SYSTEM_PROMPT, RAG_INSTRUCTION, buildUserPrompt } from '../utils/prompt'
-import { toTextStream } from '../utils/stream'
+import { toLoggedTextStream } from '../utils/stream'
 import { retrieveDocs } from '../rag/retrieve'
 import type { EmbedConfig, RagConfig, RagSource } from '../rag/types'
 
@@ -75,6 +75,7 @@ export default defineEventHandler(async (event) => {
   const systemPrompt = docs.length > 0 ? SYSTEM_PROMPT + RAG_INSTRUCTION : SYSTEM_PROMPT
 
   // ---- 4. 调用上游大模型 ----
+  const startedAt = Date.now()
   let upstream: Response
   try {
     upstream = await fetch(`${config.llmBaseUrl}/chat/completions`, {
@@ -86,6 +87,7 @@ export default defineEventHandler(async (event) => {
       body: JSON.stringify({
         model: config.llmModel,
         stream: true,
+        stream_options: { include_usage: true },
         temperature: 0.3, // 偏低：解释类任务要稳定、少发挥
         // 五段讲解的输出上限；10 万低于模型单次最大输出 393,216，只是上限
         max_tokens: 100_000,
@@ -129,5 +131,12 @@ export default defineEventHandler(async (event) => {
     headers['X-Rag-Sources'] = encodeURIComponent(JSON.stringify(sources))
   }
 
-  return new Response(toTextStream(upstream.body) as unknown as ReadableStream, { headers })
+  return new Response(
+    toLoggedTextStream(
+      upstream.body,
+      {},
+      { feature: 'code/analyze', model: config.llmModel, startedAt },
+    ) as unknown as ReadableStream,
+    { headers },
+  )
 })

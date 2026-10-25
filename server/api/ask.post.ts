@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { toTextStream } from '../utils/stream'
+import { toLoggedTextStream } from '../utils/stream'
 import { HISTORY_ITEM_GUARD, charBudgetOf, trimHistory } from '../utils/history'
 
 /**
@@ -120,6 +120,7 @@ export default defineEventHandler(async (event) => {
   const userMessage = `# 完整代码\n\n\`\`\`\n${code}\n\`\`\`${focus}${read}\n\n# 他的问题\n\n${question}`
 
   // ---- 4. 调用上游 ----
+  const startedAt = Date.now()
   let upstream: Response
   try {
     upstream = await fetch(`${config.llmBaseUrl}/chat/completions`, {
@@ -131,6 +132,7 @@ export default defineEventHandler(async (event) => {
       body: JSON.stringify({
         model: config.llmModel,
         stream: true,
+        stream_options: { include_usage: true },
         temperature: 0.3, // 偏低：解释类任务要稳定、少发挥
         // 追问的输出上限；5,000 约 8,300 汉字，对三五句话足够，只是上限
         max_tokens: 5_000,
@@ -183,5 +185,12 @@ export default defineEventHandler(async (event) => {
     )
   }
 
-  return new Response(toTextStream(upstream.body) as unknown as ReadableStream, { headers })
+  return new Response(
+    toLoggedTextStream(
+      upstream.body,
+      {},
+      { feature: 'code/ask', model: config.llmModel, startedAt },
+    ) as unknown as ReadableStream,
+    { headers },
+  )
 })

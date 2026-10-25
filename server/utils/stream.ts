@@ -13,9 +13,13 @@
  * 所以只能用流内标记告诉前端「这次输出被截断了」。
  */
 
+import { logLlmUsage, type LlmUsage } from './usage-log'
+
 export interface TextStreamOptions {
   /** 撞到输出上限时，在流末尾追加这个标记；不传就完全保持原来的行为 */
   truncatedMarker?: string
+  /** 上游在最后一块返回 usage 时回调；不是所有流都会带 */
+  onUsage?: (usage: LlmUsage) => void
 }
 
 export async function* toTextStream(
@@ -51,6 +55,7 @@ export async function* toTextStream(
 
         try {
           const chunk = JSON.parse(payload)
+          if (chunk?.usage) options.onUsage?.(chunk.usage as LlmUsage)
           const choice = chunk?.choices?.[0]
           const text = choice?.delta?.content
           if (text) yield text
@@ -71,5 +76,42 @@ export async function* toTextStream(
     (finishReason === 'length' || finishReason === 'max_tokens')
   ) {
     yield options.truncatedMarker
+  }
+}
+
+export interface LoggedStreamMeta {
+  feature: string
+  model?: string
+  startedAt: number
+}
+
+/**
+ * 在 toTextStream 外面包一层：流结束（或中断）时写一行 token 用量。
+ *
+ * 用法和 toTextStream 一样，只是多传一个 feature / model / startedAt。
+ * 用户中途停止时可能没有 usage，日志会标 usageMissing，不补假数。
+ */
+export async function* toLoggedTextStream(
+  body: ReadableStream<Uint8Array>,
+  options: TextStreamOptions,
+  meta: LoggedStreamMeta,
+): AsyncGenerator<string> {
+  let usage: LlmUsage | null = null
+
+  try {
+    for await (const text of toTextStream(body, {
+      ...options,
+      onUsage: (next) => {
+        usage = next
+        options.onUsage?.(next)
+      },
+    })) {
+      yield text
+    }
+  } finally {
+    logLlmUsage(meta.feature, usage, meta.startedAt, {
+      model: meta.model,
+      usageMissing: !usage,
+    })
   }
 }

@@ -6,6 +6,7 @@
  * 两家的向量空间不通用，拿错 key 只会得到 404 或维度错乱。
  */
 import type { EmbedConfig } from './types'
+import { logLlmUsage } from '../utils/usage-log'
 
 /** 智谱 embedding 接口单次数组上限是 64 条 */
 const BATCH_SIZE = 64
@@ -24,6 +25,7 @@ export async function embedTexts(
     throw new Error(`单次最多 ${BATCH_SIZE} 条，收到 ${texts.length} 条`)
   }
 
+  const startedAt = Date.now()
   const baseUrl = cfg.baseUrl.replace(/\/$/, '')
   const res = await fetch(`${baseUrl}/embeddings`, {
     method: 'POST',
@@ -41,10 +43,23 @@ export async function embedTexts(
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '')
+    logLlmUsage('rag/embedding', null, startedAt, {
+      model: cfg.model,
+      count: texts.length,
+      failed: true,
+      status: res.status,
+    })
     throw new Error(`embedding 服务返回 HTTP ${res.status}：${detail.slice(0, 200)}`)
   }
 
-  const json = (await res.json()) as { data?: { embedding?: number[] }[] }
+  const json = (await res.json()) as {
+    data?: { embedding?: number[] }[]
+    usage?: { prompt_tokens?: number; total_tokens?: number; [key: string]: unknown }
+  }
+  logLlmUsage('rag/embedding', json?.usage ?? null, startedAt, {
+    model: cfg.model,
+    count: texts.length,
+  })
   const vectors = json?.data?.map((d) => d.embedding)
 
   if (!Array.isArray(vectors) || vectors.length !== texts.length) {

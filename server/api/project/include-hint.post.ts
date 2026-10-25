@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { callLlmText } from '../../utils/llm'
+import { logLlmUsage } from '../../utils/usage-log'
 
 /**
  * POST /api/project/include-hint
@@ -46,8 +47,9 @@ export default defineEventHandler(async (event): Promise<{ text: string }> => {
     .filter(Boolean)
     .join('\n')
 
+  const startedAt = Date.now()
   try {
-    const text = await callLlmText(
+    const result = await callLlmText(
       {
         apiKey: config.llmApiKey,
         baseUrl: config.llmBaseUrl,
@@ -64,9 +66,17 @@ export default defineEventHandler(async (event): Promise<{ text: string }> => {
         timeoutMs: 20_000,
       },
     )
+    logLlmUsage('project/include-hint', result.usage, startedAt, {
+      model: config.llmModel,
+      finishReason: result.finishReason,
+    })
 
-    return { text: text.trim() || FALLBACK }
+    return { text: result.text.trim() || FALLBACK }
   } catch (err) {
+    logLlmUsage('project/include-hint', null, startedAt, {
+      model: config.llmModel,
+      failed: true,
+    })
     console.warn('[project/include-hint] 模型调用失败，使用固定说明：', err)
     return { text: FALLBACK }
   }

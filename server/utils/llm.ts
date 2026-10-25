@@ -73,6 +73,7 @@ export async function callLlm(config: LlmRuntimeConfig, opts: LlmCallOptions): P
         temperature: opts.temperature ?? 0.3,
         max_tokens: opts.maxTokens ?? 8192,
         messages: opts.messages,
+        ...(opts.stream ? { stream_options: { include_usage: true } } : {}),
         ...(opts.tools ? { tools: opts.tools } : {}),
         ...(opts.toolChoice ? { tool_choice: opts.toolChoice } : {}),
       }),
@@ -106,17 +107,39 @@ export async function callLlm(config: LlmRuntimeConfig, opts: LlmCallOptions): P
   }
 }
 
+export interface LlmTextResult {
+  text: string
+  finishReason: string
+  usage: {
+    prompt_tokens?: number
+    completion_tokens?: number
+    total_tokens?: number
+    prompt_cache_hit_tokens?: number
+    prompt_cache_miss_tokens?: number
+    [key: string]: unknown
+  } | null
+}
+
 /**
  * 非流式调用，直接把模型输出的文本取出来。
  * 只给"项目地图"这种一次要一小段 JSON 的调用用。
  */
-export async function callLlmText(config: LlmRuntimeConfig, opts: LlmCallOptions): Promise<string> {
+export async function callLlmText(
+  config: LlmRuntimeConfig,
+  opts: LlmCallOptions,
+): Promise<LlmTextResult> {
   const res = await callLlm(config, { ...opts, stream: false })
   const data = (await res.json().catch(() => null)) as {
-    choices?: { message?: { content?: string } }[]
+    choices?: { message?: { content?: string }; finish_reason?: string }[]
+    usage?: LlmTextResult['usage']
   } | null
+  const choice = data?.choices?.[0]
 
-  return data?.choices?.[0]?.message?.content ?? ''
+  return {
+    text: choice?.message?.content ?? '',
+    finishReason: choice?.finish_reason ?? '',
+    usage: data?.usage ?? null,
+  }
 }
 
 export interface LlmMessage {
@@ -134,6 +157,7 @@ export interface LlmMessageResult {
   message: LlmMessage
   /** 上游的 finish_reason；length 表示撞到输出上限被截断 */
   finishReason: string
+  usage: LlmTextResult['usage']
 }
 
 export async function callLlmMessage(
@@ -143,11 +167,13 @@ export async function callLlmMessage(
   const res = await callLlm(config, { ...opts, stream: false })
   const data = (await res.json().catch(() => null)) as {
     choices?: { message?: LlmMessage; finish_reason?: string }[]
+    usage?: LlmTextResult['usage']
   } | null
   const choice = data?.choices?.[0]
 
   return {
     message: choice?.message ?? { role: 'assistant', content: '' },
     finishReason: choice?.finish_reason ?? '',
+    usage: data?.usage ?? null,
   }
 }

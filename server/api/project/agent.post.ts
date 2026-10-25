@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { callLlmMessage } from '../../utils/llm'
+import { logLlmUsage } from '../../utils/usage-log'
 import {
   PROJECT_AGENT_SYSTEM_PROMPT,
   PROJECT_AGENT_TOOLS,
@@ -65,7 +66,8 @@ export default defineEventHandler(async (event) => {
       ? PROJECT_SELF_CHECK_SYSTEM_PROMPT
       : PROJECT_AGENT_SYSTEM_PROMPT
 
-  const { message, finishReason } = await callLlmMessage(
+  const startedAt = Date.now()
+  const { message, finishReason, usage } = await callLlmMessage(
     {
       apiKey: config.llmApiKey,
       baseUrl: config.llmBaseUrl,
@@ -82,6 +84,17 @@ export default defineEventHandler(async (event) => {
       tools: PROJECT_AGENT_TOOLS,
       toolChoice: parsed.data.final ? 'none' : 'auto',
       timeoutMs: 90_000,
+    },
+  )
+
+  logLlmUsage(
+    parsed.data.mode === 'self-check' ? 'project/agent:self-check' : 'project/agent:map',
+    usage,
+    startedAt,
+    {
+      model: config.llmModel,
+      finishReason,
+      final: parsed.data.final,
     },
   )
 

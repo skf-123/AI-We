@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { callLlmText } from '../../utils/llm'
+import { logLlmUsage } from '../../utils/usage-log'
 import {
   PROJECT_MAP_SYSTEM_PROMPT,
   buildProjectMapPrompt,
@@ -85,8 +86,9 @@ export default defineEventHandler(async (event): Promise<MapResult> => {
   const fileHeads: MapFileHead[] = parsed.data.fileHeads
 
   let raw: string
+  const startedAt = Date.now()
   try {
-    raw = await callLlmText(
+    const result = await callLlmText(
       {
         apiKey: config.llmApiKey,
         baseUrl: config.llmBaseUrl,
@@ -110,8 +112,14 @@ export default defineEventHandler(async (event): Promise<MapResult> => {
         timeoutMs: 60_000,
       },
     )
+    raw = result.text
+    logLlmUsage('project/map', result.usage, startedAt, {
+      model: config.llmModel,
+      finishReason: result.finishReason,
+    })
   } catch (err) {
     // 地图生成失败不该挡住后面的逐文件解析：返回空说明，让前端降级
+    logLlmUsage('project/map', null, startedAt, { model: config.llmModel, failed: true })
     console.warn('[project/map] 模型调用失败，降级为空说明：', err)
     return { summary: '', folders: [], files: [], degraded: true }
   }

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { callLlmText } from '../../utils/llm'
+import { logLlmUsage } from '../../utils/usage-log'
 import {
   PROJECT_VENDOR_REVIEW_SYSTEM_PROMPT,
   buildVendorReviewPrompt,
@@ -54,8 +55,9 @@ export default defineEventHandler(async (event) => {
   const allowed = new Set(candidates.map((item) => item.path))
   const config = useRuntimeConfig(event)
 
+  const startedAt = Date.now()
   try {
-    const raw = await callLlmText(
+    const result = await callLlmText(
       {
         apiKey: config.llmApiKey,
         baseUrl: config.llmBaseUrl,
@@ -72,8 +74,12 @@ export default defineEventHandler(async (event) => {
         timeoutMs: 30_000,
       },
     )
+    logLlmUsage('project/vendor-review', result.usage, startedAt, {
+      model: config.llmModel,
+      finishReason: result.finishReason,
+    })
 
-    const data = extractJson(raw) as { suggestions?: unknown } | null
+    const data = extractJson(result.text) as { suggestions?: unknown } | null
     const suggestions: { path: string; evidence: string }[] = []
 
     if (data && Array.isArray(data.suggestions)) {
@@ -95,6 +101,10 @@ export default defineEventHandler(async (event) => {
 
     return { suggestions: suggestions.slice(0, candidates.length) }
   } catch (err) {
+    logLlmUsage('project/vendor-review', null, startedAt, {
+      model: config.llmModel,
+      failed: true,
+    })
     console.warn('[project/vendor-review] 模型调用失败，跳过建议：', err)
     return { suggestions: [] }
   }
