@@ -311,7 +311,7 @@ function formatRange(session: UsageSession): string {
 
 <template>
   <div class="min-h-dvh bg-[#f5f6f8] text-slate-800">
-    <main class="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
+    <main class="w-full px-4 py-6 sm:px-6">
       <div class="mb-4 flex flex-wrap items-center gap-3">
         <h1 class="text-lg font-semibold">Token 用量</h1>
         <p class="text-xs text-slate-400">只统计本机 logs/llm-usage.jsonl</p>
