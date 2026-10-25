@@ -37,62 +37,106 @@ interface UsageResponse {
 }
 
 /** 每个 feature 的中文名、具体板块和当前代码里的上限 */
-const FEATURES: Record<string, { label: string; detail: string; limit: string }> = {
+interface FeatureInfo {
+  label: string
+  detail: string
+  limit: string
+  /** 这个功能的单次输出上限 token；没有就按不适用处理 */
+  outputLimit?: number
+  /** 只有和别的请求/轮次/前缀共享上下文时才写；独立请求不标记 */
+  context?: { label: string; detail: string }
+}
+
+const FEATURES: Record<string, FeatureInfo> = {
   'code/analyze': {
     label: '贴代码主链路',
     detail: '五段讲解：逐词逐句 → 局部关系 → 整段作用 → 技术溯源 → 知识框架图；带知识库引用',
     limit: '输入 ≤20,000 字符；输出 ≤100,000 token；检索 topK 4、阈值 0.38',
+    outputLimit: 100_000,
   },
   'code/ask': {
     label: '贴代码追问',
     detail: '选中解析结果里的一段代码就地提问，可多轮',
     limit:
       '代码 ≤50,000 字符；选中 ≤2,000；刚生成的解析 ≤20,000；问题 ≤500；历史 ≤100,000 token；输出 ≤5,000 token',
+    outputLimit: 5_000,
+    context: {
+      label: '多轮历史（前端重发）',
+      detail: '每问一次是独立请求，服务端不存会话；历史由前端在每次请求里重新带上',
+    },
   },
   'project/analyze': {
     label: '项目模式 · 逐文件四段解析',
     detail: '每个文件一次请求：逐词逐句 → 局部关系 → 整段作用 → 技术溯源；带项目结构结论与按文件检索',
     limit:
       '单文件 ≤50,000 字符；项目结构结论 ≤50,000；输出 ≤10,000 token；并发池 h1=5 / h2=32',
+    outputLimit: 10_000,
+    context: {
+      label: '共用项目前缀',
+      detail: '每个文件是独立请求，但都带同一份项目结构结论作为公共前缀，用于前缀缓存；不是同一段对话',
+    },
   },
   'project/summary': {
     label: '项目模式 · 项目总览 + 项目图',
     detail: '一次请求同时写正文和唯一一张项目图；正文和图共用一个输出上限',
     limit:
       '结构结论 ≤50,000 字符；目录树 ≤200,000；文件 ≤2,000 个；输出 ≤300,000 token（正文和图共用）；超时 120 秒',
+    outputLimit: 300_000,
+    context: {
+      label: '与项目图同一请求',
+      detail: '项目总览正文和项目图 JSON 在同一次请求里生成，共用一个上下文和同一个 300,000 输出上限',
+    },
   },
   'project/graph': {
     label: '项目模式 · 只重画项目图',
     detail: '不重跑正文，沿用上次汇总冻结的输入，只生成图 JSON',
     limit:
       '结构结论 ≤50,000 字符；目录树 ≤200,000；正文 ≤20,000；输出 ≤300,000 token；超时 120 秒',
+    outputLimit: 300_000,
+    context: {
+      label: '沿用汇总输入',
+      detail: '独立请求，不共享请求状态；只沿用上次汇总冻结的项目结构结论、目录树和文件清单',
+    },
   },
   'project/agent:map': {
     label: '项目模式 · 地图侦查 Agent',
     detail: '解析前读目录、配置和关键文件，产出项目结构结论、跨文件线索和证据',
     limit:
       '最多 min(待解析文件数, 40) 轮；每轮输出 ≤50,000 token；消息 ≤500 条；工具调用 ≤10 个/轮；上下文 1.4M / 1.5M 字符；超时 90 秒/轮；5 个只读工具',
+    outputLimit: 50_000,
+    context: {
+      label: '多轮共用对话',
+      detail: '整段侦查的多轮工具调用共用同一个对话上下文，消息逐轮累积；和图自检、其他功能不共享',
+    },
   },
   'project/agent:self-check': {
     label: '项目模式 · 图自检 Agent',
     detail: '图生成后检查浮着的节点、分组到分组的边、写反或编造的关系；可读文件确认',
     limit:
       '最多 min(待解析文件数, 10) 轮；整段工具调用 ≤12 次（每轮最多 10 个）；每轮输出 ≤50,000 token；上下文 1.4M / 1.5M 字符；超时 90 秒/轮',
+    outputLimit: 50_000,
+    context: {
+      label: '多轮共用对话',
+      detail: '图自检的多轮工具调用共用同一个对话上下文，消息逐轮累积；和地图侦查、其他功能不共享',
+    },
   },
   'project/map': {
     label: '项目模式 · 固定地图回退',
     detail: 'Agent 失败时，用目录树 + 每个文件头部几行生成目录说明和项目结构结论',
     limit: '目录树 ≤200,000 字符；文件头 ≤2,000 个；输出 ≤4,096 token；超时 60 秒',
+    outputLimit: 4_096,
   },
   'project/vendor-review': {
     label: '项目模式 · 第三方库复核',
     detail: '对规则拿不准的疑似第三方库文件做一次小评审，只给建议，不自动勾选',
     limit: '输出 ≤1,536 token；超时 30 秒',
+    outputLimit: 1_536,
   },
   'project/include-hint': {
     label: '项目模式 · 勾选系统文件前的说明',
     detail: '点选系统文件时用一两句话说明为什么默认不勾、勾了会占什么预算',
     limit: '输出 ≤160 token；超时 20 秒',
+    outputLimit: 160,
   },
   'rag/embedding': {
     label: '知识库 · 向量化',
@@ -101,7 +145,7 @@ const FEATURES: Record<string, { label: string; detail: string; limit: string }>
   },
 }
 
-function featureInfo(key: string) {
+function featureInfo(key: string): FeatureInfo {
   return FEATURES[key] ?? { label: key, detail: '未登记的中文说明', limit: '—' }
 }
 
@@ -208,24 +252,37 @@ function onSelectSession(event: Event): void {
  * 所有登记过的功能都列出来；还没有调用记录的补 0。
  * 这样即使刚打开页面，也能看到每个功能的中文名和上限。
  */
+function makeTableRow(feature: string, row?: UsageSummary) {
+  const calls = row?.calls ?? 0
+  const total = row?.total ?? 0
+  const completion = row?.completion ?? 0
+  const info = featureInfo(feature)
+
+  return {
+    feature,
+    calls,
+    prompt: row?.prompt ?? 0,
+    completion,
+    total,
+    avgMs: row?.avgMs ?? 0,
+    missing: row?.missing ?? 0,
+    avgTotal: calls ? total / calls : 0,
+    avgCompletion: calls ? completion / calls : 0,
+    pct1m: calls ? `${(((total / calls) / 1_000_000) * 100).toFixed(2)}%` : '—',
+    pctOutput:
+      calls && info.outputLimit
+        ? `${(((completion / calls) / info.outputLimit) * 100).toFixed(2)}%`
+        : '—',
+    info,
+  }
+}
+
 const tableRows = computed(() => {
   const byFeature = new Map(rows.value.map((row) => [row.feature, row]))
-  const known = Object.keys(FEATURES).map((feature) => {
-    const row = byFeature.get(feature)
-    return {
-      feature,
-      calls: row?.calls ?? 0,
-      prompt: row?.prompt ?? 0,
-      completion: row?.completion ?? 0,
-      total: row?.total ?? 0,
-      avgMs: row?.avgMs ?? 0,
-      missing: row?.missing ?? 0,
-      info: FEATURES[feature],
-    }
-  })
+  const known = Object.keys(FEATURES).map((feature) => makeTableRow(feature, byFeature.get(feature)))
   const unknown = rows.value
     .filter((row) => !FEATURES[row.feature])
-    .map((row) => ({ ...row, info: featureInfo(row.feature) }))
+    .map((row) => makeTableRow(row.feature, row))
 
   return [...known, ...unknown].sort((a, b) => b.total - a.total)
 })
@@ -376,7 +433,7 @@ function formatRange(session: UsageSession): string {
         </p>
 
         <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-          <table class="w-full min-w-[1100px] text-left text-sm">
+          <table class="w-full min-w-[1500px] text-left text-sm">
             <thead class="bg-slate-50 text-[11px] text-slate-500">
               <tr>
                 <th class="px-3 py-2 font-medium">功能</th>
@@ -385,16 +442,31 @@ function formatRange(session: UsageSession): string {
                 <th class="px-3 py-2 text-right font-medium">输入</th>
                 <th class="px-3 py-2 text-right font-medium">输出</th>
                 <th class="px-3 py-2 text-right font-medium">合计</th>
+                <th class="px-3 py-2 text-right font-medium">平均每次</th>
+                <th class="px-3 py-2 text-right font-medium">占 1M</th>
+                <th class="px-3 py-2 text-right font-medium">占输出上限</th>
                 <th class="px-3 py-2 text-right font-medium">平均耗时</th>
                 <th class="px-3 py-2 text-right font-medium">缺 usage</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="row in tableRows" :key="row.feature" class="border-t border-slate-100">
-                <td class="min-w-[320px] px-3 py-2.5 align-top">
+                <td class="min-w-[340px] px-3 py-2.5 align-top">
                   <p class="text-xs font-medium text-slate-800">{{ row.info.label }}</p>
                   <p class="mt-0.5 text-[10.5px] leading-relaxed text-slate-500">
                     {{ row.info.detail }}
+                  </p>
+                  <span
+                    v-if="row.info.context"
+                    class="mt-1 inline-block rounded bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700"
+                  >
+                    {{ row.info.context.label }}
+                  </span>
+                  <p
+                    v-if="row.info.context"
+                    class="mt-0.5 text-[10px] leading-relaxed text-slate-500"
+                  >
+                    {{ row.info.context.detail }}
                   </p>
                   <p class="mt-0.5 font-mono text-[10px] text-slate-400">{{ row.feature }}</p>
                 </td>
@@ -405,6 +477,11 @@ function formatRange(session: UsageSession): string {
                 <td class="px-3 py-2.5 text-right align-top">{{ num(row.prompt) }}</td>
                 <td class="px-3 py-2.5 text-right align-top">{{ num(row.completion) }}</td>
                 <td class="px-3 py-2.5 text-right align-top font-medium">{{ num(row.total) }}</td>
+                <td class="px-3 py-2.5 text-right align-top text-slate-500">
+                  {{ num(Math.round(row.avgTotal)) }}
+                </td>
+                <td class="px-3 py-2.5 text-right align-top text-slate-500">{{ row.pct1m }}</td>
+                <td class="px-3 py-2.5 text-right align-top text-slate-500">{{ row.pctOutput }}</td>
                 <td class="px-3 py-2.5 text-right align-top text-slate-500">{{ num(row.avgMs) }} ms</td>
                 <td
                   class="px-3 py-2.5 text-right align-top"
@@ -414,13 +491,29 @@ function formatRange(session: UsageSession): string {
                 </td>
               </tr>
               <tr v-if="tableRows.length === 0">
-                <td colspan="8" class="px-3 py-8 text-center text-xs text-slate-400">
+                <td colspan="11" class="px-3 py-8 text-center text-xs text-slate-400">
                   还没有记录。正常用一次项目前端，再回来刷新。
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
+
+        <p class="mt-3 text-[11px] leading-relaxed text-slate-500">
+          百分比按平均每次调用算：项目总览和项目图共用一次请求，合在一起算；Agent 每轮一次请求，上下文随轮次增长；embedding 没有输出上限，占输出上限显示 —。
+        </p>
+
+        <details class="mt-2 rounded-xl border border-slate-200 bg-white p-3 text-[11px] leading-relaxed text-slate-600">
+          <summary class="cursor-pointer select-none text-slate-500">上下文标记怎么算</summary>
+          <ul class="mt-2 space-y-1">
+            <li>与项目图同一请求：项目总览（正文和图 JSON 一次生成，共用一个上下文）。</li>
+            <li>多轮共用对话：地图侦查、图自检（各自多轮累积，互不共享）。</li>
+            <li>共用项目前缀：逐文件解析（每个文件独立请求，但都带同一份项目结构结论）。</li>
+            <li>沿用汇总输入：只重画图（独立请求，沿用上次汇总冻结的数据）。</li>
+            <li>多轮历史（前端重发）：贴代码追问（服务端不存会话）。</li>
+            <li>其他功能是独立请求，不标记。</li>
+          </ul>
+        </details>
 
         <p class="mt-3 text-[11px] text-slate-400">最近一次：{{ lastText }}</p>
       </template>
