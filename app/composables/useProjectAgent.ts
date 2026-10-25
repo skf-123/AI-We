@@ -443,21 +443,64 @@ ${readableList || '（没有可读文件）'}
 
     const suspicions = input.suspicions ?? []
     const candidate = input.candidateSummary
-    const suspicionLines = suspicions.slice(0, 8).map((item, index) => {
-      const kind = item.kind === 'reversed' ? '方向相反' : '没有 import 依据'
-      return `${index + 1}. ${kind}：${item.detail.slice(0, 300)}`
-    })
+
+    const formatSuspicion = (item: (typeof suspicions)[number]) => {
+      const kind =
+        item.kind === 'reversed'
+          ? '方向相反'
+          : item.kind === 'unsupported'
+            ? '没有 import 依据'
+            : item.kind === 'floating'
+              ? '节点没有连线'
+              : '只有分组到分组'
+      return `- ${kind}：${item.detail.slice(0, 240)}`
+    }
+
+    const floating = suspicions.filter((item) => item.kind === 'floating')
+    const mismatched = suspicions.filter(
+      (item) => item.kind === 'reversed' || item.kind === 'unsupported',
+    )
+    const groupOnly = suspicions.filter((item) => item.kind === 'group-only')
+    const blocks: string[] = []
+
+    if (floating.length) {
+      blocks.push(
+        `没有任何连线的节点（${floating.length} 个）：\n${floating
+          .slice(0, 3)
+          .map(formatSuspicion)
+          .join('\n')}`,
+      )
+    }
+    if (mismatched.length) {
+      blocks.push(
+        `和 import 对不上的边（${mismatched.length} 条）：\n${mismatched
+          .slice(0, 4)
+          .map(formatSuspicion)
+          .join('\n')}`,
+      )
+    }
+    if (groupOnly.length) {
+      blocks.push(
+        `只有分组到分组的边（${groupOnly.length} 条，可选核对）：\n${groupOnly
+          .slice(0, 3)
+          .map(formatSuspicion)
+          .join('\n')}`,
+      )
+    }
+
+    const shown = Math.min(floating.length, 3) + Math.min(mismatched.length, 4) + Math.min(groupOnly.length, 3)
     const moreSuspicions =
-      suspicions.length > 8 ? `\n……另有 ${suspicions.length - 8} 条未列出。` : ''
+      suspicions.length > shown ? `\n……另有 ${suspicions.length - shown} 条未列出。` : ''
+
     const programSection = candidate
       ? `【程序预检】
 已解析 ${candidate.parsed} 个文件，从 import 里找到 ${candidate.edges} 条文件级候选边；图里 ${candidate.supported} 条有依据，${candidate.unknown} 条无法判断，${candidate.unresolved} 条 import 没能解析到文件。
 ${
-  suspicionLines.length
-    ? suspicionLines.join('\n') + moreSuspicions
-    : '没有发现图里的边和 import 明显矛盾。不要为了找问题读文件；检查分组和标签后直接输出原图 JSON。'
+  blocks.length
+    ? blocks.join('\n\n') + moreSuspicions
+    : '程序没有发现浮着的节点，也没有发现边和 import 明显矛盾；分组级关系和标签仍要你自己判断。如果确实看不出问题，可以不读文件直接输出原图；不要为了找问题通读项目。'
 }
-最多核对上面列出的 5–8 条；确认 3–5 条关键关系就输出；不要为了补全项目关系读更多文件。`
+先看浮着的节点和 import 对不上的边；分组边有预算再核对。总数控制在 8 条左右；确认 3–5 条关键关系就输出，不要为了补全项目关系读更多文件。`
       : ''
 
     return runLoop<ProjectGraphData>({

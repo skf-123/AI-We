@@ -62,6 +62,10 @@ const jsFiles = [
     text: '<template><div /></template>\n<script>\nexport default {}\n</script>',
   },
   {
+    path: 'project/blog/src/pages/Float.vue',
+    text: '<template><div /></template>\n<script>\nexport default {}\n</script>',
+  },
+  {
     path: 'project/admin/src/utils/request.js',
     text: 'export default function request() {}',
   },
@@ -90,6 +94,11 @@ const graph = {
       files: [{ path: 'project/blog/src/pages/Other.vue' }],
     },
     {
+      id: 'float',
+      label: '浮着的页面',
+      files: [{ path: 'project/blog/src/pages/Float.vue' }],
+    },
+    {
       id: 'tech',
       label: '技术',
     },
@@ -105,8 +114,10 @@ const graph = {
 const report = compareGraphToCandidates(graph, js)
 check('supported edge', report.supported, 1)
 check('unknown edge (node without files)', report.unknown, 1)
-check('one suspicion', report.suspicions.length, 2)
+check('suspicion count', report.suspicions.length, 4)
 check('suspicion kinds', report.suspicions.map((item) => item.kind).sort(), [
+  'floating',
+  'group-only',
   'reversed',
   'unsupported',
 ])

@@ -8,7 +8,7 @@
 import type { CandidateScan } from './project-candidate-edges'
 import type { GraphLike } from './project-graph-diff'
 
-export type GraphSuspicionKind = 'unsupported' | 'reversed'
+export type GraphSuspicionKind = 'unsupported' | 'reversed' | 'floating' | 'group-only'
 
 export interface GraphSuspicion {
   kind: GraphSuspicionKind
@@ -49,8 +49,23 @@ export function compareGraphToCandidates(
   scan: CandidateScan,
 ): GraphCandidateReport {
   const nodeFiles = new Map<string, Set<string>>()
+  const pathToNode = new Map<string, string>()
   for (const node of graph.nodes) {
-    nodeFiles.set(node.id, new Set((node.files ?? []).map((file) => file.path)))
+    const files = new Set((node.files ?? []).map((file) => file.path))
+    nodeFiles.set(node.id, files)
+    for (const path of files) pathToNode.set(path, node.id)
+  }
+
+  const incidentNodes = new Set<string>()
+  for (const edge of graph.edges) {
+    for (const endpoint of [edge.from, edge.to]) {
+      if (endpoint.startsWith('n:')) {
+        incidentNodes.add(endpoint.slice(2))
+      } else if (endpoint.startsWith('f:')) {
+        const nodeId = pathToNode.get(endpoint.slice(2))
+        if (nodeId) incidentNodes.add(nodeId)
+      }
+    }
   }
 
   const parsedPaths = new Set(scan.paths)
@@ -108,6 +123,41 @@ export function compareGraphToCandidates(
       to: edge.to,
       label: edge.label,
       detail: `候选 import 里没有找到 ${shortList(fromFiles)} → ${shortList(toFiles)} 的关系`,
+    })
+  }
+
+  // 两端都是分组、而且有文件级候选支撑的边：可以落到文件，也可以保留分组级；
+  // 只作为“可选核对”，不跟“找不到依据”混在一起。
+  for (const edge of graph.edges) {
+    if (!edge.from.startsWith('n:') || !edge.to.startsWith('n:')) continue
+    const fromId = edge.from.slice(2)
+    const toId = edge.to.slice(2)
+    const fromFiles = nodeFiles.get(fromId)
+    const toFiles = nodeFiles.get(toId)
+    if (!fromFiles?.size || !toFiles?.size) continue
+
+    const supported = scan.edges.some(
+      (candidate) => fromFiles.has(candidate.from) && toFiles.has(candidate.to),
+    )
+    if (!supported) continue
+
+    suspicions.push({
+      kind: 'group-only',
+      from: edge.from,
+      to: edge.to,
+      label: edge.label,
+      detail: `「${fromId}」→「${toId}」两端都是分组，但 import 里已有文件级依据；有预算时可以落到具体文件，没有就保留分组级并标注`,
+    })
+  }
+
+  for (const node of graph.nodes) {
+    if (incidentNodes.has(node.id)) continue
+    suspicions.push({
+      kind: 'floating',
+      from: `n:${node.id}`,
+      to: '',
+      label: node.label,
+      detail: `节点「${node.label ?? node.id}」没有任何连线；要么补一条真实关系，要么在角色里标注「无外部调用」`,
     })
   }
 
