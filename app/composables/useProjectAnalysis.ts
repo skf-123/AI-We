@@ -14,7 +14,7 @@ import { useAnalysis } from './useAnalysis'
  *   queue 待解析；running 在飞（≤ limit）；完成一个补一个，不是等一批全完。
  *   stop() 一次 abort 所有在飞 + 清空队列；失败继续；点排队中的文件可插队。
  *
- * 并发档位由协议决定，不交给模型：h2/h3 → 32，http/1.1 → 5。
+ * 并发档位由协议决定，不交给模型：h2/h3 → 100，http/1.1 → 5。
  */
 
 export interface ProjectSourceFile {
@@ -30,7 +30,7 @@ export function detectConcurrencyLimit(): number {
     PerformanceNavigationTiming | undefined
   const proto = nav?.nextHopProtocol
 
-  return proto === 'h2' || proto === 'h3' ? 32 : 5
+  return proto === 'h2' || proto === 'h3' ? 100 : 5
 }
 
 export function useProjectAnalysis() {
