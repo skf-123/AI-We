@@ -47,6 +47,9 @@ const {
   selfCheckSteps,
   selfCheckRounds,
   selfCheckMaxRounds,
+  selfCheckSummary,
+  canRestoreSelfCheck,
+  restoreSelfCheck,
   stopSelfCheck,
   rerunSelfCheck,
   progress,
@@ -744,8 +747,11 @@ onBeforeUnmount(() => {
             :max-rounds="selfCheckMaxRounds"
             :rerun="!selfCheckRunning"
             rerun-label="重新自检"
+            :status-text="selfCheckSummary"
+            :can-restore="canRestoreSelfCheck"
             @stop="stopSelfCheck"
             @rerun="rerunSelfCheck"
+            @restore="restoreSelfCheck"
           />
 
           <div v-if="displayGraph" class="mt-4">

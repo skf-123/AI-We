@@ -19,6 +19,7 @@ import {
   verifyEvidence,
 } from '~/utils/project-files'
 import { parseProjectSummary } from '~/utils/project-graph'
+import { diffProjectGraph, type ProjectGraphDiff } from '~/utils/project-graph-diff'
 import {
   composeVendorReason,
   detectVendor,
@@ -128,6 +129,10 @@ export function useProjectSession() {
   /** 自检修正后的图；没有自检结果时用汇总原图 */
   const selfCheckGraph = ref<ProjectGraphData | null>(null)
   const selfCheckStarted = ref(false)
+  /** 自检前的图：用于比较改动，以及“恢复自检前的图” */
+  const preSelfCheckGraph = ref<ProjectGraphData | null>(null)
+  const selfCheckDiff = ref<ProjectGraphDiff | null>(null)
+  const selfCheckRestored = ref(false)
   /** 用户单独重画出来的图；优先于汇总原图，但排在自检结果之后 */
   const graphOverride = ref<ProjectGraphData | null>(null)
   /** 上一次汇总时冻结的输入；重画图沿用它，保证图和正文用的是同一批文件 */
@@ -841,6 +846,9 @@ export function useProjectSession() {
     selfCheck.reset()
     selfCheckGraph.value = null
     selfCheckStarted.value = false
+    preSelfCheckGraph.value = null
+    selfCheckDiff.value = null
+    selfCheckRestored.value = false
 
     await summary.run({
       projectName: input.projectName,
@@ -875,6 +883,9 @@ export function useProjectSession() {
     selfCheck.reset()
     selfCheckGraph.value = null
     selfCheckStarted.value = false
+    preSelfCheckGraph.value = null
+    selfCheckDiff.value = null
+    selfCheckRestored.value = false
 
     graphOverride.value = next
     selfCheckStarted.value = true
@@ -895,6 +906,10 @@ export function useProjectSession() {
    * 自检失败/被停止就保留原图；整个过程在页面上有轨迹、可打断。
    */
   async function runSelfCheck(graph: ProjectGraphData) {
+    preSelfCheckGraph.value = null
+    selfCheckDiff.value = null
+    selfCheckRestored.value = false
+
     const result = await selfCheck.runSelfCheck({
       graph,
       projectContext: map.context(projectName.value),
@@ -904,15 +919,57 @@ export function useProjectSession() {
       getFile: (path) => fileHandles.get(path),
     })
 
-    if (result) selfCheckGraph.value = result
+    if (result) {
+      selfCheckGraph.value = result
+      preSelfCheckGraph.value = graph
+      selfCheckDiff.value = diffProjectGraph(graph, result)
+    }
+  }
+
+  /** 自检结果可以恢复时才显示按钮；没有改动就不需要恢复 */
+  const canRestoreSelfCheck = computed(
+    () =>
+      !selfCheck.running.value &&
+      !selfCheckRestored.value &&
+      Boolean(preSelfCheckGraph.value) &&
+      Boolean(selfCheckDiff.value?.changed),
+  )
+
+  /** 轨迹里的一行结果：读了多少文件、图有没有改动 */
+  const selfCheckSummary = computed(() => {
+    if (selfCheck.running.value || selfCheck.error.value) return ''
+    if (selfCheckRestored.value) return '已恢复自检前的图'
+
+    const diff = selfCheckDiff.value
+    if (!diff) return ''
+
+    const head = `自检完成：读了 ${selfCheck.readFiles.value.length} 个文件`
+    if (!diff.changed) return `${head}，图没有改动`
+
+    const parts: string[] = []
+    const nodeChanges = diff.nodesAdded + diff.nodesRemoved + diff.nodesChanged
+    const edgeChanges = diff.edgesAdded + diff.edgesRemoved + diff.edgesRelabeled
+    const fileChanges = diff.filesAdded + diff.filesRemoved + diff.filesMoved
+    if (nodeChanges) parts.push(`节点 ${nodeChanges} 处`)
+    if (edgeChanges) parts.push(`边 ${edgeChanges} 处`)
+    if (fileChanges) parts.push(`文件归属 ${fileChanges} 处`)
+
+    return `${head}，${parts.join('、')}`
+  })
+
+  /** 回到自检前的那张图；不重新请求 */
+  function restoreSelfCheck() {
+    if (!canRestoreSelfCheck.value || !preSelfCheckGraph.value) return
+    selfCheckGraph.value = preSelfCheckGraph.value
+    selfCheckRestored.value = true
   }
 
   /**
-   * 用户手动重新自检：总是从汇总原图重来，不在上一轮的自检结果上叠改。
-   * 失败或被停止时保留当前显示的图（如果有上一轮自检结果，它也还在）。
+   * 用户手动重新自检：从当前显示图去掉自检结果的那一份重来，
+   * 不在上一轮的自检结果上叠改。只重画过图时，检查的是重画后的图。
    */
   async function rerunSelfCheck() {
-    const graph = summaryGraph.value
+    const graph = graphOverride.value ?? summaryGraph.value
     if (!graph || selfCheck.running.value) return
 
     selfCheckStarted.value = true
@@ -939,6 +996,9 @@ export function useProjectSession() {
     vendorCheck.value = null
     selfCheckGraph.value = null
     selfCheckStarted.value = false
+    preSelfCheckGraph.value = null
+    selfCheckDiff.value = null
+    selfCheckRestored.value = false
     graphOverride.value = null
     lastSummaryInput.value = null
     parsingAdditional.value = false
@@ -1009,6 +1069,10 @@ export function useProjectSession() {
     selfCheckRounds: selfCheck.rounds,
     selfCheckMaxRounds: selfCheck.maxRounds,
     selfCheckResult: selfCheck.result,
+    selfCheckSummary,
+    canRestoreSelfCheck,
+    selfCheckRestored,
+    restoreSelfCheck,
     stopSelfCheck: selfCheck.stop,
     rerunSelfCheck,
     // 并发池

@@ -129,15 +129,25 @@ export interface LlmMessage {
   }[]
 }
 
-/** 非流式调用，返回完整的 assistant 消息（含 tool_calls）。Agent 循环用 */
+/** 非流式调用，返回完整的 assistant 消息（含 tool_calls）和结束原因。Agent 循环用 */
+export interface LlmMessageResult {
+  message: LlmMessage
+  /** 上游的 finish_reason；length 表示撞到输出上限被截断 */
+  finishReason: string
+}
+
 export async function callLlmMessage(
   config: LlmRuntimeConfig,
   opts: LlmCallOptions,
-): Promise<LlmMessage> {
+): Promise<LlmMessageResult> {
   const res = await callLlm(config, { ...opts, stream: false })
   const data = (await res.json().catch(() => null)) as {
-    choices?: { message?: LlmMessage }[]
+    choices?: { message?: LlmMessage; finish_reason?: string }[]
   } | null
+  const choice = data?.choices?.[0]
 
-  return data?.choices?.[0]?.message ?? { role: 'assistant', content: '' }
+  return {
+    message: choice?.message ?? { role: 'assistant', content: '' },
+    finishReason: choice?.finish_reason ?? '',
+  }
 }

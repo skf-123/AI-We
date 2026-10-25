@@ -62,6 +62,18 @@ const MAX_TREE_CHARS = 150_000
 const MAX_CONTEXT_TEXT = 100_000
 const MAX_READABLE_LIST = 300
 
+/** 工具轮数用完后的收尾指令：先告诉它不要再调工具，再要 JSON */
+function finalInstruction(mode: 'map' | 'self-check'): string {
+  if (mode === 'self-check') {
+    return '工具轮数已用完。不要再调用工具；基于你已经读到的内容，只输出修正后的完整图 JSON，不要解释，不要 Markdown 代码围栏。'
+  }
+  return '工具轮数已用完。不要再调用工具；基于你已经读到的内容，只输出项目地图 JSON（summary、folders、files、crossFileNotes、crossFileEvidence、readingPlan、backend），不要解释，不要 Markdown 代码围栏。'
+}
+
+/** 收尾仍然不是合法 JSON 时，只给它一次修复机会 */
+const REPAIR_INSTRUCTION =
+  '上面这段不是合法 JSON。只把它修成合法 JSON，保持内容不变，不要解释，不要 Markdown 代码围栏。'
+
 type AgentMessage = {
   role: 'user' | 'assistant' | 'tool'
   content: string
@@ -177,14 +189,21 @@ export function useProjectAgent() {
   const result = ref<unknown>(null)
   const rounds = ref(0)
   const maxRounds = ref(0)
+  /** 这次运行真正读过的文件路径；自检摘要用它说“读了 N 个文件” */
+  const readFiles = ref<string[]>([])
 
   let controller: AbortController | null = null
+
+  interface AskResult {
+    message: AgentMessage
+    finishReason: string
+  }
 
   async function ask(
     mode: 'map' | 'self-check',
     messages: AgentMessage[],
     final: boolean,
-  ): Promise<AgentMessage> {
+  ): Promise<AskResult> {
     controller ??= new AbortController()
 
     const res = await fetch('/api/project/agent', {
@@ -205,8 +224,11 @@ export function useProjectAgent() {
       throw new Error(msg)
     }
 
-    const data = (await res.json()) as { message?: AgentMessage }
-    return data.message ?? { role: 'assistant', content: '' }
+    const data = (await res.json()) as { message?: AgentMessage; finishReason?: string }
+    return {
+      message: data.message ?? { role: 'assistant', content: '' },
+      finishReason: data.finishReason ?? '',
+    }
   }
 
   async function runLoop<T>(options: LoopOptions<T>): Promise<T | null> {
@@ -215,12 +237,13 @@ export function useProjectAgent() {
     maxRounds.value = options.maxRounds
 
     const messages: AgentMessage[] = [{ role: 'user', content: options.initialContent }]
+    const readPaths = new Set<string>()
 
     try {
       for (let round = 1; round <= options.maxRounds; round++) {
         if (stopped.value) return null
 
-        const message = await ask(options.mode, messages, false)
+        const { message } = await ask(options.mode, messages, false)
         messages.push(message)
         rounds.value = round
 
@@ -247,6 +270,13 @@ export function useProjectAgent() {
             }
 
             const toolResult = await options.executor.execute(name, args)
+            if (
+              (name === 'read_file_slice' || name === 'read_config') &&
+              typeof args.path === 'string' &&
+              !toolResult.startsWith('错误')
+            ) {
+              readPaths.add(args.path)
+            }
             messages.push({ role: 'tool', tool_call_id: id, content: toolResult })
             const note = message.content.trim().slice(0, 300)
             const argsText = JSON.stringify(args).slice(0, 300)
@@ -283,15 +313,31 @@ export function useProjectAgent() {
         })
       }
 
-      // 工具轮数用完：禁掉工具，让它基于已有信息收尾
-      const finalMessage = await ask(options.mode, messages, true)
-      const parsed = options.parse(finalMessage.content)
+      // 工具轮数用完：先明确告诉它“不要再调工具，只交 JSON”，再禁掉工具
+      messages.push({ role: 'user', content: finalInstruction(options.mode) })
+      const final = await ask(options.mode, messages, true)
+      let parsed = options.parse(final.message.content)
       if (parsed) {
         result.value = parsed
         return parsed
       }
 
-      error.value = 'Agent 没有给出合法的 JSON，已停止'
+      // 收尾仍然不是合法 JSON：给它一次修复机会，只修格式，不重新调查
+      if (final.message.content.trim()) {
+        messages.push({ role: 'assistant', content: final.message.content })
+      }
+      messages.push({ role: 'user', content: REPAIR_INSTRUCTION })
+      const repaired = await ask(options.mode, messages, true)
+      parsed = options.parse(repaired.message.content)
+      if (parsed) {
+        result.value = parsed
+        return parsed
+      }
+
+      error.value =
+        final.finishReason === 'length' || repaired.finishReason === 'length'
+          ? 'Agent 输出被截断，没有拿到完整 JSON，已停止'
+          : 'Agent 没有给出合法的 JSON，已停止'
       return null
     } catch (err) {
       if ((err as Error)?.name === 'AbortError') {
@@ -301,6 +347,7 @@ export function useProjectAgent() {
       error.value = err instanceof Error ? err.message : String(err)
       return null
     } finally {
+      readFiles.value = [...readPaths]
       running.value = false
       controller = null
     }
@@ -399,6 +446,7 @@ ${readableList || '（没有可读文件）'}
     result.value = null
     rounds.value = 0
     maxRounds.value = 0
+    readFiles.value = []
   }
 
   return {
@@ -409,6 +457,7 @@ ${readableList || '（没有可读文件）'}
     result,
     rounds,
     maxRounds,
+    readFiles,
     run,
     runSelfCheck,
     stop,

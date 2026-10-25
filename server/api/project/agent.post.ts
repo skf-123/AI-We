@@ -65,7 +65,7 @@ export default defineEventHandler(async (event) => {
       ? PROJECT_SELF_CHECK_SYSTEM_PROMPT
       : PROJECT_AGENT_SYSTEM_PROMPT
 
-  const message = await callLlmMessage(
+  const { message, finishReason } = await callLlmMessage(
     {
       apiKey: config.llmApiKey,
       baseUrl: config.llmBaseUrl,
@@ -85,5 +85,5 @@ export default defineEventHandler(async (event) => {
     },
   )
 
-  return { message }
+  return { message, finishReason }
 })

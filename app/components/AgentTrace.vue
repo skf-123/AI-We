@@ -37,10 +37,15 @@ const props = defineProps<{
   rerunLabel?: string
   /** 收尾产出摘要，例如「概述 1 条 · 文件说明 37 条」 */
   outcome?: string
+  /** 自检结果摘要：读了多少文件、图有没有改动 */
+  statusText?: string
+  /** 是否显示「恢复自检前的图」 */
+  canRestore?: boolean
+  restoreLabel?: string
 }>()
 
 const emit = defineEmits<{
-  (e: 'stop' | 'rerun'): void
+  (e: 'stop' | 'rerun' | 'restore'): void
 }>()
 
 const view = ref<'reading' | 'raw'>('reading')
@@ -106,6 +111,14 @@ function stepSummary(step: AgentStep): string {
         </div>
 
         <button
+          v-if="props.canRestore"
+          type="button"
+          class="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10.5px] text-slate-600 transition hover:bg-slate-50"
+          @click="emit('restore')"
+        >
+          {{ props.restoreLabel || '恢复自检前的图' }}
+        </button>
+        <button
           v-if="props.running"
           type="button"
           class="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10.5px] text-slate-600 transition hover:bg-slate-50"
@@ -126,6 +139,10 @@ function stepSummary(step: AgentStep): string {
 
     <p v-if="props.error" class="mt-1.5 text-[11px] leading-relaxed text-rose-600">
       {{ props.error }}
+    </p>
+
+    <p v-if="props.statusText" class="mt-1.5 text-[11px] leading-relaxed text-slate-600">
+      {{ props.statusText }}
     </p>
 
     <!-- 阅读版：同一批工具调用的人话翻译，按轮分组 -->
