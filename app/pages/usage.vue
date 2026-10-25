@@ -1,0 +1,242 @@
+<script setup lang="ts">
+/**
+ * 只读的 token 用量页（开发期默认可用）。
+ *
+ * 数据来自本机 logs/llm-usage.jsonl；页面只展示汇总，不展示代码或提示词。
+ */
+
+interface UsageSummary {
+  feature: string
+  calls: number
+  prompt: number
+  completion: number
+  total: number
+  avgMs: number
+  missing: number
+}
+
+interface UsageResponse {
+  summaries: UsageSummary[]
+  total: { calls: number; prompt: number; completion: number; total: number }
+  last: { ts?: string; feature?: string } | null
+  file: string
+}
+
+/** 每个 feature 的中文名、具体板块和当前代码里的上限 */
+const FEATURES: Record<string, { label: string; detail: string; limit: string }> = {
+  'code/analyze': {
+    label: '贴代码主链路',
+    detail: '五段讲解：逐词逐句 → 局部关系 → 整段作用 → 技术溯源 → 知识框架图；带知识库引用',
+    limit: '输入 ≤20,000 字符；输出 ≤100,000 token；检索 topK 4、阈值 0.38',
+  },
+  'code/ask': {
+    label: '贴代码追问',
+    detail: '选中解析结果里的一段代码就地提问，可多轮',
+    limit:
+      '代码 ≤50,000 字符；选中 ≤2,000；刚生成的解析 ≤20,000；问题 ≤500；历史 ≤100,000 token；输出 ≤5,000 token',
+  },
+  'project/analyze': {
+    label: '项目模式 · 逐文件四段解析',
+    detail: '每个文件一次请求：逐词逐句 → 局部关系 → 整段作用 → 技术溯源；带项目结构结论与按文件检索',
+    limit:
+      '单文件 ≤50,000 字符；项目结构结论 ≤50,000；输出 ≤10,000 token；并发池 h1=5 / h2=32',
+  },
+  'project/summary': {
+    label: '项目模式 · 项目总览 + 项目图',
+    detail: '一次请求同时写正文和唯一一张项目图；正文和图共用一个输出上限',
+    limit:
+      '结构结论 ≤50,000 字符；目录树 ≤200,000；文件 ≤2,000 个；输出 ≤300,000 token（正文和图共用）；超时 120 秒',
+  },
+  'project/graph': {
+    label: '项目模式 · 只重画项目图',
+    detail: '不重跑正文，沿用上次汇总冻结的输入，只生成图 JSON',
+    limit:
+      '结构结论 ≤50,000 字符；目录树 ≤200,000；正文 ≤20,000；输出 ≤300,000 token；超时 120 秒',
+  },
+  'project/agent:map': {
+    label: '项目模式 · 地图侦查 Agent',
+    detail: '解析前读目录、配置和关键文件，产出项目结构结论、跨文件线索和证据',
+    limit:
+      '最多 min(待解析文件数, 40) 轮；每轮输出 ≤50,000 token；消息 ≤500 条；工具调用 ≤10 个/轮；上下文 1.4M / 1.5M 字符；超时 90 秒/轮；5 个只读工具',
+  },
+  'project/agent:self-check': {
+    label: '项目模式 · 图自检 Agent',
+    detail: '图生成后检查浮着的节点、分组到分组的边、写反或编造的关系；可读文件确认',
+    limit:
+      '最多 min(待解析文件数, 10) 轮；工具调用 ≤12 次；每轮输出 ≤50,000 token；上下文 1.4M / 1.5M 字符；超时 90 秒/轮',
+  },
+  'project/map': {
+    label: '项目模式 · 固定地图回退',
+    detail: 'Agent 失败时，用目录树 + 每个文件头部几行生成目录说明和项目结构结论',
+    limit: '目录树 ≤200,000 字符；文件头 ≤2,000 个；输出 ≤4,096 token；超时 60 秒',
+  },
+  'project/vendor-review': {
+    label: '项目模式 · 第三方库复核',
+    detail: '对规则拿不准的疑似第三方库文件做一次小评审，只给建议，不自动勾选',
+    limit: '输出 ≤1,536 token；超时 30 秒',
+  },
+  'project/include-hint': {
+    label: '项目模式 · 勾选系统文件前的说明',
+    detail: '点选系统文件时用一两句话说明为什么默认不勾、勾了会占什么预算',
+    limit: '输出 ≤160 token；超时 20 秒',
+  },
+  'rag/embedding': {
+    label: '知识库 · 向量化',
+    detail: '把代码或检索问题变成向量，供知识库检索；与生成模型是两家服务',
+    limit: '单次 ≤64 条；1024 维；查询超时 3 秒；检索 topK 4、阈值 0.38',
+  },
+}
+
+function featureInfo(key: string) {
+  return FEATURES[key] ?? { label: key, detail: '未登记的中文说明', limit: '—' }
+}
+
+const { data, error, pending, refresh } = await useFetch<UsageResponse>('/api/usage')
+
+const rows = computed(() => data.value?.summaries ?? [])
+
+/**
+ * 所有登记过的功能都列出来；还没有调用记录的补 0。
+ * 这样即使刚打开页面，也能看到每个功能的中文名和上限。
+ */
+const tableRows = computed(() => {
+  const byFeature = new Map(rows.value.map((row) => [row.feature, row]))
+  const known = Object.keys(FEATURES).map((feature) => {
+    const row = byFeature.get(feature)
+    return {
+      feature,
+      calls: row?.calls ?? 0,
+      prompt: row?.prompt ?? 0,
+      completion: row?.completion ?? 0,
+      total: row?.total ?? 0,
+      avgMs: row?.avgMs ?? 0,
+      missing: row?.missing ?? 0,
+      info: FEATURES[feature],
+    }
+  })
+  const unknown = rows.value
+    .filter((row) => !FEATURES[row.feature])
+    .map((row) => ({ ...row, info: featureInfo(row.feature) }))
+
+  return [...known, ...unknown].sort((a, b) => b.total - a.total)
+})
+const total = computed(() => data.value?.total ?? { calls: 0, prompt: 0, completion: 0, total: 0 })
+const last = computed(() => data.value?.last ?? null)
+const lastText = computed(() => {
+  if (!last.value?.ts) return '还没有记录'
+  const time = new Date(last.value.ts).toLocaleString('zh-CN')
+  return `${time} · ${last.value.feature ?? ''}`
+})
+
+function num(value: number): string {
+  return value.toLocaleString('zh-CN')
+}
+</script>
+
+<template>
+  <div class="min-h-dvh bg-[#f5f6f8] text-slate-800">
+    <main class="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
+      <div class="mb-4 flex flex-wrap items-center gap-3">
+        <h1 class="text-lg font-semibold">Token 用量</h1>
+        <p class="text-xs text-slate-400">只统计本机 logs/llm-usage.jsonl</p>
+        <div class="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            class="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+            :disabled="pending"
+            @click="refresh()"
+          >
+            {{ pending ? '刷新中…' : '刷新' }}
+          </button>
+          <NuxtLink
+            to="/"
+            class="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-50"
+          >
+            返回首页
+          </NuxtLink>
+        </div>
+      </div>
+
+      <div v-if="error" class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+        读不到用量数据。开发期默认开放；生产环境要设置 NUXT_USAGE_PAGE=1。
+      </div>
+
+      <template v-else>
+        <div class="mb-4 grid gap-3 sm:grid-cols-4">
+          <div class="rounded-xl border border-slate-200 bg-white p-3">
+            <p class="text-[11px] text-slate-400">调用次数</p>
+            <p class="mt-1 text-xl font-semibold">{{ num(total.calls) }}</p>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-white p-3">
+            <p class="text-[11px] text-slate-400">输入 token</p>
+            <p class="mt-1 text-xl font-semibold">{{ num(total.prompt) }}</p>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-white p-3">
+            <p class="text-[11px] text-slate-400">输出 token</p>
+            <p class="mt-1 text-xl font-semibold">{{ num(total.completion) }}</p>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-white p-3">
+            <p class="text-[11px] text-slate-400">合计 token</p>
+            <p class="mt-1 text-xl font-semibold">{{ num(total.total) }}</p>
+          </div>
+        </div>
+
+        <p
+          v-if="rows.length === 0"
+          class="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs leading-relaxed text-amber-700"
+        >
+          还没有调用记录。下面是全部功能和当前上限；正常用一次前端后，再回来刷新就能看到 token。
+        </p>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table class="w-full min-w-[1100px] text-left text-sm">
+            <thead class="bg-slate-50 text-[11px] text-slate-500">
+              <tr>
+                <th class="px-3 py-2 font-medium">功能</th>
+                <th class="px-3 py-2 font-medium">限制</th>
+                <th class="px-3 py-2 text-right font-medium">调用次数</th>
+                <th class="px-3 py-2 text-right font-medium">输入</th>
+                <th class="px-3 py-2 text-right font-medium">输出</th>
+                <th class="px-3 py-2 text-right font-medium">合计</th>
+                <th class="px-3 py-2 text-right font-medium">平均耗时</th>
+                <th class="px-3 py-2 text-right font-medium">缺 usage</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in tableRows" :key="row.feature" class="border-t border-slate-100">
+                <td class="min-w-[320px] px-3 py-2.5 align-top">
+                  <p class="text-xs font-medium text-slate-800">{{ row.info.label }}</p>
+                  <p class="mt-0.5 text-[10.5px] leading-relaxed text-slate-500">
+                    {{ row.info.detail }}
+                  </p>
+                  <p class="mt-0.5 font-mono text-[10px] text-slate-400">{{ row.feature }}</p>
+                </td>
+                <td class="min-w-[300px] px-3 py-2.5 align-top text-[10.5px] leading-relaxed text-slate-500">
+                  {{ row.info.limit }}
+                </td>
+                <td class="px-3 py-2.5 text-right align-top">{{ num(row.calls) }}</td>
+                <td class="px-3 py-2.5 text-right align-top">{{ num(row.prompt) }}</td>
+                <td class="px-3 py-2.5 text-right align-top">{{ num(row.completion) }}</td>
+                <td class="px-3 py-2.5 text-right align-top font-medium">{{ num(row.total) }}</td>
+                <td class="px-3 py-2.5 text-right align-top text-slate-500">{{ num(row.avgMs) }} ms</td>
+                <td
+                  class="px-3 py-2.5 text-right align-top"
+                  :class="row.missing ? 'text-amber-700' : 'text-slate-400'"
+                >
+                  {{ num(row.missing) }}
+                </td>
+              </tr>
+              <tr v-if="tableRows.length === 0">
+                <td colspan="8" class="px-3 py-8 text-center text-xs text-slate-400">
+                  还没有记录。正常用一次项目前端，再回来刷新。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="mt-3 text-[11px] text-slate-400">最近一次：{{ lastText }}</p>
+      </template>
+    </main>
+  </div>
+</template>
