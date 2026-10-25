@@ -15,11 +15,23 @@ interface UsageSummary {
   missing: number
 }
 
+interface UsageSession {
+  id: string
+  name: string
+  savedAt: string
+  calls: number
+  total: number
+}
+
 interface UsageResponse {
   summaries: UsageSummary[]
   total: { calls: number; prompt: number; completion: number; total: number }
   last: { ts?: string; feature?: string } | null
   file: string
+  selected: string | null
+  sessions: UsageSession[]
+  current: { calls: number; total: number }
+  enabledInProduction: boolean
 }
 
 /** 每个 feature 的中文名、具体板块和当前代码里的上限 */
@@ -91,9 +103,104 @@ function featureInfo(key: string) {
   return FEATURES[key] ?? { label: key, detail: '未登记的中文说明', limit: '—' }
 }
 
-const { data, error, pending, refresh } = await useFetch<UsageResponse>('/api/usage')
+const data = ref<UsageResponse | null>(null)
+const error = ref('')
+const pending = ref(false)
+const actionPending = ref(false)
+const notice = ref('')
+const selected = ref('')
+const name = ref('')
 
+const sessions = computed(() => data.value?.sessions ?? [])
 const rows = computed(() => data.value?.summaries ?? [])
+const current = computed(() => data.value?.current ?? { calls: 0, total: 0 })
+const selectedSession = computed(
+  () => sessions.value.find((item) => item.id === selected.value) ?? null,
+)
+
+async function load(sessionId = ''): Promise<void> {
+  pending.value = true
+  error.value = ''
+  try {
+    const query = sessionId ? `?session=${encodeURIComponent(sessionId)}` : ''
+    data.value = await $fetch<UsageResponse>(`/api/usage${query}`)
+    selected.value = data.value.selected ?? ''
+  } catch {
+    data.value = null
+    error.value = '读不到用量数据。开发期默认开放；生产环境要设置 NUXT_USAGE_PAGE=1。'
+  } finally {
+    pending.value = false
+  }
+}
+
+onMounted(() => {
+  void load()
+})
+
+async function saveCurrent(): Promise<void> {
+  if (actionPending.value) return
+  if (current.value.calls === 0) {
+    notice.value = '当前没有记录，先跑一次功能再保留'
+    return
+  }
+
+  actionPending.value = true
+  error.value = ''
+  try {
+    const res = await $fetch<{ session: { id: string; name: string } }>('/api/usage/save', {
+      method: 'POST',
+      body: { name: name.value },
+    })
+    name.value = ''
+    await load(res.session.id)
+    notice.value = `已保留「${res.session.name}」；当前记录从 0 重新开始`
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '保留失败'
+  } finally {
+    actionPending.value = false
+  }
+}
+
+async function removeSelected(): Promise<void> {
+  if (!selectedSession.value || actionPending.value) return
+  if (!window.confirm(`删除保留记录「${selectedSession.value.name}」？删除后不能恢复。`)) return
+
+  actionPending.value = true
+  error.value = ''
+  try {
+    await $fetch(`/api/usage/session/${encodeURIComponent(selectedSession.value.id)}`, {
+      method: 'DELETE',
+    })
+    await load()
+    notice.value = '保留记录已删除'
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '删除失败'
+  } finally {
+    actionPending.value = false
+  }
+}
+
+async function clearCurrentRecords(): Promise<void> {
+  if (actionPending.value) return
+  if (!window.confirm('清空当前记录？不会生成保留文件，清空后不能恢复。')) return
+
+  actionPending.value = true
+  error.value = ''
+  try {
+    await $fetch('/api/usage/clear', { method: 'POST' })
+    await load()
+    notice.value = '当前记录已清空'
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '清空失败'
+  } finally {
+    actionPending.value = false
+  }
+}
+
+function onSelectSession(event: Event): void {
+  const value = (event.target as HTMLSelectElement).value
+  void load(value)
+}
 
 /**
  * 所有登记过的功能都列出来；还没有调用记录的补 0。
@@ -131,6 +238,10 @@ const lastText = computed(() => {
 function num(value: number): string {
   return value.toLocaleString('zh-CN')
 }
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleString('zh-CN')
+}
 </script>
 
 <template>
@@ -144,7 +255,7 @@ function num(value: number): string {
             type="button"
             class="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
             :disabled="pending"
-            @click="refresh()"
+            @click="load(selected)"
           >
             {{ pending ? '刷新中…' : '刷新' }}
           </button>
@@ -157,8 +268,73 @@ function num(value: number): string {
         </div>
       </div>
 
+      <div
+        class="mb-4 rounded-xl border border-slate-200 bg-white p-3"
+      >
+        <div class="flex flex-wrap items-end gap-3">
+          <label class="flex flex-col gap-1 text-[11px] text-slate-500">
+            查看
+            <select
+              :value="selected"
+              class="min-w-[260px] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700"
+              @change="onSelectSession"
+            >
+              <option value="">当前（未保留）</option>
+              <option v-for="session in sessions" :key="session.id" :value="session.id">
+                {{ session.name }} · {{ formatTime(session.savedAt) }} · {{ session.calls }} 次
+              </option>
+            </select>
+          </label>
+
+          <label class="flex flex-col gap-1 text-[11px] text-slate-500">
+            保留当前记录，命名
+            <input
+              v-model="name"
+              type="text"
+              maxlength="40"
+              placeholder="例如：187 文件第一次"
+              class="w-[260px] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700"
+            />
+          </label>
+
+          <button
+            type="button"
+            class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            :disabled="actionPending || current.calls === 0"
+            @click="saveCurrent"
+          >
+            保留当前记录
+          </button>
+
+          <button
+            v-if="selectedSession"
+            type="button"
+            class="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:text-slate-300"
+            :disabled="actionPending"
+            @click="removeSelected"
+          >
+            删除这条保留记录
+          </button>
+          <button
+            v-else
+            type="button"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+            :disabled="actionPending || current.calls === 0"
+            @click="clearCurrentRecords"
+          >
+            清空当前
+          </button>
+        </div>
+
+        <p class="mt-2 text-[11px] text-slate-500">
+          当前未保留：{{ current.calls }} 次调用 · {{ num(current.total) }} token
+          <template v-if="selectedSession"> · 正在看：{{ selectedSession.name }}</template>
+        </p>
+        <p v-if="notice" class="mt-1 text-[11px] text-emerald-700">{{ notice }}</p>
+      </div>
+
       <div v-if="error" class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-        读不到用量数据。开发期默认开放；生产环境要设置 NUXT_USAGE_PAGE=1。
+        {{ error }}
       </div>
 
       <template v-else>
