@@ -10,6 +10,7 @@
  */
 
 import type { GraphNodeType, RagSource } from './analysis'
+import type { FactCheck } from './facts'
 
 /** 目录树上的三类标签 */
 export type ProjectFileCategory = 'user' | 'config' | 'system'
@@ -133,6 +134,10 @@ export interface FileProgress {
   outputTruncated: boolean
   /** 解析中的缓冲百分比；按时间走，不是真实进度 */
   percent: number
+  /** 跨文件事实块经过程序核对后的结果 */
+  facts?: FactCheck
+  /** 事实块没闭合或不是合法 JSON */
+  factsError?: string
 }
 
 /** 项目图里的一个文件 */

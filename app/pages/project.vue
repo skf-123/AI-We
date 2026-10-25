@@ -590,6 +590,8 @@ onBeforeUnmount(() => {
                 :subtitle="activeTitle"
                 :empty-hint="emptyHint"
                 :output-truncated="activeProgress?.outputTruncated ?? false"
+                :facts="activeProgress?.facts"
+                :facts-error="activeProgress?.factsError"
                 fill-height
                 @selection="setSelection"
               />

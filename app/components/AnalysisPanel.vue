@@ -11,6 +11,7 @@
  */
 import glossaryData from '~/data/glossary.json'
 import type { GlossaryTerm, RagSource } from '~/types/analysis'
+import type { FactCheck } from '~/types/facts'
 import { parseSections } from '~/utils/analysis-sections'
 import { rangeLines } from '~/utils/locate-lines'
 
@@ -32,6 +33,10 @@ const props = defineProps<{
   subtitle?: string
   /** 模型输出撞到上限，后面的内容没有讲完 */
   outputTruncated?: boolean
+  /** 跨文件事实块核对结果；贴代码入口不传 */
+  facts?: FactCheck
+  /** 事实块没闭合或不是合法 JSON */
+  factsError?: string
   /**
    * 高度模式。
    * false：贴代码入口，锁一屏高度（桌面端）
@@ -359,6 +364,48 @@ defineExpose({ scrollIntoView })
         >
           输出到达上限，后面的内容没有讲完。可以重试，或者把文件拆小一点再看。
         </p>
+
+        <!-- 跨文件事实块：程序核对过才显示；只标“改动”，不替模型背书 -->
+        <div
+          v-if="facts || factsError"
+          class="rounded-lg border p-2.5 text-xs leading-relaxed"
+          :class="
+            facts && facts.unverified > 0
+              ? 'border-amber-200 bg-amber-50 text-amber-800'
+              : 'border-slate-200 bg-slate-50 text-slate-600'
+          "
+        >
+          <p v-if="facts">
+            跨文件事实：{{ facts.verified }} 条已核实<template v-if="facts.unverified">
+              ，{{ facts.unverified }} 条未核实</template
+            >
+          </p>
+          <p v-if="factsError">{{ factsError }}</p>
+          <details v-if="facts?.items.length" class="mt-1">
+            <summary class="cursor-pointer select-none text-[10.5px] text-slate-500">
+              查看核对明细
+            </summary>
+            <ul class="mt-1 space-y-1">
+              <li v-for="(item, index) in facts.items" :key="`fact-${index}`">
+                <span
+                  class="mr-1 rounded px-1 text-[10px]"
+                  :class="
+                    item.status === 'verified'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-amber-100 text-amber-700'
+                  "
+                >
+                  {{ item.status === 'verified' ? '已核实' : '未核实' }}
+                </span>
+                <span class="font-mono text-[10px] text-slate-500">
+                  {{ item.path }}:{{ item.line }}
+                </span>
+                <span v-if="item.claim"> · {{ item.claim }}</span>
+                <span v-if="item.reason" class="text-slate-500">（{{ item.reason }}）</span>
+              </li>
+            </ul>
+          </details>
+        </div>
 
         <!-- 知识库检索到的引用来源，紧跟在四段解释之后 -->
         <SourceList v-if="sources.length" ref="sourceListRef" :sources="sources" />

@@ -1,5 +1,6 @@
 import type { FileProgress } from '~/types/project'
 import { normalizePath } from '~/utils/project-files'
+import { verifyFacts } from '~/utils/project-facts'
 import { useAnalysis } from './useAnalysis'
 
 /**
@@ -82,6 +83,7 @@ export function useProjectAnalysis() {
     const inst = useAnalysis({
       endpoint: '/api/project/analyze',
       buildBody: (code) => ({ code, path, projectContext: context }),
+      parseFacts: true,
     })
     instances[path] = inst
     progress[path] = {
@@ -92,12 +94,23 @@ export function useProjectAnalysis() {
       truncated: false,
       outputTruncated: false,
       percent: 0,
+      facts: undefined,
+      factsError: '',
     }
 
     // useAnalysis 是每个文件一个实例、状态互相独立；这里把它的 ref
     // 镜像到 progress，目录树和右侧面板都只读 progress，不认识 composable。
     const stop = watch(
-      [inst.output, inst.sources, inst.errorMsg, inst.truncated, inst.outputTruncated],
+      [
+        inst.output,
+        inst.sources,
+        inst.errorMsg,
+        inst.truncated,
+        inst.outputTruncated,
+        inst.facts,
+        inst.factsError,
+        inst.done,
+      ],
       () => {
         const p = progress[path]
         if (!p) return
@@ -106,6 +119,13 @@ export function useProjectAnalysis() {
         p.error = inst.errorMsg.value
         p.truncated = inst.truncated.value
         p.outputTruncated = inst.outputTruncated.value
+        p.factsError = inst.factsError.value
+
+        if (inst.done.value) {
+          p.facts = inst.facts.value.length
+            ? verifyFacts(inst.facts.value, path, texts.get(path) ?? '')
+            : undefined
+        }
       },
       { immediate: true },
     )

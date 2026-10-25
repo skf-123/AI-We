@@ -1,5 +1,7 @@
 import { stripOutputTruncation } from '#shared/stream-meta'
 import type { RagSource } from '~/types/analysis'
+import type { FactClaim } from '~/types/facts'
+import { stripFactsBlock } from '~/utils/project-facts'
 
 /**
  * 「贴代码 → 流式出解析结果」这条链路的全部状态与请求逻辑。
@@ -21,6 +23,8 @@ export interface UseAnalysisOptions {
   endpoint?: string
   /** 默认只发 { code }；项目入口要额外带上文件路径与项目结构结论 */
   buildBody?: (code: string) => Record<string, unknown>
+  /** 项目入口专用：把输出末尾的跨文件事实块剥掉，交给上层核对 */
+  parseFacts?: boolean
 }
 
 export function useAnalysis(options: UseAnalysisOptions = {}) {
@@ -38,6 +42,9 @@ export function useAnalysis(options: UseAnalysisOptions = {}) {
   const truncated = ref(false)
   /** 输出是否撞到模型上限（流末尾的标记），和输入截断是两回事 */
   const outputTruncated = ref(false)
+  /** 项目入口：模型在末尾给出的跨文件事实块 */
+  const facts = ref<FactClaim[]>([])
+  const factsError = ref('')
 
   let controller: AbortController | null = null
 
@@ -53,6 +60,8 @@ export function useAnalysis(options: UseAnalysisOptions = {}) {
     sources.value = []
     truncated.value = false
     outputTruncated.value = false
+    facts.value = []
+    factsError.value = ''
     loading.value = true
     done.value = false
 
@@ -108,7 +117,32 @@ export function useAnalysis(options: UseAnalysisOptions = {}) {
         const stripped = stripOutputTruncation(streamed)
         streamed = stripped.text
         if (stripped.truncated) outputTruncated.value = true
-        output.value = streamed
+
+        if (options.parseFacts) {
+          const next = stripFactsBlock(streamed)
+          output.value = next.text
+          if (next.claims) {
+            facts.value = next.claims
+            factsError.value = next.error ?? ''
+          } else if (next.error) {
+            factsError.value = next.error
+          }
+        } else {
+          output.value = streamed
+        }
+      }
+
+      if (options.parseFacts) {
+        const final = stripFactsBlock(streamed)
+        output.value = final.text
+        if (final.claims) {
+          facts.value = final.claims
+          factsError.value = final.error ?? ''
+        } else if (final.error) {
+          factsError.value = final.error
+        } else if (final.pending) {
+          factsError.value = '事实块没有闭合，本次没有可核对的事实'
+        }
       }
 
       done.value = true
@@ -139,7 +173,22 @@ export function useAnalysis(options: UseAnalysisOptions = {}) {
     sources.value = []
     truncated.value = false
     outputTruncated.value = false
+    facts.value = []
+    factsError.value = ''
   }
 
-  return { output, sources, errorMsg, loading, done, truncated, outputTruncated, run, stop, reset }
+  return {
+    output,
+    sources,
+    errorMsg,
+    loading,
+    done,
+    truncated,
+    outputTruncated,
+    facts,
+    factsError,
+    run,
+    stop,
+    reset,
+  }
 }
