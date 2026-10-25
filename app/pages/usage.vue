@@ -286,6 +286,20 @@ const tableRows = computed(() => {
 
   return [...known, ...unknown].sort((a, b) => b.total - a.total)
 })
+
+function statsOf(row: ReturnType<typeof makeTableRow>): { label: string; value: string }[] {
+  return [
+    { label: '调用次数', value: num(row.calls) },
+    { label: '输入 token', value: num(row.prompt) },
+    { label: '输出 token', value: num(row.completion) },
+    { label: '合计 token', value: num(row.total) },
+    { label: '平均每次', value: num(Math.round(row.avgTotal)) },
+    { label: '占 1M', value: row.pct1m },
+    { label: '占输出上限', value: row.pctOutput },
+    { label: '平均耗时', value: `${num(row.avgMs)} ms` },
+    { label: '缺 usage', value: num(row.missing) },
+  ]
+}
 const total = computed(() => data.value?.total ?? { calls: 0, prompt: 0, completion: 0, total: 0 })
 const last = computed(() => data.value?.last ?? null)
 const lastText = computed(() => {
@@ -432,71 +446,48 @@ function formatRange(session: UsageSession): string {
           还没有调用记录。下面是全部功能和当前上限；正常用一次前端后，再回来刷新就能看到 token。
         </p>
 
-        <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-          <table class="w-full min-w-[1500px] text-left text-sm">
-            <thead class="bg-slate-50 text-[11px] text-slate-500">
-              <tr>
-                <th class="px-3 py-2 font-medium">功能</th>
-                <th class="px-3 py-2 font-medium">限制</th>
-                <th class="px-3 py-2 text-right font-medium">调用次数</th>
-                <th class="px-3 py-2 text-right font-medium">输入</th>
-                <th class="px-3 py-2 text-right font-medium">输出</th>
-                <th class="px-3 py-2 text-right font-medium">合计</th>
-                <th class="px-3 py-2 text-right font-medium">平均每次</th>
-                <th class="px-3 py-2 text-right font-medium">占 1M</th>
-                <th class="px-3 py-2 text-right font-medium">占输出上限</th>
-                <th class="px-3 py-2 text-right font-medium">平均耗时</th>
-                <th class="px-3 py-2 text-right font-medium">缺 usage</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in tableRows" :key="row.feature" class="border-t border-slate-100">
-                <td class="min-w-[340px] px-3 py-2.5 align-top">
-                  <p class="text-xs font-medium text-slate-800">{{ row.info.label }}</p>
-                  <p class="mt-0.5 text-[10.5px] leading-relaxed text-slate-500">
-                    {{ row.info.detail }}
-                  </p>
+        <div class="space-y-2">
+          <section
+            v-for="row in tableRows"
+            :key="row.feature"
+            class="rounded-xl border border-slate-200 bg-white p-3"
+          >
+            <div class="flex flex-wrap items-start gap-x-4 gap-y-2">
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h2 class="text-xs font-semibold text-slate-800">{{ row.info.label }}</h2>
                   <span
                     v-if="row.info.context"
-                    class="mt-1 inline-block rounded bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700"
+                    class="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700"
                   >
                     {{ row.info.context.label }}
                   </span>
-                  <p
-                    v-if="row.info.context"
-                    class="mt-0.5 text-[10px] leading-relaxed text-slate-500"
-                  >
-                    {{ row.info.context.detail }}
-                  </p>
-                  <p class="mt-0.5 font-mono text-[10px] text-slate-400">{{ row.feature }}</p>
-                </td>
-                <td class="min-w-[300px] px-3 py-2.5 align-top text-[10.5px] leading-relaxed text-slate-500">
-                  {{ row.info.limit }}
-                </td>
-                <td class="px-3 py-2.5 text-right align-top">{{ num(row.calls) }}</td>
-                <td class="px-3 py-2.5 text-right align-top">{{ num(row.prompt) }}</td>
-                <td class="px-3 py-2.5 text-right align-top">{{ num(row.completion) }}</td>
-                <td class="px-3 py-2.5 text-right align-top font-medium">{{ num(row.total) }}</td>
-                <td class="px-3 py-2.5 text-right align-top text-slate-500">
-                  {{ num(Math.round(row.avgTotal)) }}
-                </td>
-                <td class="px-3 py-2.5 text-right align-top text-slate-500">{{ row.pct1m }}</td>
-                <td class="px-3 py-2.5 text-right align-top text-slate-500">{{ row.pctOutput }}</td>
-                <td class="px-3 py-2.5 text-right align-top text-slate-500">{{ num(row.avgMs) }} ms</td>
-                <td
-                  class="px-3 py-2.5 text-right align-top"
-                  :class="row.missing ? 'text-amber-700' : 'text-slate-400'"
+                </div>
+                <p class="mt-0.5 text-[10.5px] leading-relaxed text-slate-500">
+                  {{ row.info.detail }}
+                </p>
+                <p class="mt-0.5 font-mono text-[10px] text-slate-400">{{ row.feature }}</p>
+                <p
+                  v-if="row.info.context"
+                  class="mt-1 text-[10px] leading-relaxed text-slate-500"
                 >
-                  {{ num(row.missing) }}
-                </td>
-              </tr>
-              <tr v-if="tableRows.length === 0">
-                <td colspan="11" class="px-3 py-8 text-center text-xs text-slate-400">
-                  还没有记录。正常用一次项目前端，再回来刷新。
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                  {{ row.info.context.detail }}
+                </p>
+              </div>
+              <div class="w-full text-[10.5px] leading-relaxed text-slate-500 sm:w-[380px]">
+                <span class="text-slate-400">限制：</span>{{ row.info.limit }}
+              </div>
+            </div>
+
+            <div
+              class="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-2 sm:grid-cols-4 lg:grid-cols-9"
+            >
+              <div v-for="stat in statsOf(row)" :key="stat.label">
+                <p class="text-[10px] text-slate-400">{{ stat.label }}</p>
+                <p class="text-xs font-medium text-slate-700">{{ stat.value }}</p>
+              </div>
+            </div>
+          </section>
         </div>
 
         <p class="mt-3 text-[11px] leading-relaxed text-slate-500">
