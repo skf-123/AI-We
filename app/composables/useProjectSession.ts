@@ -20,6 +20,8 @@ import {
 } from '~/utils/project-files'
 import { parseProjectSummary } from '~/utils/project-graph'
 import { diffProjectGraph, type ProjectGraphDiff } from '~/utils/project-graph-diff'
+import { scanCandidateEdges } from '~/utils/project-candidate-edges'
+import { compareGraphToCandidates } from '~/utils/project-graph-candidates'
 import {
   composeVendorReason,
   detectVendor,
@@ -910,6 +912,16 @@ export function useProjectSession() {
     selfCheckDiff.value = null
     selfCheckRestored.value = false
 
+    // 候选边只从已经解析完的文件的原文里扫；没解析的文件不参与判断，
+    // 避免把“没读到”误判成“没有关系”。
+    const candidateSources = files.value
+      .filter((entry) => pool.progress[entry.path]?.status === 'done')
+      .map((entry) => ({ path: entry.path, text: pool.textOf(entry.path) }))
+      .filter((entry) => entry.text)
+
+    const candidateScan = scanCandidateEdges(candidateSources)
+    const candidateReport = compareGraphToCandidates(graph, candidateScan)
+
     const result = await selfCheck.runSelfCheck({
       graph,
       projectContext: map.context(projectName.value),
@@ -917,6 +929,18 @@ export function useProjectSession() {
       parseCount: filesToParse(files.value).length,
       readablePaths: filesForMap(files.value).map((entry) => entry.path),
       getFile: (path) => fileHandles.get(path),
+      suspicions: candidateReport.suspicions,
+      candidateSummary:
+        candidateScan.filesParsed > 0
+          ? {
+              parsed: candidateScan.filesParsed,
+              edges: candidateScan.edges.length,
+              supported: candidateReport.supported,
+              unknown: candidateReport.unknown,
+              unresolved: candidateScan.unresolved.length,
+            }
+          : undefined,
+      maxToolCalls: 12,
     })
 
     if (result) {

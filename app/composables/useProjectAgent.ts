@@ -7,6 +7,7 @@ import type {
 import { createProjectToolExecutor } from '~/utils/project-tools'
 import { sanitizeProjectGraph } from '~/utils/project-graph'
 import { formatStepResult } from '~/utils/agent-trace'
+import type { GraphSuspicion } from '~/utils/project-graph-candidates'
 
 /**
  * 项目 Agent 的循环。一个实例只跑一种任务：
@@ -53,6 +54,18 @@ export interface ProjectSelfCheckInput {
   parseCount: number
   readablePaths: string[]
   getFile: (path: string) => File | undefined
+  /** 程序从 import 和图的边里找到的差异；自检只核对这批项 */
+  suspicions?: GraphSuspicion[]
+  /** 候选边的覆盖情况，写进初始内容让模型知道证据边界 */
+  candidateSummary?: {
+    parsed: number
+    edges: number
+    supported: number
+    unknown: number
+    unresolved: number
+  }
+  /** 本次最多执行多少次工具调用；到上限就强制收尾 */
+  maxToolCalls?: number
 }
 
 const MAX_ROUNDS_HARD = 40
@@ -65,9 +78,9 @@ const MAX_READABLE_LIST = 300
 /** 工具轮数用完后的收尾指令：先告诉它不要再调工具，再要 JSON */
 function finalInstruction(mode: 'map' | 'self-check'): string {
   if (mode === 'self-check') {
-    return '工具轮数已用完。不要再调用工具；基于你已经读到的内容，只输出修正后的完整图 JSON，不要解释，不要 Markdown 代码围栏。'
+    return '工具轮数或工具调用次数已用完。不要再调用工具；基于你已经读到的内容，只输出修正后的完整图 JSON，不要解释，不要 Markdown 代码围栏。'
   }
-  return '工具轮数已用完。不要再调用工具；基于你已经读到的内容，只输出项目地图 JSON（summary、folders、files、crossFileNotes、crossFileEvidence、readingPlan、backend），不要解释，不要 Markdown 代码围栏。'
+  return '工具轮数或工具调用次数已用完。不要再调用工具；基于你已经读到的内容，只输出项目地图 JSON（summary、folders、files、crossFileNotes、crossFileEvidence、readingPlan、backend），不要解释，不要 Markdown 代码围栏。'
 }
 
 /** 收尾仍然不是合法 JSON 时，只给它一次修复机会 */
@@ -85,6 +98,8 @@ interface LoopOptions<T> {
   mode: 'map' | 'self-check'
   initialContent: string
   maxRounds: number
+  /** 可选：整段运行最多执行多少次工具调用；到上限就收尾 */
+  maxToolCalls?: number
   executor: ReturnType<typeof createProjectToolExecutor>
   parse: (content: string) => T | null
 }
@@ -238,6 +253,8 @@ export function useProjectAgent() {
 
     const messages: AgentMessage[] = [{ role: 'user', content: options.initialContent }]
     const readPaths = new Set<string>()
+    const maxToolCalls = options.maxToolCalls ?? Number.POSITIVE_INFINITY
+    let capReached = false
 
     try {
       for (let round = 1; round <= options.maxRounds; round++) {
@@ -254,6 +271,19 @@ export function useProjectAgent() {
               function?: { name?: unknown; arguments?: unknown }
             }
             const id = typeof call.id === 'string' ? call.id : `call_${round}_${steps.value.length}`
+
+            // 工具调用总量到上限后，不再执行；每条调用都要补一个 tool 消息，
+            // 否则下一轮的消息结构不完整。
+            if (steps.value.length >= maxToolCalls) {
+              capReached = true
+              messages.push({
+                role: 'tool',
+                tool_call_id: id,
+                content: '已达到本次检查的工具调用上限，停止读取，请直接输出 JSON。',
+              })
+              continue
+            }
+
             const name = typeof call.function?.name === 'string' ? call.function.name : ''
             const rawArgs = call.function?.arguments
             let args: Record<string, unknown> = {}
@@ -291,6 +321,8 @@ export function useProjectAgent() {
 
             if (stopped.value) return null
           }
+
+          if (capReached) break
 
           if (JSON.stringify(messages).length > MAX_CONTEXT_CHARS) {
             error.value = 'Agent 对话达到上下文上限，停止继续读'
@@ -409,6 +441,25 @@ ${readableList || '（没有可读文件）'}
         ? input.projectContext.slice(0, MAX_CONTEXT_TEXT) + '\n……已截断'
         : input.projectContext
 
+    const suspicions = input.suspicions ?? []
+    const candidate = input.candidateSummary
+    const suspicionLines = suspicions.slice(0, 8).map((item, index) => {
+      const kind = item.kind === 'reversed' ? '方向相反' : '没有 import 依据'
+      return `${index + 1}. ${kind}：${item.detail.slice(0, 300)}`
+    })
+    const moreSuspicions =
+      suspicions.length > 8 ? `\n……另有 ${suspicions.length - 8} 条未列出。` : ''
+    const programSection = candidate
+      ? `【程序预检】
+已解析 ${candidate.parsed} 个文件，从 import 里找到 ${candidate.edges} 条文件级候选边；图里 ${candidate.supported} 条有依据，${candidate.unknown} 条无法判断，${candidate.unresolved} 条 import 没能解析到文件。
+${
+  suspicionLines.length
+    ? suspicionLines.join('\n') + moreSuspicions
+    : '没有发现图里的边和 import 明显矛盾。不要为了找问题读文件；检查分组和标签后直接输出原图 JSON。'
+}
+最多核对上面列出的 5–8 条；确认 3–5 条关键关系就输出；不要为了补全项目关系读更多文件。`
+      : ''
+
     return runLoop<ProjectGraphData>({
       mode: 'self-check',
       initialContent: `【当前项目图】
@@ -419,9 +470,11 @@ ${context}
 
 【已勾选、可读取的文件】
 ${readableList || '（没有可读文件）'}
+${programSection ? `\n${programSection}` : ''}
 
 请检查这张图：有没有文件节点浮着没有连线、有没有只有分组到分组的边、有没有写反或编造的关系。需要时读代码确认，最后输出修正后的图 JSON。`,
       maxRounds: Math.max(1, Math.min(input.parseCount || 1, MAX_SELF_CHECK_ROUNDS)),
+      maxToolCalls: input.maxToolCalls,
       executor,
       parse: (content) =>
         sanitizeProjectGraph(
