@@ -32,6 +32,8 @@ const RequestSchema = z.object({
   path: z.string().trim().min(1).max(1000),
   code: z.string().trim().min(1).max(100_000, '文件太大了'),
   projectContext: z.string().max(50_000).default(''),
+  /** 前端从源码解析出的、与本文件相关的硬事实；没有就是空字符串 */
+  verifiedFacts: z.string().max(20_000).default(''),
 })
 
 export default defineEventHandler(async (event) => {
@@ -43,7 +45,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const { path: filePath, projectContext } = parsed.data
+  const { path: filePath, projectContext, verifiedFacts } = parsed.data
   const truncated = parsed.data.code.length > FILE_MAX
   const code = truncated ? parsed.data.code.slice(0, FILE_MAX) : parsed.data.code
 
@@ -75,7 +77,13 @@ export default defineEventHandler(async (event) => {
   const systemPrompt =
     docs.length > 0 ? PROJECT_FILE_SYSTEM_PROMPT + RAG_INSTRUCTION : PROJECT_FILE_SYSTEM_PROMPT
 
-  const userPrompt = buildProjectFilePrompt(projectContext, filePath, code, docs)
+  const userPrompt = buildProjectFilePrompt(
+    projectContext,
+    filePath,
+    code,
+    docs,
+    verifiedFacts,
+  )
 
   // ---- 上游调用（callLlm 内部处理 429 / 超时 / 非 200）----
   const startedAt = Date.now()

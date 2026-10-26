@@ -282,11 +282,22 @@ export function buildProjectFilePrompt(
   filePath: string,
   code: string,
   docs: RetrievedDoc[] = [],
+  verifiedFacts = '',
 ): string {
+  const facts = verifiedFacts.trim()
+  const factsSection = facts
+    ? `【已核实事实（程序从源码解析，不得改写）】
+${facts}
+
+以上事实由程序解析：跨文件结论只能引用这些事实；事实里没有的，写「从代码看，可能……」，不得自行推断包名、namespace、注入类型。
+
+`
+    : ''
+
   const base = `【项目结构结论】
 ${projectContext}
 
-【当前文件】${filePath}
+${factsSection}【当前文件】${filePath}
 
 \`\`\`
 ${code}
