@@ -9,6 +9,7 @@
  */
 
 import type { FactCheck, FactClaim, VerifiedFact } from '~/types/facts'
+import type { HardFact } from '~/types/structure'
 
 export const FACTS_START = '<!--facts'
 export const FACTS_END = '-->'
@@ -145,4 +146,10 @@ export function verifyFacts(
     unverified: items.length - verified,
     items,
   }
+}
+
+/** 把程序事实排成逐文件请求里的一段纯文本；没有事实返回空字符串 */
+export function formatVerifiedFacts(facts: HardFact[]): string {
+  if (facts.length === 0) return ''
+  return facts.map((fact) => `- ${fact.text}`).join('\n')
 }

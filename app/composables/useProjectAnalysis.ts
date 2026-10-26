@@ -1,6 +1,7 @@
 import type { FileProgress } from '~/types/project'
 import { normalizePath } from '~/utils/project-files'
-import { verifyFacts } from '~/utils/project-facts'
+import { formatVerifiedFacts, verifyFacts } from '~/utils/project-facts'
+import type { ProjectStructureResult } from '~/utils/structure'
 import { useAnalysis } from './useAnalysis'
 
 /**
@@ -63,6 +64,8 @@ export function useProjectAnalysis() {
   let ticker: ReturnType<typeof setInterval> | null = null
   /** 项目结构结论 —— 每次请求原样带上，作为前缀缓存的公共前缀 */
   let context = ''
+  /** 当前项目的结构事实；上传后由 useProjectSession 设置，没有就是 null */
+  let structure: ProjectStructureResult | null = null
   /** 等「增量解析全部落定」的调用方；allSettled 时统一 resolve */
   const settleWaiters: (() => void)[] = []
 
@@ -76,13 +79,24 @@ export function useProjectAnalysis() {
     return new Promise((resolve) => settleWaiters.push(resolve))
   }
 
+  /** 上传后由 useProjectSession 传入；之后新建的逐文件实例才会带事实 */
+  function setStructure(value: ProjectStructureResult | null) {
+    structure = value
+  }
+
   function ensure(path: string) {
     const existing = instances[path]
     if (existing) return existing
 
+    const hardFacts = structure?.selectFacts(path) ?? []
     const inst = useAnalysis({
       endpoint: '/api/project/analyze',
-      buildBody: (code) => ({ code, path, projectContext: context }),
+      buildBody: (code) => ({
+        code,
+        path,
+        projectContext: context,
+        verifiedFacts: formatVerifiedFacts(hardFacts),
+      }),
       parseFacts: true,
     })
     instances[path] = inst
@@ -96,6 +110,8 @@ export function useProjectAnalysis() {
       percent: 0,
       facts: undefined,
       factsError: '',
+      hardFacts,
+      factWarnings: [],
     }
 
     // useAnalysis 是每个文件一个实例、状态互相独立；这里把它的 ref
@@ -437,5 +453,6 @@ export function useProjectAnalysis() {
     prioritize,
     reset,
     textOf,
+    setStructure,
   }
 }

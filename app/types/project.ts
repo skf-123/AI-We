@@ -11,6 +11,7 @@
 
 import type { GraphNodeType, RagSource } from './analysis'
 import type { FactCheck } from './facts'
+import type { HardFact } from './structure'
 
 /** 目录树上的三类标签 */
 export type ProjectFileCategory = 'user' | 'config' | 'system'
@@ -138,6 +139,10 @@ export interface FileProgress {
   facts?: FactCheck
   /** 事实块没闭合或不是合法 JSON */
   factsError?: string
+  /** 程序从源码解析出的、与本文件相关的事实 */
+  hardFacts?: HardFact[]
+  /** 正文里和已核实事实矛盾的句子 */
+  factWarnings?: string[]
 }
 
 /** 项目图里的一个文件 */

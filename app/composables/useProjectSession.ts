@@ -510,6 +510,7 @@ export function useProjectSession() {
 
       // 结构事实图只读本地文件；失败不影响上传、地图和逐文件解析
       await buildStructure()
+      pool.setStructure(structure.value)
 
       phase.value = 'review'
       runVendorReview(candidates)
@@ -1074,6 +1075,7 @@ export function useProjectSession() {
     lastSummaryInput.value = null
     parsingAdditional.value = false
     activeParsingPaths.value = []
+    pool.setStructure(null)
     pool.reset()
     map.reset()
     summary.reset()
