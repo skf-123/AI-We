@@ -764,7 +764,7 @@ export function findUncoveredClaims(
     const simpleNames = [...new Set(names.map((name) => simpleNameOf(name)))]
     const covered = claims.some((claim) => {
       const text = `${claim.claim ?? ''} ${claim.quote ?? ''}`
-      return simpleNames.some((name) => name.length >= 4 && text.includes(name))
+      return simpleNames.every((name) => name.length < 4 || text.includes(name))
     })
     if (covered) continue
     warnings.push(`没有对应事实的跨文件句子：${sentence.slice(0, 160)}`)

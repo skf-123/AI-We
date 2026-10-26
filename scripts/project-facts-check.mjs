@@ -349,6 +349,15 @@ check(
   0,
 )
 check(
+  'partial claim still uncovered',
+  findUncoveredClaims(
+    'BookController 调用 BookMapper。',
+    [{ claim: 'BookController 调用 BookService', quote: '' }],
+    hardFacts,
+  ).length,
+  1,
+)
+check(
   'plain sentence not flagged',
   findUncoveredClaims('BookController 是 Web 层控制器。', [], hardFacts).length,
   0,
