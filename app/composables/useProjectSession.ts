@@ -30,6 +30,7 @@ import {
   type VendorCandidate,
 } from '~/utils/project-vendor'
 import { useProjectAgent, type ProjectAgentMapResult } from './useProjectAgent'
+import { summaryRoleForFile } from '~/utils/project-facts'
 import { useProjectMap } from './useProjectMap'
 import { useProjectAnalysis } from './useProjectAnalysis'
 import { useProjectGraph, type ProjectGraphPayload } from './useProjectGraph'
@@ -832,7 +833,12 @@ export function useProjectSession() {
     let skipped = 0
 
     for (const entry of doneFiles.value) {
-      const role = thirdSection(pool.progress[entry.path]?.output ?? '').slice(0, 300)
+      const progress = pool.progress[entry.path]
+      const role = summaryRoleForFile(
+        thirdSection(progress?.output ?? '').slice(0, 300),
+        progress?.factWarnings ?? [],
+        progress?.hardFacts ?? [],
+      )
       if (used + role.length > SUMMARY_CHAR_BUDGET) {
         skipped++
         continue

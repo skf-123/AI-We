@@ -9,6 +9,7 @@ import {
   findBodyFactConflicts,
   formatVerifiedFacts,
   stripFactsBlock,
+  summaryRoleForFile,
   verifyFacts,
 } from '../app/utils/project-facts.ts'
 
@@ -273,6 +274,31 @@ check(
   fixedSentence.text.includes('BookServiceImpl 的注入类型是 com.com.mapper.BookMapper'),
   true,
 )
+
+const fixedServlet = applyFactFixes(
+  '项目结构里写明 web.xml 没有注册 Servlet，两个 HelloServlet 也没有用 @WebServlet 的证据。所以点这个链接大概率是 404。',
+  hardFacts,
+)
+check('fix servlet negative', fixedServlet.text.includes('项目里有 @WebServlet'), true)
+check('fix 404 conclusion', fixedServlet.text.includes('因此这个链接可用'), true)
+check('servlet warnings after fix', findBodyFactConflicts(fixedServlet.text, hardFacts).length, 0)
+
+const fixedImport = applyFactFixes(
+  'BookServiceImpl 里 import 的应该是 com.mapper.BookMapper（按 XML 的 namespace 推断）。',
+  hardFacts,
+)
+check(
+  'fix import reasoning',
+  fixedImport.text.includes('BookServiceImpl 实际引用的是 com.com.mapper.BookMapper'),
+  true,
+)
+check('import reasoning removed', fixedImport.text.includes('按 XML 的 namespace 推断'), false)
+
+check('summary role clean', summaryRoleForFile('角色', [], hardFacts), '角色')
+const roleNote = summaryRoleForFile('角色', ['w'], hardFacts)
+check('summary role notes warnings', roleNote.includes('未自动更正'), true)
+check('summary role carries facts', roleNote.includes('com.com.mapper.BookMapper'), true)
+check('summary role capped', roleNote.length <= 300, true)
 
 if (failed > 0) {
   console.error(`\n${failed} 项失败`)

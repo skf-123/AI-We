@@ -146,7 +146,15 @@ const fixRound2Mapper = fixedBody(2, 'BookMapper.java')
 check('round 2 mapper unchanged', fixRound2Mapper.fixes.length, 0)
 const fixRound2Service = fixedBody(2, 'BookServiceImpl.java')
 check('round 2 service unchanged', fixRound2Service.fixes.length, 0)
-check('index still warns after other fixes', fixedWarnings(2, 'index.jsp').length, 1)
+const fixIndex = fixedBody(2, 'index.jsp')
+check('round 2 index fixed', fixIndex.fixes.length > 0, true)
+check('round 2 index has servlet fact', fixIndex.text.includes('项目里有 @WebServlet'), true)
+check('round 2 index clean after fix', fixedWarnings(2, 'index.jsp').length, 0)
+check(
+  'round 1 mapper import reasoning fixed',
+  fixRound1Mapper.text.includes('实际引用的是 com.com.mapper.BookMapper'),
+  true,
+)
 
 if (failed > 0) {
   console.error(`\n${failed} 项失败`)

@@ -408,7 +408,7 @@ defineExpose({ scrollIntoView })
           v-if="factWarnings?.length"
           class="rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs leading-relaxed text-rose-700"
         >
-          <p class="font-medium">正文和已核实事实有出入</p>
+          <p class="font-medium">正文和已核实事实有出入（未自动更正）</p>
           <ul class="mt-1 list-disc space-y-1 pl-4">
             <li v-for="(warning, index) in factWarnings" :key="`fact-warning-${index}`">
               {{ warning }}

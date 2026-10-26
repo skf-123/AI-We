@@ -469,7 +469,51 @@ export function applyFactFixes(
     }
   }
 
-  // 2) 直接说「注入类型是 X」：只换 X 这个名字
+  // 2) 说没有 @WebServlet，或者由「没注册」推出 404：两句都换成事实句
+  const servletFacts = hardFacts.filter((fact) => fact.kind === 'web-servlet')
+  if (servletFacts.length > 0) {
+    const servlet = servletFacts[0]!
+    const negativeRe = /([^。；\n]*(?:没有|无|未)[^。；\n]{0,20}@WebServlet[^。；\n]*|[^。；\n]*@WebServlet[^。；\n]{0,20}(?:没有|无|未)[^。；\n]*)/g
+    text = text.replace(negativeRe, (sentence: string, _match: string, offset: number) => {
+      if (/有\s*@WebServlet/.test(sentence)) return sentence
+      const replacement = `项目里有 @WebServlet：${servlet.text}`
+      pushFix(sentence.trim(), replacement, servlet, '正文说没有 @WebServlet', offset)
+      return replacement
+    })
+    const servletSentenceRe = /([^。；\n]*(?:这个链接[^。；\n]*Servlet|Servlet[^。；\n]*没有注册|死链接)[^。；\n]*)/g
+    text = text.replace(servletSentenceRe, (sentence: string, _match: string, offset: number) => {
+      if (/已经用\s*@WebServlet\s*注册|有\s*@WebServlet/.test(sentence)) return sentence
+      const replacement = `这个链接指向的 Servlet 已经用 @WebServlet 注册（${servlet.path}:${servlet.line}）`
+      pushFix(sentence.trim(), replacement, servlet, '正文说这个 Servlet 没有注册', offset)
+      return replacement
+    })
+    const notFoundRe = /([^。；\n]*404[^。；\n]*)/g
+    text = text.replace(notFoundRe, (sentence: string, _match: string, offset: number) => {
+      if (!/(链接|Servlet|servlet|hello-servlet)/.test(sentence)) return sentence
+      if (/不会[^。；\n]*404/.test(sentence)) return sentence
+      const replacement = '这个链接对应的 Servlet 已经用 @WebServlet 注册，因此这个链接可用'
+      pushFix(sentence.trim(), replacement, servlet, '正文的 404 结论和 @WebServlet 事实矛盾', offset)
+      return replacement
+    })
+  }
+
+  // 3) import 的推断依据不在事实里：整句换成源码事实
+  const importSentenceRe = /([^。；\n]*import[^。；\n]*)/g
+
+  for (const field of fields) {
+    const correct = field.object ?? ''
+    if (!correct) continue
+    text = text.replace(importSentenceRe, (sentence: string, _match: string, offset: number) => {
+      if (!/(应该是|按 XML|推断)/.test(sentence)) return sentence
+      if (!sentence.includes(correct)) return sentence
+      const owner = field.path.split('/').pop()?.replace(/\.[^.]+$/, '') ?? '这个类'
+      const replacement = `${owner} 实际引用的是 ${correct}；这个结论来自源码里的声明，不是从 XML namespace 推断的`
+      pushFix(sentence.trim(), replacement, field, '导入关系的推断依据不在事实里', offset)
+      return replacement
+    })
+  }
+
+  // 4) 直接说「注入类型是 X」：只换 X 这个名字
   const directRe = /注入(?:类型|字段)?(?:是|为|写成|用)\s*[`"']?([\w.]+)/g
   for (const field of fields) {
     const correct = field.object ?? ''
@@ -484,7 +528,7 @@ export function applyFactFixes(
     })
   }
 
-  // 3) 句子里说「注入类型上」：整句换成程序事实句
+  // 5) 句子里说「注入类型上」：整句换成程序事实句
   const sentenceRe = /([^。；\n]*注入类型上[^。；\n]*)/g
   for (const field of fields) {
     const correct = field.object ?? ''
@@ -505,4 +549,25 @@ export function applyFactFixes(
   }
 
   return { text, fixes }
+}
+
+/**
+ * 总览输入里，一个文件应该带什么 role。
+ *
+ * 正文还有没自动更正的跨文件矛盾时，不把第三段喂给总览；换成一句说明和已核实事实，
+ * 避免总览继承错结论。没有预警时原样返回。
+ */
+export function summaryRoleForFile(
+  role: string,
+  warnings: string[],
+  hardFacts: HardFact[],
+): string {
+  if (warnings.length === 0) return role
+  const facts = hardFacts
+    .filter((fact) => fact.kind === 'conflict' || fact.kind === 'fqn' || fact.kind === 'field-type')
+    .slice(0, 3)
+    .map((fact) => fact.text)
+    .join('；')
+  const note = `（正文有未自动更正的跨文件矛盾，未纳入总览${facts ? `；已核实事实：${facts}` : ''}）`
+  return note.slice(0, 300)
 }
