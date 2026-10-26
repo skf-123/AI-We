@@ -10,7 +10,7 @@
  */
 
 import type { GraphNodeType, RagSource } from './analysis'
-import type { FactCheck } from './facts'
+import type { FactCheck, FactFix } from './facts'
 import type { HardFact } from './structure'
 
 /** 目录树上的三类标签 */
@@ -143,6 +143,8 @@ export interface FileProgress {
   hardFacts?: HardFact[]
   /** 正文里和已核实事实矛盾的句子 */
   factWarnings?: string[]
+  /** 已按程序事实更正的名字；原文和更正后都留着 */
+  factFixes?: FactFix[]
 }
 
 /** 项目图里的一个文件 */

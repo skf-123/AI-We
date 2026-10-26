@@ -1,6 +1,11 @@
 import type { FileProgress } from '~/types/project'
 import { normalizePath } from '~/utils/project-files'
-import { findBodyFactConflicts, formatVerifiedFacts, verifyFacts } from '~/utils/project-facts'
+import {
+  applyFactFixes,
+  findBodyFactConflicts,
+  formatVerifiedFacts,
+  verifyFacts,
+} from '~/utils/project-facts'
 import type { ProjectStructureResult } from '~/utils/structure'
 import { useAnalysis } from './useAnalysis'
 
@@ -111,6 +116,7 @@ export function useProjectAnalysis() {
       facts: undefined,
       factsError: '',
       hardFacts,
+      factFixes: [],
       factWarnings: [],
     }
 
@@ -139,6 +145,9 @@ export function useProjectAnalysis() {
 
         if (inst.done.value) {
           const hardFacts = p.hardFacts ?? []
+          const fixed = applyFactFixes(p.output, hardFacts)
+          p.output = fixed.text
+          p.factFixes = fixed.fixes
           p.facts = inst.facts.value.length
             ? verifyFacts(
                 inst.facts.value,
@@ -225,6 +234,7 @@ export function useProjectAnalysis() {
       texts.set(path, text)
 
       const p = progress[path]!
+      p.factFixes = []
       p.percent = 0
       startedAt.set(path, Date.now())
       ensureTicker()
@@ -239,6 +249,9 @@ export function useProjectAnalysis() {
       p.error = inst.errorMsg.value
 
       const hardFacts = p.hardFacts ?? []
+      const fixed = applyFactFixes(p.output, hardFacts)
+      p.output = fixed.text
+      p.factFixes = fixed.fixes
       p.facts = inst.facts.value.length
         ? verifyFacts(inst.facts.value, path, text, structure?.allFacts ?? hardFacts)
         : undefined

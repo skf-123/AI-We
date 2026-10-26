@@ -11,7 +11,7 @@
  */
 import glossaryData from '~/data/glossary.json'
 import type { GlossaryTerm, RagSource } from '~/types/analysis'
-import type { FactCheck } from '~/types/facts'
+import type { FactCheck, FactFix } from '~/types/facts'
 import type { HardFact } from '~/types/structure'
 import { parseSections } from '~/utils/analysis-sections'
 import { rangeLines } from '~/utils/locate-lines'
@@ -42,6 +42,8 @@ const props = defineProps<{
   hardFacts?: HardFact[]
   /** 正文里和已核实事实矛盾的句子 */
   factWarnings?: string[]
+  /** 已按程序事实更正的名字 */
+  factFixes?: FactFix[]
   /**
    * 高度模式。
    * false：贴代码入口，锁一屏高度（桌面端）
@@ -369,6 +371,24 @@ defineExpose({ scrollIntoView })
         >
           输出到达上限，后面的内容没有讲完。可以重试，或者把文件拆小一点再看。
         </p>
+
+        <!-- 已按程序事实更正：正文里那一小块名字已经换掉 -->
+        <details
+          v-if="factFixes?.length"
+          class="rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-xs leading-relaxed text-emerald-800"
+        >
+          <summary class="cursor-pointer select-none">
+            已按已核实事实更正 {{ factFixes.length }} 处
+          </summary>
+          <ul class="mt-1 space-y-1">
+            <li v-for="(fix, index) in factFixes" :key="`fact-fix-${index}`" class="break-words">
+              <span class="font-mono text-[10px]">{{ fix.from }}</span>
+              <span class="mx-1">→</span>
+              <span class="font-mono text-[10px]">{{ fix.to }}</span>
+              <span class="text-[10px] text-emerald-600">（{{ fix.path }}:{{ fix.line }}）</span>
+            </li>
+          </ul>
+        </details>
 
         <!-- 正文和程序事实矛盾：先显示，最显眼 -->
         <div

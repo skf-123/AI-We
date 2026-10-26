@@ -5,6 +5,7 @@
  */
 
 import {
+  applyFactFixes,
   findBodyFactConflicts,
   formatVerifiedFacts,
   stripFactsBlock,
@@ -244,6 +245,34 @@ check(
 
 check('empty facts format', formatVerifiedFacts([]), '')
 check('facts format includes text', formatVerifiedFacts(hardFacts).includes('BookMapper.java:1'), true)
+
+// ---- 名字级更正 ----
+const fixedCall = applyFactFixes('后者再调 com.mapper.BookMapper，然后返回。', hardFacts)
+check('fix wrong interface name', fixedCall.text.includes('com.com.mapper.BookMapper'), true)
+check('fix records one replacement', fixedCall.fixes.length, 1)
+check(
+  'fix keeps legitimate namespace',
+  applyFactFixes('BookMapper.xml 的 namespace 是 com.mapper.BookMapper。', hardFacts).text.includes(
+    'com.mapper.BookMapper',
+  ),
+  true,
+)
+check(
+  'fix ignores null',
+  applyFactFixes('如果找不到，注入类型是 null。', hardFacts).text.includes('null'),
+  true,
+)
+const fixedInjection = applyFactFixes('BookServiceImpl 的注入类型是 com.mapper。', hardFacts)
+check('fix direct injection', fixedInjection.text.includes('com.com.mapper.BookMapper'), true)
+const fixedSentence = applyFactFixes(
+  'com.mapper 这个包名同时出现在 BookServiceImpl 的注入类型上。',
+  hardFacts,
+)
+check(
+  'fix injection sentence',
+  fixedSentence.text.includes('BookServiceImpl 的注入类型是 com.com.mapper.BookMapper'),
+  true,
+)
 
 if (failed > 0) {
   console.error(`\n${failed} 项失败`)

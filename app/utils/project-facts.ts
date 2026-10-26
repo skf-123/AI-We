@@ -8,7 +8,7 @@
  * 不判断 claim 的业务语义，也不重写正文。
  */
 
-import type { FactCheck, FactClaim, VerifiedFact } from '~/types/facts'
+import type { FactCheck, FactClaim, FactFix, VerifiedFact } from '~/types/facts'
 import type { HardFact } from '~/types/structure'
 
 export const FACTS_START = '<!--facts'
@@ -302,42 +302,65 @@ export function verifyFacts(
  * 按句切，不按行切 —— 中文长段落一行里经常同时出现对的和错的名字。
  * 每个名字只看前后 40 字，避免整句只要出现 namespace 就全部放过。
  */
-export function findBodyFactConflicts(body: string, hardFacts: HardFact[]): string[] {
-  if (hardFacts.length === 0) return []
-
-  const tokenPositions = (text: string, token: string): number[] => {
-    const positions: number[] = []
-    if (!token) return positions
-    let index = text.indexOf(token)
-    while (index !== -1) {
-      const before = index > 0 ? text[index - 1] : ''
-      const after = index + token.length < text.length ? text[index + token.length] : ''
-      if (!/[A-Za-z0-9_.$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) positions.push(index)
-      index = text.indexOf(token, index + token.length)
-    }
-    return positions
+function boundedPositions(text: string, token: string): number[] {
+  const positions: number[] = []
+  if (!token) return positions
+  let index = text.indexOf(token)
+  while (index !== -1) {
+    const before = index > 0 ? text[index - 1] : ''
+    const after = index + token.length < text.length ? text[index + token.length] : ''
+    if (!/[A-Za-z0-9_.$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) positions.push(index)
+    index = text.indexOf(token, index + token.length)
   }
+  return positions
+}
 
+/** 已知的「另一个全限定名」：XML namespace、import、字段类型，映射到真正的符号 */
+function buildAliasPairs(hardFacts: HardFact[]): { alias: string; correct: HardFact }[] {
   const symbols = hardFacts.filter((fact) => fact.kind === 'fqn' && fact.object)
   const aliases = hardFacts.filter(
     (fact) =>
       (fact.kind === 'xml-namespace' || fact.kind === 'import' || fact.kind === 'field-type') &&
       fact.object,
   )
+  const pairs: { alias: string; correct: HardFact }[] = []
+  for (const alias of aliases) {
+    const simple = simpleNameOf(alias.object ?? '')
+    const correct = symbols.find((fact) => simpleNameOf(fact.object ?? '') === simple)
+    if (!correct || correct.object === alias.object) continue
+    pairs.push({ alias: alias.object!, correct })
+  }
+  return pairs
+}
+
+const IGNORED_INJECTION_TOKENS = new Set([
+  'null',
+  'undefined',
+  '空',
+  '未知',
+  'int',
+  'long',
+  'short',
+  'byte',
+  'float',
+  'double',
+  'boolean',
+  'char',
+  'String',
+  'Integer',
+  'Object',
+])
+
+export function findBodyFactConflicts(body: string, hardFacts: HardFact[]): string[] {
+  if (hardFacts.length === 0) return []
+
+  const aliasPairs = buildAliasPairs(hardFacts)
   const fields = hardFacts.filter((fact) => fact.kind === 'field-type' && fact.object)
   const servletFacts = hardFacts.filter((fact) => fact.kind === 'web-servlet')
   const warnings: string[] = []
 
   const add = (message: string) => {
     if (!warnings.includes(message)) warnings.push(message)
-  }
-
-  const aliasPairs: { alias: string; correct: HardFact }[] = []
-  for (const alias of aliases) {
-    const simple = simpleNameOf(alias.object ?? '')
-    const correct = symbols.find((fact) => simpleNameOf(fact.object ?? '') === simple)
-    if (!correct || correct.object === alias.object) continue
-    aliasPairs.push({ alias: alias.object!, correct })
   }
 
   const wrongPackages = new Set<string>()
@@ -360,7 +383,7 @@ export function findBodyFactConflicts(body: string, hardFacts: HardFact[]): stri
 
     // 1) 已知的另一个全限定名，被当成接口、类型或 import
     for (const { alias, correct } of aliasPairs) {
-      for (const index of tokenPositions(sentence, alias)) {
+      for (const index of boundedPositions(sentence, alias)) {
         const before = sentence.slice(Math.max(0, index - 30), index)
         const after = sentence.slice(index + alias.length, index + alias.length + 14)
         if (/namespace\s*(是|为|=|:)\s*[`"']?$/i.test(before)) continue
@@ -383,16 +406,16 @@ export function findBodyFactConflicts(body: string, hardFacts: HardFact[]): stri
           !ignored.has(token) &&
           token !== correct &&
           !correct.startsWith(`${token}.`) &&
-          tokenPositions(sentence, correct).length === 0
+          boundedPositions(sentence, correct).length === 0
         ) {
           add(`正文把注入类型说成 ${token}，已核实的事实是 ${correct}（${field.path}:${field.line}）`)
           continue
         }
       }
 
-      if (/注入类型上/.test(sentence) && tokenPositions(sentence, correct).length === 0) {
+      if (/注入类型上/.test(sentence) && boundedPositions(sentence, correct).length === 0) {
         for (const wrongPackage of wrongPackages) {
-          if (tokenPositions(sentence, wrongPackage).length === 0) continue
+          if (boundedPositions(sentence, wrongPackage).length === 0) continue
           if (correct.startsWith(`${wrongPackage}.`)) continue
           add(`正文把注入类型说成 ${wrongPackage}，已核实的事实是 ${correct}（${field.path}:${field.line}）`)
         }
@@ -407,4 +430,79 @@ export function findBodyFactConflicts(body: string, hardFacts: HardFact[]): stri
 export function formatVerifiedFacts(facts: HardFact[]): string {
   if (facts.length === 0) return ''
   return facts.map((fact) => `- ${fact.text}`).join('\n')
+}
+
+/**
+ * 按程序事实更正正文里的一小块名字。
+ *
+ * 只换 token：全限定名、包名；只在明确的接口/类型/调用/注入上下文里换，
+ * 遇到「namespace 是 …」这种合法配置说明不动。流式结束后调用一次。
+ */
+export function applyFactFixes(
+  body: string,
+  hardFacts: HardFact[],
+): { text: string; fixes: FactFix[] } {
+  if (hardFacts.length === 0) return { text: body, fixes: [] }
+
+  const aliasPairs = buildAliasPairs(hardFacts)
+  const fields = hardFacts.filter((fact) => fact.kind === 'field-type' && fact.object)
+  const fixes: FactFix[] = []
+  let text = body
+
+  const pushFix = (from: string, to: string, fact: HardFact, reason: string, offset: number) => {
+    const before = text.slice(Math.max(0, offset - 80), offset + from.length + 80)
+    const after = before.split(from).join(to)
+    fixes.push({ from, to, path: fact.path, line: fact.line, reason, before, after })
+  }
+
+  // 1) 把已知的另一个全限定名（例如 XML namespace）当成接口/类型
+  for (const { alias, correct } of aliasPairs) {
+    for (const pos of boundedPositions(text, alias).reverse()) {
+      const before = text.slice(Math.max(0, pos - 30), pos)
+      const after = text.slice(pos + alias.length, pos + alias.length + 30)
+      if (/namespace\s*(是|为|=|:)\s*[`"']?$/i.test(before)) continue
+      const window = `${before}${alias}${after}`
+      if (!/(接口|类型|调用|调|实现|import|注入|字段)/i.test(window)) continue
+      const replacement = correct.object ?? alias
+      pushFix(alias, replacement, correct, '把已知的另一个全限定名当成了接口/类型', pos)
+      text = text.slice(0, pos) + replacement + text.slice(pos + alias.length)
+    }
+  }
+
+  // 2) 直接说「注入类型是 X」：只换 X 这个名字
+  const directRe = /注入(?:类型|字段)?(?:是|为|写成|用)\s*[`"']?([\w.]+)/g
+  for (const field of fields) {
+    const correct = field.object ?? ''
+    if (!correct) continue
+    text = text.replace(directRe, (match, token: string, offset: number) => {
+      if (IGNORED_INJECTION_TOKENS.has(token) || token === correct) return match
+      if (correct.startsWith(`${token}.`)) return match
+      if (boundedPositions(text, correct).length > 0) return match
+      const replacement = match.replace(token, correct)
+      pushFix(token, correct, field, '注入类型说成了另一个名字', offset)
+      return replacement
+    })
+  }
+
+  // 3) 句子里说「注入类型上」：整句换成程序事实句
+  const sentenceRe = /([^。；\n]*注入类型上[^。；\n]*)/g
+  for (const field of fields) {
+    const correct = field.object ?? ''
+    if (!correct) continue
+    const owner = field.path.split('/').pop()?.replace(/\.[^.]+$/, '') ?? '这个类'
+    text = text.replace(sentenceRe, (sentence: string, _match: string, offset: number) => {
+      if (boundedPositions(sentence, correct).length > 0) return sentence
+      const wrong = aliasPairs.some(({ alias }) => {
+        const index = alias.lastIndexOf('.')
+        const wrongPackage = index > 0 ? alias.slice(0, index) : ''
+        return Boolean(wrongPackage) && boundedPositions(sentence, wrongPackage).length > 0
+      })
+      if (!wrong) return sentence
+      const replacement = `${owner} 的注入类型是 ${correct}（${field.path}:${field.line}）`
+      pushFix(sentence.trim(), replacement, field, '注入类型说成了另一个包', offset)
+      return replacement
+    })
+  }
+
+  return { text, fixes }
 }

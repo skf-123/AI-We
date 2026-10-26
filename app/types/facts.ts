@@ -35,3 +35,19 @@ export interface FactCheck {
   contradictions: number
   items: VerifiedFact[]
 }
+
+/** 按程序事实更正正文的一处记录 */
+export interface FactFix {
+  /** 正文里原来的名字 */
+  from: string
+  /** 事实图里的正确名字 */
+  to: string
+  /** 依据的事实所在文件与行 */
+  path: string
+  line: number
+  /** 为什么更正 */
+  reason: string
+  /** 更正前后的上下文，给页面展开看 */
+  before: string
+  after: string
+}
