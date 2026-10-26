@@ -7,6 +7,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { javaSpringAdapter } from '../app/utils/structure/java-spring.ts'
+import { findBodyFactConflicts } from '../app/utils/project-facts.ts'
 
 const ROOT = path.resolve(import.meta.dirname, '../../我们的交互/项目测试/sportboot测试/demo15')
 let failed = 0
@@ -37,6 +38,7 @@ const files = [
   read('src/main/java/com/controller/BookController.java'),
   read('src/main/java/com/example/demo15/HelloServlet.java'),
   read('src/main/resources/com/mapper/BookMapper.xml'),
+  read('src/main/webapp/index.jsp'),
   read('src/main/resources/application-mapper.xml'),
 ]
 
@@ -65,16 +67,42 @@ check('one conflict', graph.conflicts.length, 1)
 check('conflict mentions interface', graph.conflicts[0]?.detail.includes('com.com.mapper.BookMapper'), true)
 check('conflict mentions scan', graph.conflicts[0]?.detail.includes('com.mapper'), true)
 
-const servlet = factsOf('annotation').find((fact) => fact.object?.startsWith('WebServlet'))
-check('webservlet fact', servlet?.object.includes('/hello-servlet'), true)
+const servlet = factsOf('web-servlet').find((fact) => fact.object?.includes('/hello-servlet'))
+check('webservlet fact', Boolean(servlet), true)
 
 const controllerFacts = javaSpringAdapter.selectFacts(graph, 'src/main/java/com/controller/BookController.java')
 check('controller gets conflict', controllerFacts.some((fact) => fact.kind === 'conflict'), true)
 check('controller fact cap', controllerFacts.length <= 10, true)
+check(
+  'controller gets interface fqn',
+  controllerFacts.some((fact) => fact.kind === 'fqn' && fact.object === 'com.com.mapper.BookMapper'),
+  true,
+)
+check(
+  'controller gets namespace',
+  controllerFacts.some((fact) => fact.kind === 'xml-namespace' && fact.object === 'com.mapper.BookMapper'),
+  true,
+)
+check(
+  'controller body would warn',
+  findBodyFactConflicts('后者再调 com.mapper.BookMapper，然后返回。', controllerFacts).length,
+  1,
+)
 
 const serviceFacts = javaSpringAdapter.selectFacts(graph, 'src/main/java/com/service/impl/BookServiceImpl.java')
 check('service gets field fact', serviceFacts.some((fact) => fact.kind === 'field-type' && fact.object === 'com.com.mapper.BookMapper'), true)
 check('service gets conflict', serviceFacts.some((fact) => fact.kind === 'conflict'), true)
+
+const indexFacts = javaSpringAdapter.selectFacts(graph, 'src/main/webapp/index.jsp')
+check('index gets servlet fact', indexFacts.some((fact) => fact.kind === 'web-servlet'), true)
+check(
+  'index 404 claim would warn',
+  findBodyFactConflicts(
+    '这个链接指向的 Servlet 没有注册，两个 HelloServlet 也没有用 @WebServlet 的证据。',
+    indexFacts,
+  ).length,
+  1,
+)
 
 // ---- 一个完全对得上的小项目：不应产生矛盾 ----
 const matching = [

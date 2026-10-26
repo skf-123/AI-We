@@ -1,6 +1,6 @@
 import type { FileProgress } from '~/types/project'
 import { normalizePath } from '~/utils/project-files'
-import { formatVerifiedFacts, verifyFacts } from '~/utils/project-facts'
+import { findBodyFactConflicts, formatVerifiedFacts, verifyFacts } from '~/utils/project-facts'
 import type { ProjectStructureResult } from '~/utils/structure'
 import { useAnalysis } from './useAnalysis'
 
@@ -138,9 +138,11 @@ export function useProjectAnalysis() {
         p.factsError = inst.factsError.value
 
         if (inst.done.value) {
+          const hardFacts = p.hardFacts ?? []
           p.facts = inst.facts.value.length
-            ? verifyFacts(inst.facts.value, path, texts.get(path) ?? '')
+            ? verifyFacts(inst.facts.value, path, texts.get(path) ?? '', hardFacts)
             : undefined
+          p.factWarnings = findBodyFactConflicts(p.output, hardFacts)
         }
       },
       { immediate: true },
@@ -230,6 +232,12 @@ export function useProjectAnalysis() {
       p.truncated = inst.truncated.value
       p.outputTruncated = inst.outputTruncated.value
       p.error = inst.errorMsg.value
+
+      const hardFacts = p.hardFacts ?? []
+      p.facts = inst.facts.value.length
+        ? verifyFacts(inst.facts.value, path, text, hardFacts)
+        : undefined
+      p.factWarnings = findBodyFactConflicts(p.output, hardFacts)
 
       if (stopped.value) {
         p.status = 'error'

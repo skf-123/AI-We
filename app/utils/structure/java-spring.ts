@@ -328,7 +328,7 @@ export const javaSpringAdapter: ProjectStructureAdapter = {
         const ownerFqn = file.packageName ? `${file.packageName}.${owner}` : owner
         addFact({
           id: `ann:${file.path}:${ann.line}:${ann.name}`,
-          kind: 'annotation',
+          kind: ann.name === 'WebServlet' ? 'web-servlet' : 'annotation',
           path: file.path,
           line: ann.line,
           quote: ann.text,
@@ -490,7 +490,12 @@ export const javaSpringAdapter: ProjectStructureAdapter = {
         id: `conflict:${conflicts.length + 1}`,
         kind: 'package-scan-namespace',
         detail,
-        factIds: [ns.fact.id, ...scanFacts.map((item) => item.fact.id), ...injectionFields.map((item) => item.fact.id)],
+        factIds: [
+          `fqn:${fqn}`,
+          ns.fact.id,
+          ...scanFacts.map((item) => item.fact.id),
+          ...injectionFields.map((item) => item.fact.id),
+        ],
         paths: relatedPaths,
       }
       conflicts.push(conflict)
@@ -521,9 +526,24 @@ export const javaSpringAdapter: ProjectStructureAdapter = {
   selectFacts(graph, path) {
     const normalized = normalizePath(path)
     const conflicts = graph.facts.filter((fact) => fact.kind === 'conflict')
+    // JSP / HTML 里的链接要找 @WebServlet；把 servlet 事实也带上
+    const servletFacts = /\.(jsp|html?)$/i.test(normalized)
+      ? graph.facts.filter((fact) => fact.kind === 'web-servlet').slice(0, 4)
+      : []
+    // 矛盾涉及的事实也要带上，否则模型只看到一句「三处不一致」，不知道三处分别是什么
+    const referencedIds = new Set(graph.conflicts.flatMap((conflict) => conflict.factIds))
+    const referenced = graph.facts.filter((fact) => referencedIds.has(fact.id))
     const own = graph.facts.filter(
       (fact) => fact.kind !== 'conflict' && (fact.path === normalized || fact.relatedPaths?.includes(normalized)),
     )
-    return [...conflicts, ...own].slice(0, 10)
+
+    const merged: HardFact[] = []
+    const seen = new Set<string>()
+    for (const fact of [...conflicts, ...servletFacts, ...referenced, ...own]) {
+      if (seen.has(fact.id)) continue
+      seen.add(fact.id)
+      merged.push(fact)
+    }
+    return merged.slice(0, 10)
   },
 }

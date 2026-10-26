@@ -91,11 +91,97 @@ export function stripFactsBlock(text: string): FactsBlockResult {
   }
 }
 
-/** 用当前文件的原文核对每条事实；最多 20 条，避免异常输出拖慢页面 */
+function simpleNameOf(value: string): string {
+  const clean = value.replace(/<.*>/g, '').trim()
+  const index = clean.lastIndexOf('.')
+  return index === -1 ? clean : clean.slice(index + 1)
+}
+
+function quoteMatches(left: string, right: string): boolean {
+  const a = normalizeWhitespace(left)
+  const b = normalizeWhitespace(right)
+  if (a.length < 3 || b.length < 3) return false
+  return a.includes(b) || b.includes(a)
+}
+
+/**
+ * 先在模型报的行找，找不到再全文件找最近的同名行。
+ * 模型数错一两行很常见；引文对得上就回填真实行号，不假装未核实。
+ */
+function findQuoteLine(
+  lines: string[],
+  quote: string,
+  claimedLine: number,
+): { line: number; exact: boolean } | null {
+  if (Number.isInteger(claimedLine) && claimedLine >= 1 && claimedLine <= lines.length) {
+    if (quoteMatches(lines[claimedLine - 1] ?? '', quote)) return { line: claimedLine, exact: true }
+  }
+
+  let best: { line: number; distance: number } | null = null
+  for (let i = 0; i < lines.length; i++) {
+    if (!quoteMatches(lines[i] ?? '', quote)) continue
+    const line = i + 1
+    const distance = Number.isInteger(claimedLine) ? Math.abs(line - claimedLine) : line
+    if (!best || distance < best.distance) best = { line, distance }
+  }
+  return best ? { line: best.line, exact: false } : null
+}
+
+function hardFactForClaim(
+  claimPath: string,
+  quote: string,
+  hardFacts: HardFact[],
+): HardFact | null {
+  const normalized = normalizePath(claimPath)
+  for (const fact of hardFacts) {
+    if (fact.kind === 'conflict') continue
+    if (normalizePath(fact.path) !== normalized) continue
+    if (quote && quoteMatches(fact.quote, quote)) return fact
+  }
+  return null
+}
+
+const FQN_RE = /\b[a-z][\w]*(?:\.[a-z][\w]*)+\b/gi
+
+/**
+ * 一条 claim 里出现了项目符号的另一个全限定名，就可能是把 XML namespace 当成接口。
+ *
+ * 只在句子没提 XML / namespace / 配置时判；提到这些词时，那个名字可能本来就是在说配置。
+ */
+function findContradiction(
+  claimText: string,
+  quote: string,
+  hardFacts: HardFact[],
+): HardFact | null {
+  const text = `${claimText}\n${quote}`
+  if (/(没有|无|未).{0,16}@WebServlet|@WebServlet.{0,16}(没有|无|未)/.test(text)) {
+    const servlet = hardFacts.find((fact) => fact.kind === 'web-servlet')
+    if (servlet) return servlet
+  }
+  if (/namespace|xml|配置/i.test(text)) return null
+
+  const symbols = hardFacts.filter((fact) => fact.kind === 'fqn' && fact.object)
+  const aliases = hardFacts.filter(
+    (fact) =>
+      (fact.kind === 'xml-namespace' || fact.kind === 'import' || fact.kind === 'field-type') &&
+      fact.object,
+  )
+
+  for (const token of text.match(FQN_RE) ?? []) {
+    const simple = simpleNameOf(token)
+    const correct = symbols.find((fact) => simpleNameOf(fact.object ?? '') === simple)
+    if (!correct || token === correct.object) continue
+    if (aliases.some((fact) => fact.object === token)) return correct
+  }
+  return null
+}
+
+/** 用当前文件的原文和程序事实核对每条 claim；最多 20 条，避免异常输出拖慢页面 */
 export function verifyFacts(
   claims: FactClaim[],
   currentPath: string,
   fileText: string,
+  hardFacts: HardFact[] = [],
 ): FactCheck {
   const path = normalizePath(currentPath)
   const lines = fileText.split(/\r?\n/)
@@ -107,45 +193,198 @@ export function verifyFacts(
     const quote = typeof claim.quote === 'string' ? claim.quote.trim() : ''
     const claimText = typeof claim.claim === 'string' ? claim.claim.trim() : ''
 
-    let status: VerifiedFact['status'] = 'unverified'
-    let reason = ''
-
-    if (claimPath && claimPath !== path) {
-      reason = '引用的是另一个文件，程序没有它的原文'
-    } else if (!Number.isInteger(line) || line < 1 || line > lines.length) {
-      reason = '行号不在当前文件里'
-    } else if (!quote) {
-      reason = '没有给引文'
-    } else {
-      const lineText = normalizeWhitespace(lines[line - 1])
-      const needle = normalizeWhitespace(quote)
-      const matched =
-        needle.length >= 3 &&
-        (lineText.includes(needle) || (lineText.length >= 3 && needle.includes(lineText)))
-      if (matched) {
-        status = 'verified'
-      } else {
-        reason = '引文和这一行对不上'
-      }
+    const contradiction = findContradiction(claimText, quote, hardFacts)
+    if (contradiction) {
+      items.push({
+        path: claimPath || path,
+        line: Number.isInteger(line) ? line : 0,
+        quote,
+        claim: claimText,
+        status: 'contradiction',
+        reason: '与程序事实矛盾',
+        factId: contradiction.id,
+        correct: contradiction.text,
+      })
+      continue
     }
 
-    items.push({
-      path: claimPath || path,
-      line: Number.isInteger(line) ? line : 0,
-      quote,
-      claim: claimText,
-      status,
-      reason: reason || undefined,
-    })
+    const hardFact = hardFactForClaim(claimPath || path, quote, hardFacts)
+    if (hardFact) {
+      items.push({
+        path: claimPath || path,
+        line: hardFact.line > 0 ? hardFact.line : Number.isInteger(line) ? line : 0,
+        quote,
+        claim: claimText,
+        status: 'verified',
+        factId: hardFact.id,
+      })
+      continue
+    }
+
+    if (claimPath && claimPath !== path) {
+      items.push({
+        path: claimPath,
+        line: Number.isInteger(line) ? line : 0,
+        quote,
+        claim: claimText,
+        status: 'unverified',
+        reason: '引用的是另一个文件，程序没有它的原文',
+      })
+      continue
+    }
+
+    if (!quote) {
+      items.push({
+        path,
+        line: Number.isInteger(line) ? line : 0,
+        quote,
+        claim: claimText,
+        status: 'unverified',
+        reason: '没有给引文',
+      })
+      continue
+    }
+
+    const found = findQuoteLine(lines, quote, line)
+    if (found) {
+      items.push({
+        path,
+        line: found.line,
+        quote,
+        claim: claimText,
+        status: 'verified',
+        reason: found.exact ? undefined : `行号已修正：引文在第 ${found.line} 行`,
+      })
+    } else {
+      items.push({
+        path,
+        line: Number.isInteger(line) ? line : 0,
+        quote,
+        claim: claimText,
+        status: 'unverified',
+        reason: '引文不在这个文件里',
+      })
+    }
   }
 
   const verified = items.filter((item) => item.status === 'verified').length
+  const contradictions = items.filter((item) => item.status === 'contradiction').length
 
   return {
     verified,
-    unverified: items.length - verified,
+    unverified: items.length - verified - contradictions,
+    contradictions,
     items,
   }
+}
+
+/**
+ * 在正文里找和程序事实直接矛盾的说法。
+ *
+ * 只报两种能对上的：
+ *   1. 把已知的另一个全限定名（例如 XML namespace）当成接口类型；
+ *   2. 句子里把注入类型说成另一个包。
+ *
+ * 按句切，不按行切 —— 中文长段落一行里经常同时出现对的和错的名字。
+ * 每个名字只看前后 40 字，避免整句只要出现 namespace 就全部放过。
+ */
+export function findBodyFactConflicts(body: string, hardFacts: HardFact[]): string[] {
+  if (hardFacts.length === 0) return []
+
+  const tokenPositions = (text: string, token: string): number[] => {
+    const positions: number[] = []
+    if (!token) return positions
+    let index = text.indexOf(token)
+    while (index !== -1) {
+      const before = index > 0 ? text[index - 1] : ''
+      const after = index + token.length < text.length ? text[index + token.length] : ''
+      if (!/[A-Za-z0-9_.$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) positions.push(index)
+      index = text.indexOf(token, index + token.length)
+    }
+    return positions
+  }
+
+  const symbols = hardFacts.filter((fact) => fact.kind === 'fqn' && fact.object)
+  const aliases = hardFacts.filter(
+    (fact) =>
+      (fact.kind === 'xml-namespace' || fact.kind === 'import' || fact.kind === 'field-type') &&
+      fact.object,
+  )
+  const fields = hardFacts.filter((fact) => fact.kind === 'field-type' && fact.object)
+  const servletFacts = hardFacts.filter((fact) => fact.kind === 'web-servlet')
+  const warnings: string[] = []
+
+  const add = (message: string) => {
+    if (!warnings.includes(message)) warnings.push(message)
+  }
+
+  const aliasPairs: { alias: string; correct: HardFact }[] = []
+  for (const alias of aliases) {
+    const simple = simpleNameOf(alias.object ?? '')
+    const correct = symbols.find((fact) => simpleNameOf(fact.object ?? '') === simple)
+    if (!correct || correct.object === alias.object) continue
+    aliasPairs.push({ alias: alias.object!, correct })
+  }
+
+  const wrongPackages = new Set<string>()
+  for (const { alias } of aliasPairs) {
+    const index = alias.lastIndexOf('.')
+    if (index > 0) wrongPackages.add(alias.slice(0, index))
+  }
+
+  for (const raw of body.split(/[。；\n]/)) {
+    const sentence = raw.trim()
+    if (!sentence) continue
+
+    if (
+      servletFacts.length &&
+      /(没有|无|未).{0,16}@WebServlet|@WebServlet.{0,16}(没有|无|未)/.test(sentence)
+    ) {
+      add(`正文说没有 @WebServlet，已核实的事实是 ${servletFacts[0].text}`)
+      continue
+    }
+
+    // 1) 已知的另一个全限定名，被当成接口、类型或 import
+    for (const { alias, correct } of aliasPairs) {
+      for (const index of tokenPositions(sentence, alias)) {
+        const before = sentence.slice(Math.max(0, index - 30), index)
+        const after = sentence.slice(index + alias.length, index + alias.length + 14)
+        if (/namespace\s*(是|为|=|:)\s*[`"']?$/i.test(before)) continue
+        const window = `${before}${alias}${after}`
+        if (!/(接口|类型|调用|调|实现|import|注入|字段)/i.test(window)) continue
+        add(`正文写的是 ${alias}，已核实的事实是 ${correct.object}（${correct.path}:${correct.line}）`)
+      }
+    }
+
+    // 2) 注入类型：只认「注入类型是/为/写成/用」和「注入类型上」两种明确说法
+    for (const field of fields) {
+      const correct = field.object ?? ''
+      if (!correct) continue
+
+      const direct = sentence.match(/注入(?:类型|字段)?(?:是|为|写成|用)\s*[`"']?([\w.]+)/)
+      if (direct) {
+        const token = direct[1]!
+        if (
+          token !== correct &&
+          !correct.startsWith(`${token}.`) &&
+          tokenPositions(sentence, correct).length === 0
+        ) {
+          add(`正文把注入类型说成 ${token}，已核实的事实是 ${correct}（${field.path}:${field.line}）`)
+          continue
+        }
+      }
+
+      if (/注入类型上/.test(sentence) && tokenPositions(sentence, correct).length === 0) {
+        for (const wrongPackage of wrongPackages) {
+          if (tokenPositions(sentence, wrongPackage).length === 0) continue
+          if (correct.startsWith(`${wrongPackage}.`)) continue
+          add(`正文把注入类型说成 ${wrongPackage}，已核实的事实是 ${correct}（${field.path}:${field.line}）`)
+        }
+      }
+    }
+  }
+
+  return warnings.slice(0, 3)
 }
 
 /** 把程序事实排成逐文件请求里的一段纯文本；没有事实返回空字符串 */

@@ -16,12 +16,22 @@ export interface VerifiedFact {
   line: number
   quote: string
   claim: string
-  status: 'verified' | 'unverified'
+  /**
+   * verified：引文在文件里能找到（可能修正了行号）
+   * contradiction：claim 和程序事实直接矛盾
+   * unverified：既没有对上引文，也没有程序事实依据
+   */
+  status: 'verified' | 'unverified' | 'contradiction'
   reason?: string
+  /** 有程序事实依据时，指向那条事实的 id */
+  factId?: string
+  /** 矛盾时，程序事实说的是什么 */
+  correct?: string
 }
 
 export interface FactCheck {
   verified: number
   unverified: number
+  contradictions: number
   items: VerifiedFact[]
 }
