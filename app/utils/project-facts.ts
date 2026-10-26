@@ -498,7 +498,7 @@ export function applyFactFixes(
         return Boolean(wrongPackage) && boundedPositions(sentence, wrongPackage).length > 0
       })
       if (!wrong) return sentence
-      const replacement = `${owner} 的注入类型是 ${correct}（${field.path}:${field.line}）`
+      const replacement = `${owner} 的注入类型是 ${correct}`
       pushFix(sentence.trim(), replacement, field, '注入类型说成了另一个包', offset)
       return replacement
     })
