@@ -35,7 +35,11 @@ import { useProjectAnalysis } from './useProjectAnalysis'
 import { useProjectGraph, type ProjectGraphPayload } from './useProjectGraph'
 import { useProjectSummary } from './useProjectSummary'
 import { useProjectVendorReview } from './useProjectVendorReview'
-import { analyzeProjectStructure, type ProjectStructureResult } from '~/utils/structure'
+import {
+  analyzeProjectStructure,
+  structureFactsEnabled,
+  type ProjectStructureResult,
+} from '~/utils/structure'
 import type { StructureSourceFile } from '~/types/structure'
 
 /**
@@ -537,6 +541,11 @@ export function useProjectSession() {
    * 失败就置空，逐文件解析照常走 —— 结构层是加法，不能拖垮上传。
    */
   async function buildStructure() {
+    if (!structureFactsEnabled()) {
+      structure.value = null
+      return
+    }
+
     const entries = files.value
       .filter(
         (entry) =>

@@ -40,14 +40,28 @@ function parseClaims(raw: string): { claims: FactClaim[] | null; error?: string 
 
   if (!cleaned) return { claims: [] }
 
-  try {
-    const parsed = JSON.parse(cleaned)
-    if (!Array.isArray(parsed)) return { claims: null, error: '事实块不是数组' }
-    const claims = parsed.filter((item): item is FactClaim => Boolean(item) && typeof item === 'object')
-    return { claims }
-  } catch {
-    return { claims: null, error: '事实块不是合法 JSON' }
+  const parseArray = (text: string): FactClaim[] | null => {
+    try {
+      const parsed = JSON.parse(text)
+      if (!Array.isArray(parsed)) return null
+      return parsed.filter((item): item is FactClaim => Boolean(item) && typeof item === 'object')
+    } catch {
+      return null
+    }
   }
+
+  const first = parseArray(cleaned)
+  if (first) return { claims: first }
+
+  // 模型偶尔把多条事实写成多个数组，一行一个；拼成一个数组再试
+  const body = cleaned.replace(/^\s*\[/, '').replace(/\]\s*$/, '')
+  if (body.includes(']') && body.includes('[')) {
+    const joined = `[${body.replace(/\]\s*\[/g, ',')}]`
+    const second = parseArray(joined)
+    if (second) return { claims: second }
+  }
+
+  return { claims: null, error: '事实块不是合法 JSON' }
 }
 
 /** 从流式文本里剥掉事实块；未闭合时把这一段先扣住，等下一块 */
@@ -364,7 +378,9 @@ export function findBodyFactConflicts(body: string, hardFacts: HardFact[]): stri
       const direct = sentence.match(/注入(?:类型|字段)?(?:是|为|写成|用)\s*[`"']?([\w.]+)/)
       if (direct) {
         const token = direct[1]!
+        const ignored = new Set(['null', 'undefined', '空', '未知', 'int', 'long', 'short', 'byte', 'float', 'double', 'boolean', 'char', 'String', 'Integer', 'Object'])
         if (
+          !ignored.has(token) &&
           token !== correct &&
           !correct.startsWith(`${token}.`) &&
           tokenPositions(sentence, correct).length === 0

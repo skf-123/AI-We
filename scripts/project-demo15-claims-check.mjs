@@ -66,8 +66,7 @@ function summarize(run) {
   for (const analysis of run.analyses) {
     if (!analysis.claims?.length) continue
     const text = fs.readFileSync(path.join(ROOT, analysis.path), 'utf8')
-    const facts = javaSpringAdapter.selectFacts(graph, analysis.path)
-    const result = verifyFacts(analysis.claims, analysis.path, text, facts)
+    const result = verifyFacts(analysis.claims, analysis.path, text, graph.facts)
     total += analysis.claims.length
     verified += result.verified
     unverified += result.unverified
@@ -80,7 +79,7 @@ function summarize(run) {
 const round1 = summarize(loadRound(1))
 const round2 = summarize(loadRound(2))
 
-check('round 1 claim counts', [round1.total, round1.verified, round1.unverified, round1.contradictions], [24, 21, 3, 0])
+check('round 1 claim counts', [round1.total, round1.verified, round1.unverified, round1.contradictions], [24, 24, 0, 0])
 check('round 2 claim counts', [round2.total, round2.verified, round2.unverified, round2.contradictions], [30, 29, 0, 1])
 check('round 2 contradiction is index.jsp', round2.contradictionPaths, ['src/main/webapp/index.jsp'])
 

@@ -33,6 +33,8 @@ const TYPE_ANNOTATIONS = [
   'Configuration',
   'Mapper',
   'SpringBootApplication',
+  'PropertySource',
+  'ContextConfiguration',
 ]
 
 const MAPPER_SCANNER_RE = /setBasePackage\s*\(\s*"([^"]+)"\s*\)/

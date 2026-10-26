@@ -140,7 +140,12 @@ export function useProjectAnalysis() {
         if (inst.done.value) {
           const hardFacts = p.hardFacts ?? []
           p.facts = inst.facts.value.length
-            ? verifyFacts(inst.facts.value, path, texts.get(path) ?? '', hardFacts)
+            ? verifyFacts(
+                inst.facts.value,
+                path,
+                texts.get(path) ?? '',
+                structure?.allFacts ?? hardFacts,
+              )
             : undefined
           p.factWarnings = findBodyFactConflicts(p.output, hardFacts)
         }
@@ -235,7 +240,7 @@ export function useProjectAnalysis() {
 
       const hardFacts = p.hardFacts ?? []
       p.facts = inst.facts.value.length
-        ? verifyFacts(inst.facts.value, path, text, hardFacts)
+        ? verifyFacts(inst.facts.value, path, text, structure?.allFacts ?? hardFacts)
         : undefined
       p.factWarnings = findBodyFactConflicts(p.output, hardFacts)
 

@@ -41,6 +41,14 @@ check('unclosed held back', [unclosed.text, unclosed.pending], ['正文', true])
 const malformed = stripFactsBlock('正文<!--facts\n{not json}\n-->')
 check('malformed reports error', [malformed.text, Boolean(malformed.error)], ['正文', true])
 
+const multi = stripFactsBlock(
+  `正文<!--facts
+[{"path":"a.js","line":1,"quote":"const a = 1","claim":"一"}]
+[{"path":"a.js","line":2,"quote":"console.log(a)","claim":"二"}]
+-->`,
+)
+check('multiple arrays parsed', multi.claims?.length, 2)
+
 const fileText = 'const a = 1\nconsole.log(a)'
 
 const ok = verifyFacts(
@@ -227,6 +235,12 @@ const servletClaim = verifyFacts(
 )
 check('servlet claim contradiction', servletClaim.contradictions, 1)
 check('servlet body warning', findBodyFactConflicts('两个 HelloServlet 也没有用 @WebServlet 的证据。', hardFacts).length, 1)
+
+check(
+  'null is not an injection type',
+  findBodyFactConflicts('如果找不到，注入类型是 null。', hardFacts).length,
+  0,
+)
 
 check('empty facts format', formatVerifiedFacts([]), '')
 check('facts format includes text', formatVerifiedFacts(hardFacts).includes('BookMapper.java:1'), true)
