@@ -145,6 +145,8 @@ export interface FileProgress {
   factWarnings?: string[]
   /** 已按程序事实更正的名字；原文和更正后都留着 */
   factFixes?: FactFix[]
+  /** 没有对应 claim 的跨文件句子 */
+  claimWarnings?: string[]
 }
 
 /** 项目图里的一个文件 */

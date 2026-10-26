@@ -7,6 +7,7 @@
 import {
   applyFactFixes,
   findBodyFactConflicts,
+  findUncoveredClaims,
   formatVerifiedFacts,
   stripFactsBlock,
   summaryRoleForFile,
@@ -332,6 +333,26 @@ const bareOut = applyFactFixes('这里第 99 行讲的是别的东西。', hardF
   currentLineCount: 23,
 })
 check('bare line out of range handled', bareOut.text.includes('行号超出当前文件'), true)
+
+check(
+  'uncovered relationship flagged',
+  findUncoveredClaims('BookController 调用 BookService。', [], hardFacts).length,
+  1,
+)
+check(
+  'covered relationship not flagged',
+  findUncoveredClaims(
+    'BookController 调用 BookService。',
+    [{ claim: 'BookController 调用 BookService', quote: '' }],
+    hardFacts,
+  ).length,
+  0,
+)
+check(
+  'plain sentence not flagged',
+  findUncoveredClaims('BookController 是 Web 层控制器。', [], hardFacts).length,
+  0,
+)
 
 if (failed > 0) {
   console.error(`\n${failed} 项失败`)

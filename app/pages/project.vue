@@ -603,6 +603,7 @@ onBeforeUnmount(() => {
                 :hard-facts="activeProgress?.hardFacts"
                 :fact-warnings="activeProgress?.factWarnings"
                 :fact-fixes="activeProgress?.factFixes"
+                :claim-warnings="activeProgress?.claimWarnings"
                 fill-height
                 @selection="setSelection"
               />

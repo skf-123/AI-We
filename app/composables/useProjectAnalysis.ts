@@ -3,6 +3,7 @@ import { normalizePath } from '~/utils/project-files'
 import {
   applyFactFixes,
   findBodyFactConflicts,
+  findUncoveredClaims,
   formatVerifiedFacts,
   verifyFacts,
 } from '~/utils/project-facts'
@@ -118,6 +119,7 @@ export function useProjectAnalysis() {
       hardFacts,
       factFixes: [],
       factWarnings: [],
+      claimWarnings: [],
     }
 
     // useAnalysis 是每个文件一个实例、状态互相独立；这里把它的 ref
@@ -162,6 +164,7 @@ export function useProjectAnalysis() {
               )
             : undefined
           p.factWarnings = findBodyFactConflicts(p.output, hardFacts)
+          p.claimWarnings = findUncoveredClaims(p.output, inst.facts.value, hardFacts)
         }
       },
       { immediate: true },
@@ -265,6 +268,7 @@ export function useProjectAnalysis() {
         ? verifyFacts(inst.facts.value, path, text, structure?.allFacts ?? hardFacts)
         : undefined
       p.factWarnings = findBodyFactConflicts(p.output, hardFacts)
+      p.claimWarnings = findUncoveredClaims(p.output, inst.facts.value, hardFacts)
 
       if (stopped.value) {
         p.status = 'error'

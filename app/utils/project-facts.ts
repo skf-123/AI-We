@@ -722,3 +722,53 @@ export function summaryRoleForFile(
   const note = `（正文有未自动更正的跨文件矛盾，未纳入总览${facts ? `；已核实事实：${facts}` : ''}）`
   return note.slice(0, 300)
 }
+
+/**
+ * 跨文件句子有没有对应的 claim。
+ *
+ * 只看「A 调用/注入/依赖/实现/继承/返回/传给/传入/引入 B」这类关系句；
+ * 句子里至少出现一个项目符号/文件名，且模型的事实块里没有任何一条
+ * 提到这个符号，就说明这句没有结构化 claim 支撑，建议写成「可能」。
+ *
+ * 这不是语义核对，只是覆盖检查；宁可少报，先只报关系句。
+ */
+const RELATION_RE =
+  /([A-Za-z_$][\w.$]*)\s*(调用|注入|依赖|实现|继承|返回|传给|传入|引入|import)\s*([A-Za-z_$][\w.$]*)/g
+
+export function findUncoveredClaims(
+  body: string,
+  claims: FactClaim[],
+  hardFacts: HardFact[],
+): string[] {
+  const known = new Set<string>()
+  for (const fact of hardFacts) {
+    for (const value of [fact.object, fact.subject]) {
+      const simple = simpleNameOf(value ?? '')
+      if (simple.length >= 4) known.add(simple)
+    }
+    const base = fact.path.split('/').pop()?.replace(/\.[^.]+$/, '')
+    if (base && base.length >= 4) known.add(base)
+  }
+  if (known.size === 0) return []
+
+  const warnings: string[] = []
+  for (const raw of body.split(/[。；\n]/)) {
+    const sentence = raw.trim()
+    if (!sentence || sentence.length < 8) continue
+    const matches = [...sentence.matchAll(RELATION_RE)]
+    if (matches.length === 0) continue
+    const names = matches
+      .flatMap((match) => [match[1], match[3]])
+      .filter((name): name is string => Boolean(name))
+    if (!names.some((name) => known.has(simpleNameOf(name)))) continue
+    const simpleNames = [...new Set(names.map((name) => simpleNameOf(name)))]
+    const covered = claims.some((claim) => {
+      const text = `${claim.claim ?? ''} ${claim.quote ?? ''}`
+      return simpleNames.some((name) => name.length >= 4 && text.includes(name))
+    })
+    if (covered) continue
+    warnings.push(`没有对应事实的跨文件句子：${sentence.slice(0, 160)}`)
+    if (warnings.length >= 3) break
+  }
+  return warnings
+}

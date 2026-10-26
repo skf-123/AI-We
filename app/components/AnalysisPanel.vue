@@ -44,6 +44,8 @@ const props = defineProps<{
   factWarnings?: string[]
   /** 已按程序事实更正的名字 */
   factFixes?: FactFix[]
+  /** 没有对应 claim 的跨文件句子 */
+  claimWarnings?: string[]
   /**
    * 高度模式。
    * false：贴代码入口，锁一屏高度（桌面端）
@@ -411,6 +413,22 @@ defineExpose({ scrollIntoView })
           <p class="font-medium">正文和已核实事实有出入（未自动更正）</p>
           <ul class="mt-1 list-disc space-y-1 pl-4">
             <li v-for="(warning, index) in factWarnings" :key="`fact-warning-${index}`">
+              {{ warning }}
+            </li>
+          </ul>
+        </div>
+
+        <!-- 没有对应 claim 的跨文件句子：不冒充事实 -->
+        <div
+          v-if="claimWarnings?.length"
+          class="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs leading-relaxed text-amber-800"
+        >
+          <p class="font-medium">这些跨文件句子没有对应的事实块 claim</p>
+          <p class="mt-0.5 text-[10.5px] text-amber-700">
+            没有程序事实支撑，建议写成「可能」；以右侧已核实事实为准。
+          </p>
+          <ul class="mt-1 list-disc space-y-1 pl-4">
+            <li v-for="(warning, index) in claimWarnings" :key="`claim-warning-${index}`">
               {{ warning }}
             </li>
           </ul>

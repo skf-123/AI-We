@@ -836,7 +836,7 @@ export function useProjectSession() {
       const progress = pool.progress[entry.path]
       const role = summaryRoleForFile(
         thirdSection(progress?.output ?? '').slice(0, 300),
-        progress?.factWarnings ?? [],
+        [...(progress?.factWarnings ?? []), ...(progress?.claimWarnings ?? [])],
         progress?.hardFacts ?? [],
       )
       if (used + role.length > SUMMARY_CHAR_BUDGET) {
