@@ -382,10 +382,23 @@ defineExpose({ scrollIntoView })
           </summary>
           <ul class="mt-1 space-y-1">
             <li v-for="(fix, index) in factFixes" :key="`fact-fix-${index}`" class="break-words">
-              <span class="font-mono text-[10px]">{{ fix.from }}</span>
-              <span class="mx-1">→</span>
-              <span class="font-mono text-[10px]">{{ fix.to }}</span>
-              <span class="text-[10px] text-emerald-600">（{{ fix.path }}:{{ fix.line }}）</span>
+              <div>
+                <span class="font-mono text-[10px]">{{ fix.from }}</span>
+                <span class="mx-1">→</span>
+                <span class="font-mono text-[10px]">{{ fix.to }}</span>
+                <span class="text-[10px] text-emerald-600">（{{ fix.path }}:{{ fix.line }}）</span>
+              </div>
+              <details class="mt-1">
+                <summary class="cursor-pointer select-none text-[10px] text-emerald-600">
+                  看原文和更正后的句子
+                </summary>
+                <p class="mt-1 break-words text-[10.5px] text-emerald-700">
+                  原文：{{ fix.before }}
+                </p>
+                <p class="mt-0.5 break-words text-[10.5px] text-emerald-700">
+                  更正后：{{ fix.after }}
+                </p>
+              </details>
             </li>
           </ul>
         </details>
