@@ -12,6 +12,7 @@
 import glossaryData from '~/data/glossary.json'
 import type { GlossaryTerm, RagSource } from '~/types/analysis'
 import type { FactCheck } from '~/types/facts'
+import type { HardFact } from '~/types/structure'
 import { parseSections } from '~/utils/analysis-sections'
 import { rangeLines } from '~/utils/locate-lines'
 
@@ -37,6 +38,10 @@ const props = defineProps<{
   facts?: FactCheck
   /** 事实块没闭合或不是合法 JSON */
   factsError?: string
+  /** 程序从源码解析出的、与本文件相关的事实 */
+  hardFacts?: HardFact[]
+  /** 正文里和已核实事实矛盾的句子 */
+  factWarnings?: string[]
   /**
    * 高度模式。
    * false：贴代码入口，锁一屏高度（桌面端）
@@ -365,20 +370,55 @@ defineExpose({ scrollIntoView })
           输出到达上限，后面的内容没有讲完。可以重试，或者把文件拆小一点再看。
         </p>
 
-        <!-- 跨文件事实块：程序核对过才显示；只标“改动”，不替模型背书 -->
+        <!-- 正文和程序事实矛盾：先显示，最显眼 -->
+        <div
+          v-if="factWarnings?.length"
+          class="rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs leading-relaxed text-rose-700"
+        >
+          <p class="font-medium">正文和已核实事实有出入</p>
+          <ul class="mt-1 list-disc space-y-1 pl-4">
+            <li v-for="(warning, index) in factWarnings" :key="`fact-warning-${index}`">
+              {{ warning }}
+            </li>
+          </ul>
+        </div>
+
+        <!-- 程序从源码解析出的事实；和模型的 claim 分开 -->
+        <details
+          v-if="hardFacts?.length"
+          class="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs leading-relaxed text-slate-600"
+        >
+          <summary class="cursor-pointer select-none">
+            已核实事实（程序解析）· {{ hardFacts.length }} 条
+          </summary>
+          <ul class="mt-1 space-y-1">
+            <li v-for="fact in hardFacts" :key="fact.id" class="break-words">
+              {{ fact.text }}
+            </li>
+          </ul>
+        </details>
+
+        <!-- 模型自己写的事实块：这里只核引文，不替结论背书 -->
         <div
           v-if="facts || factsError"
           class="rounded-lg border p-2.5 text-xs leading-relaxed"
           :class="
-            facts && facts.unverified > 0
-              ? 'border-amber-200 bg-amber-50 text-amber-800'
-              : 'border-slate-200 bg-slate-50 text-slate-600'
+            facts && facts.contradictions > 0
+              ? 'border-rose-200 bg-rose-50 text-rose-800'
+              : facts && facts.unverified > 0
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : 'border-slate-200 bg-slate-50 text-slate-600'
           "
         >
           <p v-if="facts">
-            跨文件事实：{{ facts.verified }} 条已核实<template v-if="facts.unverified">
-              ，{{ facts.unverified }} 条未核实</template
+            跨文件事实引文核对：{{ facts.verified }} 条能在原文找到<template v-if="facts.unverified">
+              ，{{ facts.unverified }} 条没对上</template
+            ><template v-if="facts.contradictions">
+              ，{{ facts.contradictions }} 条与事实矛盾</template
             >
+          </p>
+          <p v-if="facts" class="mt-0.5 text-[10.5px] text-slate-500">
+            只核对引文，不判断结论对错。
           </p>
           <p v-if="factsError">{{ factsError }}</p>
           <details v-if="facts?.items.length" class="mt-1">
@@ -392,16 +432,27 @@ defineExpose({ scrollIntoView })
                   :class="
                     item.status === 'verified'
                       ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-amber-100 text-amber-700'
+                      : item.status === 'contradiction'
+                        ? 'bg-rose-100 text-rose-700'
+                        : 'bg-amber-100 text-amber-700'
                   "
                 >
-                  {{ item.status === 'verified' ? '已核实' : '未核实' }}
+                  {{
+                    item.status === 'verified'
+                      ? '能对上'
+                      : item.status === 'contradiction'
+                        ? '与事实矛盾'
+                        : '没对上'
+                  }}
                 </span>
                 <span class="font-mono text-[10px] text-slate-500">
                   {{ item.path }}:{{ item.line }}
                 </span>
                 <span v-if="item.claim"> · {{ item.claim }}</span>
                 <span v-if="item.reason" class="text-slate-500">（{{ item.reason }}）</span>
+                <span v-if="item.correct" class="mt-0.5 block text-[10px] text-rose-600">
+                  程序事实：{{ item.correct }}
+                </span>
               </li>
             </ul>
           </details>

@@ -21,6 +21,7 @@ const STEPS = ['上传项目', '勾选要解析的文件', '逐文件解析', '�
 const {
   projectName,
   files,
+  structure,
   started,
   phase,
   preparing,
@@ -373,6 +374,13 @@ onBeforeUnmount(() => {
                 <p v-if="mapReadingPlan.length" class="mt-0.5 text-[11px] text-slate-400">
                   建议先读：{{ mapReadingPlan.slice(0, 3).join(' → ') }}
                 </p>
+                <p v-if="structure" class="mt-0.5 text-[11px] text-emerald-600">
+                  已识别：{{ structure.profile === 'java-spring' ? 'Java / Spring / MyBatis' : structure.profile }}
+                  · 包名、import、namespace、扫描包、注入类型由程序核实
+                </p>
+                <p v-else class="mt-0.5 text-[11px] text-slate-400">
+                  这个项目类型暂未做结构核对；跨文件结论只作为解释。
+                </p>
               </div>
               <button
                 type="button"
@@ -592,6 +600,8 @@ onBeforeUnmount(() => {
                 :output-truncated="activeProgress?.outputTruncated ?? false"
                 :facts="activeProgress?.facts"
                 :facts-error="activeProgress?.factsError"
+                :hard-facts="activeProgress?.hardFacts"
+                :fact-warnings="activeProgress?.factWarnings"
                 fill-height
                 @selection="setSelection"
               />
