@@ -449,9 +449,26 @@ export function applyFactFixes(
   const fixes: FactFix[] = []
   let text = body
 
+  const sentenceAround = (value: string, offset: number, length: number): string => {
+    const start =
+      Math.max(
+        value.lastIndexOf('。', Math.max(0, offset - 1)),
+        value.lastIndexOf('；', Math.max(0, offset - 1)),
+        value.lastIndexOf('\n', Math.max(0, offset - 1)),
+      ) + 1
+    const ends = [
+      value.indexOf('。', offset + length),
+      value.indexOf('；', offset + length),
+      value.indexOf('\n', offset + length),
+    ].filter((index) => index !== -1)
+    const end = ends.length > 0 ? Math.min(...ends) + 1 : value.length
+    return value.slice(start, end)
+  }
+
   const pushFix = (from: string, to: string, fact: HardFact, reason: string, offset: number) => {
-    const before = text.slice(Math.max(0, offset - 80), offset + from.length + 80)
-    const after = before.split(from).join(to)
+    const raw = sentenceAround(text, offset, from.length)
+    const before = raw.trim()
+    const after = raw.split(from).join(to).trim()
     fixes.push({ from, to, path: fact.path, line: fact.line, reason, before, after })
   }
 
