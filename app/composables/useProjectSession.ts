@@ -35,6 +35,8 @@ import { useProjectAnalysis } from './useProjectAnalysis'
 import { useProjectGraph, type ProjectGraphPayload } from './useProjectGraph'
 import { useProjectSummary } from './useProjectSummary'
 import { useProjectVendorReview } from './useProjectVendorReview'
+import { analyzeProjectStructure, type ProjectStructureResult } from '~/utils/structure'
+import type { StructureSourceFile } from '~/types/structure'
 
 /**
  * 项目页的状态机。
@@ -57,6 +59,9 @@ export const SUMMARY_CHAR_BUDGET = 300_000
 
 /** 最多读多少个文件的头做第三方库识别，防止超大项目卡住上传 */
 const MAX_VENDOR_PROBES = 2000
+
+/** 结构事实最多读多少个文件；再多的项目只做逐文件解释，不做结构核对 */
+const MAX_STRUCTURE_FILES = 2000
 
 /** 文件所在目录；根目录文件返回 null */
 function folderOf(path: string): string | null {
@@ -109,6 +114,11 @@ export function useProjectSession() {
 
   /** 文件内容按路径存放：地图只读头部，逐文件解析时才整份读 */
   const fileHandles = new Map<string, File>()
+  /**
+   * 程序解析出的项目结构事实图；没有支持的语言时为 null。
+   * 只作为逐文件解析的附加输入，不参与地图、总览和图。
+   */
+  const structure = shallowRef<ProjectStructureResult | null>(null)
 
   const map = useProjectMap()
   const agent = useProjectAgent()
@@ -498,6 +508,9 @@ export function useProjectSession() {
         vendorCheck.value = { probed: 0, total: 0, failed: true }
       }
 
+      // 结构事实图只读本地文件；失败不影响上传、地图和逐文件解析
+      await buildStructure()
+
       phase.value = 'review'
       runVendorReview(candidates)
 
@@ -514,6 +527,40 @@ export function useProjectSession() {
   async function readHead(file: File): Promise<string> {
     const text = await file.slice(0, 2000).text()
     return text.split('\n').slice(0, 5).join('\n').slice(0, 600)
+  }
+
+  /**
+   * 建一次项目结构事实图。
+   *
+   * 只读用户代码和配置，不读依赖/产物/系统文件；单文件 ≤1MB。
+   * 失败就置空，逐文件解析照常走 —— 结构层是加法，不能拖垮上传。
+   */
+  async function buildStructure() {
+    const entries = files.value
+      .filter(
+        (entry) =>
+          entry.category !== 'system' &&
+          entry.size <= 1_000_000 &&
+          !isBinaryFile(entry.path),
+      )
+      .slice(0, MAX_STRUCTURE_FILES)
+
+    const sources: StructureSourceFile[] = []
+    for (const entry of entries) {
+      const file = fileHandles.get(entry.path)
+      if (!file) continue
+      try {
+        sources.push({ path: entry.path, text: await file.text() })
+      } catch {
+        /* 读不到就跳过这个文件，结构图仍然是部分覆盖 */
+      }
+    }
+
+    try {
+      structure.value = analyzeProjectStructure(sources)
+    } catch {
+      structure.value = null
+    }
   }
 
   /**
@@ -1034,6 +1081,7 @@ export function useProjectSession() {
 
     files.value = []
     fileHandles.clear()
+    structure.value = null
     activePath.value = null
     selectedFolder.value = null
     selectedGroup.value = null
@@ -1063,6 +1111,8 @@ export function useProjectSession() {
     preparing,
     uploadError,
     summarySkippedCount,
+    // 结构事实（程序解析；没有支持的语言时为 null）
+    structure,
     // 地图
     mapSummary: map.summary,
     mapLoading: map.loading,
