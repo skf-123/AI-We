@@ -397,6 +397,8 @@ export function findBodyFactConflicts(body: string, hardFacts: HardFact[]): stri
     for (const field of fields) {
       const correct = field.object ?? ''
       if (!correct) continue
+      const owner = field.path.split('/').pop()?.replace(/\.[^.]+$/, '') ?? ''
+      if (owner && !sentence.includes(owner)) continue
 
       const direct = sentence.match(/注入(?:类型|字段)?(?:是|为|写成|用)\s*[`"']?([\w.]+)/)
       if (direct) {
@@ -438,9 +440,19 @@ export function formatVerifiedFacts(facts: HardFact[]): string {
  * 只换 token：全限定名、包名；只在明确的接口/类型/调用/注入上下文里换，
  * 遇到「namespace 是 …」这种合法配置说明不动。流式结束后调用一次。
  */
+export interface FactFixContext {
+  /** 文件 → 行数；正文行号引用核对用 */
+  lineCounts?: Record<string, number>
+  /** 当前文件路径；正文只写「第 N 行」时用 */
+  currentPath?: string
+  /** 当前文件行数 */
+  currentLineCount?: number
+}
+
 export function applyFactFixes(
   body: string,
   hardFacts: HardFact[],
+  context: FactFixContext = {},
 ): { text: string; fixes: FactFix[] } {
   if (hardFacts.length === 0) return { text: body, fixes: [] }
 
@@ -535,7 +547,10 @@ export function applyFactFixes(
   for (const field of fields) {
     const correct = field.object ?? ''
     if (!correct) continue
+    const owner = field.path.split('/').pop()?.replace(/\.[^.]+$/, '') ?? ''
     text = text.replace(directRe, (match, token: string, offset: number) => {
+      const context = text.slice(Math.max(0, offset - 80), offset + match.length)
+      if (owner && !context.includes(owner)) return match
       if (IGNORED_INJECTION_TOKENS.has(token) || token === correct) return match
       if (correct.startsWith(`${token}.`)) return match
       if (boundedPositions(text, correct).length > 0) return match
@@ -552,6 +567,7 @@ export function applyFactFixes(
     if (!correct) continue
     const owner = field.path.split('/').pop()?.replace(/\.[^.]+$/, '') ?? '这个类'
     text = text.replace(sentenceRe, (sentence: string, _match: string, offset: number) => {
+      if (!sentence.includes(owner)) return sentence
       if (boundedPositions(sentence, correct).length > 0) return sentence
       const wrong = aliasPairs.some(({ alias }) => {
         const index = alias.lastIndexOf('.')
@@ -563,6 +579,124 @@ export function applyFactFixes(
       pushFix(sentence.trim(), replacement, field, '注入类型说成了另一个包', offset)
       return replacement
     })
+  }
+
+  // 6) 正文里的行号引用：先对事实行，再查文件范围
+  const lineCounts = context.lineCounts ?? {}
+  const hasLineContext = Object.keys(lineCounts).length > 0 || Boolean(context.currentLineCount)
+  if (hasLineContext) {
+    const baseToPath = new Map<string, string>()
+    for (const filePath of Object.keys(lineCounts)) {
+      baseToPath.set(filePath.split('/').pop() ?? filePath, filePath)
+    }
+    const factsByPath = new Map<string, HardFact[]>()
+    for (const fact of hardFacts) {
+      const list = factsByPath.get(fact.path) ?? []
+      list.push(fact)
+      factsByPath.set(fact.path, list)
+    }
+    const resolvePath = (raw: string): string | null => {
+      const clean = raw.replace(/\\/g, '/')
+      if (lineCounts[clean] !== undefined) return clean
+      return baseToPath.get(clean.split('/').pop() ?? clean) ?? null
+    }
+    const factLineFor = (
+      sentence: string,
+      filePath: string,
+    ): { line: number; fact: HardFact } | null => {
+      for (const fact of factsByPath.get(filePath) ?? []) {
+        if (!fact.line || fact.line < 1) continue
+        if (fact.kind === 'field-type' && !/注入|字段|属性/.test(sentence)) continue
+        if (
+          (fact.kind === 'annotation' || fact.kind === 'web-servlet') &&
+          !/注解|@|注册/.test(sentence)
+        )
+          continue
+        if (fact.kind === 'package' && !/package|包/.test(sentence)) continue
+        if (fact.kind === 'fqn' && !/定义|声明/.test(sentence)) continue
+        if (fact.kind === 'import' && !/import|引入/.test(sentence)) continue
+        if (
+          !['field-type', 'annotation', 'web-servlet', 'package', 'fqn', 'import'].includes(
+            fact.kind,
+          )
+        )
+          continue
+        const simple = simpleNameOf(fact.object ?? fact.subject ?? '')
+        if (simple.length >= 4 && sentence.includes(simple)) return { line: fact.line, fact }
+      }
+      return null
+    }
+    const replaceFileLine = (
+      match: string,
+      rawPath: string,
+      lineText: string,
+      offset: number,
+      style: 'colon' | 'cn',
+    ): string => {
+      const filePath = resolvePath(rawPath)
+      if (!filePath) return match
+      const line = Number(lineText)
+      const sentence = sentenceAround(text, offset, match.length)
+      const factLine = factLineFor(sentence, filePath)
+      if (factLine && factLine.line !== line) {
+        const replacement =
+          style === 'colon' ? `${rawPath}:${factLine.line}` : `${rawPath} 第 ${factLine.line} 行`
+        pushFix(match, replacement, factLine.fact, '行号和程序事实不一致', offset)
+        return replacement
+      }
+      const count = lineCounts[filePath]
+      if (count && (line < 1 || line > count)) {
+        const replacement = `${rawPath}（行号超出文件）`
+        const raw = sentenceAround(text, offset, match.length)
+        fixes.push({
+          from: match,
+          to: replacement,
+          path: filePath,
+          line,
+          reason: '行号不在文件范围内',
+          before: raw.trim(),
+          after: raw.split(match).join(replacement).trim(),
+        })
+        return replacement
+      }
+      return match
+    }
+    const colonRe = /([\w./-]+\.(?:java|xml|jsp|js|ts|vue))\s*[:：]\s*(\d+)/g
+    text = text.replace(colonRe, (match, rawPath: string, lineText: string, offset: number) =>
+      replaceFileLine(match, rawPath, lineText, offset, 'colon'),
+    )
+    const cnRe = /([\w./-]+\.(?:java|xml|jsp|js|ts|vue))\s*第\s*(\d+)\s*行/g
+    text = text.replace(cnRe, (match, rawPath: string, lineText: string, offset: number) =>
+      replaceFileLine(match, rawPath, lineText, offset, 'cn'),
+    )
+    if (context.currentPath && context.currentLineCount) {
+      const bareRe = /第\s*(\d+)\s*行/g
+      text = text.replace(bareRe, (match, lineText: string, offset: number) => {
+        const line = Number(lineText)
+        const sentence = sentenceAround(text, offset, match.length)
+        const factLine = factLineFor(sentence, context.currentPath!)
+        if (factLine && factLine.line !== line) {
+          const replacement = `第 ${factLine.line} 行`
+          pushFix(match, replacement, factLine.fact, '行号和程序事实不一致', offset)
+          return replacement
+        }
+        if (line < 1 || line > context.currentLineCount!) {
+          const replacement = '（行号超出当前文件）'
+          const raw = sentenceAround(text, offset, match.length)
+          fixes.push({
+            from: match,
+            to: replacement,
+            path: context.currentPath!,
+            line,
+            reason: '行号不在当前文件范围内',
+            before: raw.trim(),
+            after: raw.split(match).join(replacement).trim(),
+          })
+          return replacement
+        }
+        return match
+      })
+    }
   }
 
   return { text, fixes }

@@ -218,6 +218,9 @@ export const javaSpringAdapter: ProjectStructureAdapter = {
 
     const symbols: Record<string, StructureSymbol> = {}
     const packages: Record<string, string> = {}
+    const lineCounts: Record<string, number> = {}
+    for (const file of javaFiles) lineCounts[file.path] = file.lines.length
+    for (const file of xmlFiles) lineCounts[file.path] = file.lines.length
     const simpleToFqn = new Map<string, string[]>()
 
     for (const file of javaFiles) {
@@ -522,6 +525,7 @@ export const javaSpringAdapter: ProjectStructureAdapter = {
       conflicts,
       symbols,
       packages,
+      lineCounts,
     }
   },
 

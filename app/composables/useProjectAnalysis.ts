@@ -145,7 +145,12 @@ export function useProjectAnalysis() {
 
         if (inst.done.value) {
           const hardFacts = p.hardFacts ?? []
-          const fixed = applyFactFixes(p.output, hardFacts)
+          const fileText = texts.get(path) ?? ''
+          const fixed = applyFactFixes(p.output, hardFacts, {
+            lineCounts: structure?.lineCounts,
+            currentPath: path,
+            currentLineCount: fileText ? fileText.split('\n').length : undefined,
+          })
           p.output = fixed.text
           p.factFixes = fixed.fixes
           p.facts = inst.facts.value.length
@@ -249,7 +254,11 @@ export function useProjectAnalysis() {
       p.error = inst.errorMsg.value
 
       const hardFacts = p.hardFacts ?? []
-      const fixed = applyFactFixes(p.output, hardFacts)
+      const fixed = applyFactFixes(p.output, hardFacts, {
+        lineCounts: structure?.lineCounts,
+        currentPath: path,
+        currentLineCount: text.split('\n').length,
+      })
       p.output = fixed.text
       p.factFixes = fixed.fixes
       p.facts = inst.facts.value.length

@@ -15,6 +15,8 @@ export interface ProjectStructureResult {
   adapterId: string
   /** 完整事实图：跨文件 claim 核对用，不直接进提示词 */
   allFacts: HardFact[]
+  /** 文件 → 行数；正文行号引用核对用 */
+  lineCounts: Record<string, number>
   /** 每个文件选事实；没有图就返回空数组 */
   selectFacts(path: string): HardFact[]
   /** 给页面显示「核实到什么程度」 */
@@ -42,6 +44,7 @@ export function analyzeProjectStructure(files: StructureSourceFile[]): ProjectSt
     adapterId: adapter.id,
     profile: graph.profile,
     allFacts: graph.facts,
+    lineCounts: graph.lineCounts,
     selectFacts(path: string) {
       return adapter.selectFacts(graph, path)
     },

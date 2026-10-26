@@ -120,6 +120,17 @@ const hardFacts = [
     object: 'com.com.mapper.BookMapper',
   },
   {
+    id: 'field:BookController:14',
+    kind: 'field-type',
+    path: 'BookController.java',
+    line: 14,
+    quote: 'private com.service.BookService service;',
+    text: 'BookController.java:14 service : com.service.BookService',
+    subject: 'BookController.java#service',
+    predicate: 'field-type',
+    object: 'com.service.BookService',
+  },
+  {
     id: 'servlet:HelloServlet:7',
     kind: 'web-servlet',
     path: 'HelloServlet.java',
@@ -299,6 +310,28 @@ const roleNote = summaryRoleForFile('角色', ['w'], hardFacts)
 check('summary role notes warnings', roleNote.includes('未自动更正'), true)
 check('summary role carries facts', roleNote.includes('com.com.mapper.BookMapper'), true)
 check('summary role capped', roleNote.length <= 300, true)
+
+const lineFixed = applyFactFixes('BookController.java 第 28 行注入 BookService。', hardFacts, {
+  lineCounts: { 'BookController.java': 23 },
+  currentPath: 'BookController.java',
+  currentLineCount: 23,
+})
+check('line corrected to fact line', lineFixed.text.includes('第 14 行'), true)
+check('line fix recorded', lineFixed.fixes.some((fix) => fix.from.includes('第 28 行')), true)
+
+const lineOut = applyFactFixes('BookController.java 第 99 行讲的是别的东西。', hardFacts, {
+  lineCounts: { 'BookController.java': 23 },
+  currentPath: 'BookController.java',
+  currentLineCount: 23,
+})
+check('line out of range handled', lineOut.text.includes('行号超出文件'), true)
+
+const bareOut = applyFactFixes('这里第 99 行讲的是别的东西。', hardFacts, {
+  lineCounts: { 'BookController.java': 23 },
+  currentPath: 'BookController.java',
+  currentLineCount: 23,
+})
+check('bare line out of range handled', bareOut.text.includes('行号超出当前文件'), true)
 
 if (failed > 0) {
   console.error(`\n${failed} 项失败`)

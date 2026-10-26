@@ -74,6 +74,8 @@ export interface HardFactGraph {
   symbols: Record<string, StructureSymbol>
   /** 文件 → package */
   packages: Record<string, string>
+  /** 文件 → 行数；正文里的行号引用核对用 */
+  lineCounts: Record<string, number>
 }
 
 /**
