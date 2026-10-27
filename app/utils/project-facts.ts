@@ -276,7 +276,8 @@ export function verifyFacts(
         quote,
         claim: claimText,
         status: 'unverified',
-        reason: '引文不在这个文件里',
+        reason:
+          '引文不是当前文件里的原句，所以程序没有改正文；这不代表结论错了。结论是否成立，请看程序事实和正文预警。',
       })
     }
   }
