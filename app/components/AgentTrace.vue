@@ -26,6 +26,8 @@ const props = defineProps<{
   error: string
   round: number
   maxRounds: number
+  /** 轮 / 批；分批自检传「批」 */
+  roundUnit?: string
   fallback?: boolean
   /** 组件标题：项目侦查 / 图自检 */
   title?: string
@@ -84,7 +86,7 @@ function stepSummary(step: AgentStep): string {
 
       <div class="ml-auto flex items-center gap-2">
         <span class="text-[10px] text-slate-400">
-          {{ props.round }} / {{ props.maxRounds }} 轮 · {{ totalCalls }} 次工具调用
+          {{ props.round }} / {{ props.maxRounds }} {{ props.roundUnit || '轮' }} · {{ totalCalls }} 次工具调用
         </span>
 
         <div
@@ -152,7 +154,7 @@ function stepSummary(step: AgentStep): string {
     >
       <div v-for="group in rounds" :key="group.round">
         <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] text-slate-400">
-          <span class="rounded bg-white px-1.5 text-[10px]">第 {{ group.round }} 轮</span>
+          <span class="rounded bg-white px-1.5 text-[10px]">第 {{ group.round }} {{ props.roundUnit || '轮' }}</span>
           <span>{{ group.steps.length }} 次调用</span>
           <span class="min-w-0 truncate font-mono text-[10px] text-slate-400">
             {{ summarizeToolCalls(group.steps) }}

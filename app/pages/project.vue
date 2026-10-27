@@ -42,6 +42,7 @@ const {
   agentRounds,
   agentMaxRounds,
   stopAgent,
+  selfCheckBatchMode,
   selfCheckRunning,
   selfCheckStopped,
   selfCheckError,
@@ -759,6 +760,7 @@ onBeforeUnmount(() => {
             :error="selfCheckError"
             :round="selfCheckRounds"
             :max-rounds="selfCheckMaxRounds"
+            :round-unit="selfCheckBatchMode ? '批' : '轮'"
             :rerun="!selfCheckRunning"
             rerun-label="重新自检"
             :status-text="selfCheckSummary"

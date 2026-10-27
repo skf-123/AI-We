@@ -8,6 +8,15 @@ import { createProjectToolExecutor } from '~/utils/project-tools'
 import { sanitizeProjectGraph } from '~/utils/project-graph'
 import { formatStepResult } from '~/utils/agent-trace'
 import type { GraphSuspicion } from '~/utils/project-graph-candidates'
+import type { SelfCheckBatchResult, SelfCheckDecision, SelfCheckEvidence } from '~/types/self-check'
+import type { SelfCheckPlan } from '~/utils/self-check-plan'
+import { formatBatchContent } from '~/utils/self-check-plan'
+import {
+  allocateBatchQuota,
+  canStartBatch,
+  createSelfCheckBudget,
+  recordUsage,
+} from '~/utils/self-check-budget'
 
 /**
  * 项目 Agent 的循环。一个实例只跑一种任务：
@@ -68,6 +77,14 @@ export interface ProjectSelfCheckInput {
   maxToolCalls?: number
 }
 
+export interface BatchSelfCheckInput {
+  plan: SelfCheckPlan
+  projectContext: string
+  entries: ProjectFileEntry[]
+  readablePaths: string[]
+  getFile: (path: string) => File | undefined
+}
+
 const MAX_ROUNDS_HARD = 100
 const MAX_SELF_CHECK_ROUNDS = 100
 const MAX_CONTEXT_CHARS = 1_400_000
@@ -114,6 +131,47 @@ function extractJson(text: string): unknown {
   } catch {
     return null
   }
+}
+
+
+function parseBatchDecisions(
+  content: string,
+  allowedIds: Set<string>,
+): SelfCheckDecision[] | null {
+  const raw = extractJson(content) as { decisions?: unknown } | null
+  if (!raw || !Array.isArray(raw.decisions)) return null
+  const actions = new Set(['keep', 'remove', 'reverse', 'relabel', 'unknown'])
+  const byId = new Map<string, SelfCheckDecision>()
+  for (const item of raw.decisions) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as {
+      id?: unknown
+      action?: unknown
+      label?: unknown
+      reason?: unknown
+      evidence?: unknown
+    }
+    if (typeof row.id !== 'string' || !allowedIds.has(row.id)) continue
+    if (typeof row.action !== 'string' || !actions.has(row.action)) continue
+    byId.set(row.id, {
+      id: row.id,
+      action: row.action as SelfCheckDecision['action'],
+      label: typeof row.label === 'string' ? row.label.slice(0, 200) : undefined,
+      reason: typeof row.reason === 'string' ? row.reason.slice(0, 500) : undefined,
+      evidence: Array.isArray(row.evidence)
+        ? row.evidence.filter((value): value is string => typeof value === 'string').slice(0, 8)
+        : undefined,
+    })
+  }
+  const decisions = [...byId.values()]
+  return decisions.length ? decisions : null
+}
+
+function summarizeToolResult(result: string, maxChars: number): string {
+  const text = String(result ?? '')
+  if (text.length <= maxChars) return text
+  return `${text.slice(0, maxChars)}
+……结果被截断：共 ${text.length} 字符，已显示前 ${maxChars} 字符。需要后续请指定更窄的行段。`
 }
 
 function parseMapResult(raw: unknown, entries: ProjectFileEntry[]): ProjectAgentMapResult | null {
@@ -215,7 +273,7 @@ export function useProjectAgent() {
   }
 
   async function ask(
-    mode: 'map' | 'self-check',
+    mode: 'map' | 'self-check' | 'self-check-batch',
     messages: AgentMessage[],
     final: boolean,
   ): Promise<AskResult> {
@@ -380,6 +438,200 @@ export function useProjectAgent() {
       return null
     } finally {
       readFiles.value = [...readPaths]
+      running.value = false
+      controller = null
+    }
+  }
+
+  /**
+   * 分批图自检。
+   *
+   * 与 runLoop 的区别：不是一个越来越长的会话，而是每批一个独立 messages；
+   * 批间只共享 decisions 和预算，不共享对话。模型调用次数不设上限，
+   * 由每批工具额度、单批 token 硬顶和全局 hard stop 约束。
+   */
+  async function runSelfCheckBatch(
+    input: BatchSelfCheckInput,
+  ): Promise<SelfCheckBatchResult | null> {
+    reset()
+    running.value = true
+    maxRounds.value = input.plan.batches.length
+    const budget = createSelfCheckBudget()
+    const executor = createProjectToolExecutor({
+      entries: input.entries,
+      readablePaths: input.readablePaths,
+      getFile: input.getFile,
+    })
+    const readPaths = new Set<string>()
+    const decisions: SelfCheckDecision[] = []
+    const evidence: SelfCheckEvidence[] = []
+    let modelCalls = 0
+    let toolCalls = 0
+
+    try {
+      for (let batchIndex = 0; batchIndex < input.plan.batches.length; batchIndex++) {
+        if (stopped.value) break
+        const batch = input.plan.batches[batchIndex]!
+        const remainingBatches = input.plan.batches.slice(batchIndex)
+        const quota = allocateBatchQuota(budget, batch, remainingBatches)
+        if (!canStartBatch(budget, quota)) break
+
+        rounds.value = batch.index
+        const allowedIds = new Set(batch.items.map((item) => item.id))
+        const messages: AgentMessage[] = [
+          { role: 'user', content: formatBatchContent(batch, input.projectContext) },
+        ]
+        const hardToolLimit = Math.min(8, batch.toolAllowance + 2)
+        let batchTools = 0
+        let batchUsed = 0
+        let noProgress = 0
+        let batchDecisions: SelfCheckDecision[] = []
+
+        while (!stopped.value) {
+          const response = await ask('self-check-batch', messages, false)
+          const usage = Number(response.usage?.total ?? response.usage?.total_tokens) || 0
+          batchUsed += usage
+          modelCalls++
+          recordUsage(budget, usage)
+
+          const message = response.message
+          messages.push(message)
+          if (message.tool_calls && message.tool_calls.length > 0) {
+            let executed = 0
+            for (const rawCall of message.tool_calls) {
+              const call = rawCall as {
+                id?: unknown
+                function?: { name?: unknown; arguments?: unknown }
+              }
+              const id = typeof call.id === 'string' ? call.id : `call_${batch.index}_${batchTools}`
+              if (batchTools >= hardToolLimit || batchUsed >= quota) {
+                messages.push({
+                  role: 'tool',
+                  tool_call_id: id,
+                  content: '本批工具额度或 token 额度已用完，停止读取，请直接给决定或 unknown。',
+                })
+                continue
+              }
+
+              const name = typeof call.function?.name === 'string' ? call.function.name : ''
+              const rawArgs = call.function?.arguments
+              let args: Record<string, unknown> = {}
+              if (typeof rawArgs === 'string') {
+                try {
+                  const parsed = JSON.parse(rawArgs)
+                  if (parsed && typeof parsed === 'object') args = parsed as Record<string, unknown>
+                } catch {
+                  /* 参数不是合法 JSON，工具会返回错误 */
+                }
+              } else if (rawArgs && typeof rawArgs === 'object') {
+                args = rawArgs as Record<string, unknown>
+              }
+
+              const fullResult = await executor.execute(name, args)
+              const maxChars = Math.min(
+                2_500,
+                Math.max(600, Math.floor(Math.max(0, quota - batchUsed) * 2)),
+              )
+              const summary = summarizeToolResult(fullResult, maxChars)
+              if (
+                (name === 'read_file_slice' || name === 'read_config') &&
+                typeof args.path === 'string' &&
+                !fullResult.startsWith('错误')
+              ) {
+                readPaths.add(args.path)
+              }
+              const evidenceId = `B${batch.index}-T${batchTools + 1}`
+              evidence.push({
+                id: evidenceId,
+                tool: name,
+                args: JSON.stringify(args).slice(0, 500),
+                result: fullResult,
+              })
+              messages.push({ role: 'tool', tool_call_id: id, content: summary })
+              steps.value.push({
+                round: batch.index,
+                name,
+                args: JSON.stringify(args).slice(0, 300),
+                result: summary.slice(0, 600),
+                summary: formatStepResult({
+                  round: batch.index,
+                  name,
+                  args: JSON.stringify(args).slice(0, 300),
+                  result: fullResult,
+                }),
+              })
+              batchTools++
+              toolCalls++
+              executed++
+              if (stopped.value) break
+            }
+
+            if (executed === 0) {
+              noProgress++
+              if (noProgress >= 2) break
+            } else {
+              noProgress = 0
+            }
+            if (budget.used >= 165_000 || batchUsed >= quota) break
+            continue
+          }
+
+          const parsed = parseBatchDecisions(message.content, allowedIds)
+          if (parsed) {
+            batchDecisions = parsed
+            break
+          }
+
+          noProgress++
+          if (noProgress >= 2) break
+          messages.push({
+            role: 'user',
+            content:
+              '请只输出 decisions JSON：每条边一个 keep / remove / reverse / relabel / unknown；不要输出完整图。',
+          })
+        }
+
+        decisions.push(...batchDecisions)
+        if (budget.used >= 165_000) break
+      }
+
+      const plannedIds = new Set(input.plan.items.map((item) => item.id))
+      const decisionById = new Map(decisions.map((decision) => [decision.id, decision]))
+      const validDecisions = decisions.filter((decision) => plannedIds.has(decision.id))
+      const checked =
+        input.plan.supported +
+        validDecisions.filter((decision) => decision.action !== 'unknown').length
+      const unknown = input.plan.items.filter((item) => {
+        const decision = decisionById.get(item.id)
+        return !decision || decision.action === 'unknown'
+      }).length
+      const conflict = validDecisions.length === decisions.length ? 0 : decisions.length - validDecisions.length
+
+      readFiles.value = [...readPaths]
+      return {
+        decisions,
+        coverage: {
+          total: input.plan.total,
+          checked,
+          unknown,
+          conflict,
+          supported: input.plan.supported,
+        },
+        evidence,
+        usedTokens: budget.used,
+        modelCalls,
+        toolCalls,
+        stopped: stopped.value,
+        error: '',
+      }
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') {
+        stopped.value = true
+        return null
+      }
+      error.value = err instanceof Error ? err.message : String(err)
+      return null
+    } finally {
       running.value = false
       controller = null
     }
@@ -556,6 +808,7 @@ ${programSection ? `\n${programSection}` : ''}
     readFiles,
     run,
     runSelfCheck,
+    runSelfCheckBatch,
     stop,
     reset,
   }

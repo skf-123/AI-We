@@ -5,6 +5,7 @@ import {
   PROJECT_AGENT_SYSTEM_PROMPT,
   PROJECT_AGENT_TOOLS,
   PROJECT_SELF_CHECK_SYSTEM_PROMPT,
+  PROJECT_SELF_CHECK_BATCH_SYSTEM_PROMPT,
 } from '../../utils/project-agent-prompt'
 
 /**
@@ -31,7 +32,7 @@ const MessageSchema = z.object({
 })
 
 const RequestSchema = z.object({
-  mode: z.enum(['map', 'self-check']).default('map'),
+  mode: z.enum(['map', 'self-check', 'self-check-batch']).default('map'),
   /** 工具轮数用完后的收尾请求：禁用工具，只要最终 JSON */
   final: z.boolean().default(false),
   messages: z
@@ -62,9 +63,11 @@ export default defineEventHandler(async (event) => {
 
   const config = useRuntimeConfig(event)
   const systemPrompt =
-    parsed.data.mode === 'self-check'
-      ? PROJECT_SELF_CHECK_SYSTEM_PROMPT
-      : PROJECT_AGENT_SYSTEM_PROMPT
+    parsed.data.mode === 'self-check-batch'
+      ? PROJECT_SELF_CHECK_BATCH_SYSTEM_PROMPT
+      : parsed.data.mode === 'self-check'
+        ? PROJECT_SELF_CHECK_SYSTEM_PROMPT
+        : PROJECT_AGENT_SYSTEM_PROMPT
 
   const startedAt = Date.now()
   const { message, finishReason, usage } = await callLlmMessage(
@@ -88,7 +91,7 @@ export default defineEventHandler(async (event) => {
   )
 
   logLlmUsage(
-    parsed.data.mode === 'self-check' ? 'project/agent:self-check' : 'project/agent:map',
+    parsed.data.mode === 'map' ? 'project/agent:map' : 'project/agent:self-check',
     usage,
     startedAt,
     {
@@ -98,5 +101,5 @@ export default defineEventHandler(async (event) => {
     },
   )
 
-  return { message, finishReason }
+  return { message, finishReason, usage }
 })

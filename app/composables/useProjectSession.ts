@@ -22,6 +22,9 @@ import { parseProjectSummary } from '~/utils/project-graph'
 import { diffProjectGraph, type ProjectGraphDiff } from '~/utils/project-graph-diff'
 import { scanCandidateEdges } from '~/utils/project-candidate-edges'
 import { compareGraphToCandidates } from '~/utils/project-graph-candidates'
+import { buildSelfCheckPlan, selfCheckBatchEnabled } from '~/utils/self-check-plan'
+import { mergeSelfCheckDecisions } from '~/utils/self-check-merge'
+import type { SelfCheckCoverage, SelfCheckEvidence } from '~/types/self-check'
 import {
   composeVendorReason,
   detectVendor,
@@ -146,6 +149,11 @@ export function useProjectSession() {
   /** 自检修正后的图；没有自检结果时用汇总原图 */
   const selfCheckGraph = ref<ProjectGraphData | null>(null)
   const selfCheckStarted = ref(false)
+  /** 分批自检是否启用（?selfcheck=batch） */
+  const selfCheckBatchMode = ref(selfCheckBatchEnabled())
+  /** 分批自检的覆盖率；旧路径为 null */
+  const selfCheckCoverage = ref<SelfCheckCoverage | null>(null)
+  const selfCheckEvidence = ref<SelfCheckEvidence[]>([])
   /** 自检前的图：用于比较改动，以及“恢复自检前的图” */
   const preSelfCheckGraph = ref<ProjectGraphData | null>(null)
   const selfCheckDiff = ref<ProjectGraphDiff | null>(null)
@@ -911,6 +919,8 @@ export function useProjectSession() {
     selfCheck.reset()
     selfCheckGraph.value = null
     selfCheckStarted.value = false
+    selfCheckCoverage.value = null
+    selfCheckEvidence.value = []
     preSelfCheckGraph.value = null
     selfCheckDiff.value = null
     selfCheckRestored.value = false
@@ -948,6 +958,8 @@ export function useProjectSession() {
     selfCheck.reset()
     selfCheckGraph.value = null
     selfCheckStarted.value = false
+    selfCheckCoverage.value = null
+    selfCheckEvidence.value = []
     preSelfCheckGraph.value = null
     selfCheckDiff.value = null
     selfCheckRestored.value = false
@@ -985,6 +997,46 @@ export function useProjectSession() {
     const candidateScan = scanCandidateEdges(candidateSources)
     const candidateReport = compareGraphToCandidates(graph, candidateScan)
     const parseCount = filesToParse(files.value).length
+
+    if (selfCheckBatchMode.value) {
+      const plan = buildSelfCheckPlan(graph, candidateReport.suspicions)
+      if (plan.batches.length === 0) {
+        selfCheckCoverage.value = {
+          total: plan.total,
+          checked: plan.supported,
+          unknown: 0,
+          conflict: 0,
+          supported: plan.supported,
+        }
+        selfCheckGraph.value = graph
+        preSelfCheckGraph.value = graph
+        selfCheckDiff.value = diffProjectGraph(graph, graph)
+        return
+      }
+
+      const batchResult = await selfCheck.runSelfCheckBatch({
+        plan,
+        projectContext: map.context(projectName.value),
+        entries: files.value,
+        readablePaths: filesForMap(files.value).map((entry) => entry.path),
+        getFile: (path) => fileHandles.get(path),
+      })
+
+      if (batchResult) {
+        const merged = mergeSelfCheckDecisions(
+          graph,
+          plan.items,
+          batchResult.decisions,
+          plan.supported,
+        )
+        selfCheckGraph.value = merged.graph
+        preSelfCheckGraph.value = graph
+        selfCheckDiff.value = diffProjectGraph(graph, merged.graph)
+        selfCheckCoverage.value = merged.coverage
+        selfCheckEvidence.value = batchResult.evidence
+      }
+      return
+    }
 
     const result = await selfCheck.runSelfCheck({
       graph,
@@ -1026,6 +1078,12 @@ export function useProjectSession() {
   const selfCheckSummary = computed(() => {
     if (selfCheck.running.value || selfCheck.error.value) return ''
     if (selfCheckRestored.value) return '已恢复自检前的图'
+
+    if (selfCheckBatchMode.value) {
+      const coverage = selfCheckCoverage.value
+      if (!coverage) return ''
+      return `自检完成：已核对 ${coverage.checked}/${coverage.total} 条边，${selfCheck.rounds.value} 批，未核 ${coverage.unknown}，冲突 ${coverage.conflict}`
+    }
 
     const diff = selfCheckDiff.value
     if (!diff) return ''
@@ -1083,6 +1141,8 @@ export function useProjectSession() {
     vendorCheck.value = null
     selfCheckGraph.value = null
     selfCheckStarted.value = false
+    selfCheckCoverage.value = null
+    selfCheckEvidence.value = []
     preSelfCheckGraph.value = null
     selfCheckDiff.value = null
     selfCheckRestored.value = false
@@ -1153,6 +1213,9 @@ export function useProjectSession() {
     stopAgent: agent.stop,
     // 图自检
     displayGraph,
+    selfCheckBatchMode,
+    selfCheckCoverage,
+    selfCheckEvidence,
     selfCheckRunning: selfCheck.running,
     selfCheckStopped: selfCheck.stopped,
     selfCheckError: selfCheck.error,
