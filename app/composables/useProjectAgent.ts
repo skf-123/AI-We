@@ -480,7 +480,7 @@ export function useProjectAgent() {
         rounds.value = batch.index
         const allowedIds = new Set(batch.items.map((item) => item.id))
         const messages: AgentMessage[] = [
-          { role: 'user', content: formatBatchContent(batch, input.projectContext) },
+          { role: 'user', content: formatBatchContent(batch, input.projectContext, input.plan.overview) },
         ]
         const hardToolLimit = Math.min(8, batch.toolAllowance + 2)
         let batchTools = 0

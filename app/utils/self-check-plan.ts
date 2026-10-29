@@ -15,6 +15,7 @@ import type {
   SelfCheckItem,
   SelfCheckItemKind,
   SelfCheckNodeSummary,
+  SelfCheckOverview,
 } from '~/types/self-check'
 
 export const SELF_CHECK_BATCH_SIZE = 8
@@ -71,6 +72,7 @@ export interface SelfCheckPlan {
   batches: SelfCheckBatch[]
   supported: number
   total: number
+  overview: SelfCheckOverview
 }
 
 export function buildSelfCheckPlan(
@@ -156,11 +158,29 @@ export function buildSelfCheckPlan(
     }
   }
 
-  return { items, batches, supported, total: graph.edges.length }
+  return {
+    items,
+    batches,
+    supported,
+    total: graph.edges.length,
+    overview: {
+      groups: graph.nodes
+        .filter((node) => node.files && node.files.length > 0)
+        .map((node) => node.label),
+      nodes: graph.nodes.length,
+      edges: graph.edges.length,
+      supported,
+      total: graph.edges.length,
+    },
+  }
 }
 
 /** 模型看到的批次内容；不带完整图、不带全部文件路径。 */
-export function formatBatchContent(batch: SelfCheckBatch, projectContext: string): string {
+export function formatBatchContent(
+  batch: SelfCheckBatch,
+  projectContext: string,
+  overview: SelfCheckOverview,
+): string {
   const edges = batch.items
     .map(
       (item) =>
@@ -172,7 +192,11 @@ export function formatBatchContent(batch: SelfCheckBatch, projectContext: string
     .map((node) => `- ${node.id}：${node.label}（${node.type}）`)
     .join('\n')
 
-  return `【本批边】共 ${batch.items.length} 条，只处理这些
+  const groups = overview.groups.length > 0 ? overview.groups.join('、') : '（没有分组）'
+
+  return `【全图摘要】节点 ${overview.nodes} 个，边 ${overview.edges} 条；程序已支持 ${overview.supported} 条；分组：${groups}
+
+【本批边】共 ${batch.items.length} 条，只处理这些
 ${edges}
 
 【涉及的节点】

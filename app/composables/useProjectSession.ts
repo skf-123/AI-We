@@ -1011,8 +1011,18 @@ export function useProjectSession() {
     const candidateReport = compareGraphToCandidates(graph, candidateScan)
     const parseCount = filesToParse(files.value).length
 
+    // 程序已经用事实核实过的边，旧路径也不再重复审。
+    const edgeKey = (edge: { from: string; to: string; label?: string }) =>
+      `${edge.from}\u0000${edge.to}\u0000${edge.label ?? ''}`
+    const verifiedEdges = new Set(
+      graph.edges.filter((edge) => edge.confidence === 'verified').map(edgeKey),
+    )
+    const suspicions = candidateReport.suspicions.filter(
+      (item) => !verifiedEdges.has(edgeKey(item)),
+    )
+
     if (selfCheckBatchMode.value) {
-      const plan = buildSelfCheckPlan(graph, candidateReport.suspicions)
+      const plan = buildSelfCheckPlan(graph, suspicions)
       if (plan.batches.length === 0) {
         selfCheckCoverage.value = {
           total: plan.total,
@@ -1058,7 +1068,7 @@ export function useProjectSession() {
       parseCount,
       readablePaths: filesForMap(files.value).map((entry) => entry.path),
       getFile: (path) => fileHandles.get(path),
-      suspicions: candidateReport.suspicions,
+      suspicions,
       candidateSummary:
         candidateScan.filesParsed > 0
           ? {

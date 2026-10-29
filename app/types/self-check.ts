@@ -28,6 +28,15 @@ export interface SelfCheckNodeSummary {
   type: string
 }
 
+/** 每批都会带的一份很短的全图摘要，不是完整图 JSON */
+export interface SelfCheckOverview {
+  groups: string[]
+  nodes: number
+  edges: number
+  supported: number
+  total: number
+}
+
 export interface SelfCheckBatch {
   index: number
   items: SelfCheckItem[]
