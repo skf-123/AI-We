@@ -142,6 +142,9 @@ export function buildSelfCheckPlan(
 
   // 结构项：浮节点、未归属、重复归属。
   // 它们不是边，不能混进 edges 总数；单独计数、单独合并。
+  const groupCandidates = graph.nodes
+    .filter((node) => node.files && node.files.length > 0)
+    .map((node) => ({ id: `n:${node.id}`, label: node.label, type: node.type }))
   let structuralIndex = 0
   for (const node of graph.nodes) {
     if (!node.floating || !node.files?.length) continue
@@ -155,6 +158,7 @@ export function buildSelfCheckPlan(
       detail: '节点有文件，但没有任何外部连线',
       batch: 0,
       paths: node.files.map((file) => file.path),
+      candidates: groupCandidates.filter((candidate) => candidate.id !== `n:${node.id}`),
     })
   }
   for (const [index, path] of (graph.unownedFiles ?? []).entries()) {
@@ -167,6 +171,7 @@ export function buildSelfCheckPlan(
       detail: '文件没有出现在任何节点的 files 列表里',
       batch: 0,
       paths: [path],
+      candidates: groupCandidates,
     })
   }
   for (const [index, row] of (graph.duplicateFiles ?? []).entries()) {
@@ -179,6 +184,9 @@ export function buildSelfCheckPlan(
       detail: `文件同时属于：${row.nodes.map((id) => `n:${id}`).join('、')}`,
       batch: 0,
       paths: [row.path],
+      candidates: groupCandidates.filter((candidate) =>
+        row.nodes.some((id) => candidate.id === `n:${id}`),
+      ),
     })
   }
 
@@ -271,11 +279,16 @@ export function formatBatchContent(
     )
     .join('\n')
   const structures = structuralItems
-    .map(
-      (item) =>
-        `- ${item.id}：${item.kind}；${item.from}${item.paths?.length ? `；文件：${item.paths.join('、')}` : ''}\n  预检：${item.detail}`,
-    )
+    .map((item) => {
+      const candidates = item.candidates?.length
+        ? `
+  候选节点：${item.candidates.map((node) => `${node.id}（${node.label}）`).join('、')}`
+        : ''
+      return `- ${item.id}：${item.kind}；${item.from}${item.paths?.length ? `；文件：${item.paths.join('、')}` : ''}
+  预检：${item.detail}${candidates}`
+    })
     .join('\n')
+
 
   const nodes = batch.nodes
     .map((node) => `- ${node.id}：${node.label}（${node.type}）`)

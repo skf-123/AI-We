@@ -34,6 +34,8 @@ export interface SelfCheckItem {
   pairs?: { from: string; to: string }[]
   /** 浮节点 / 未归属 / 重复归属涉及的文件 */
   paths?: string[]
+  /** 结构项可选择的已有节点；给模型一个明确的目标范围 */
+  candidates?: { id: string; label: string; type: string }[]
 }
 
 export interface SelfCheckNodeSummary {
