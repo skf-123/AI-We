@@ -26,10 +26,13 @@ const graph = {
     { id: 'd', label: 'D', type: 'code', files: [{ path: 'd1.js' }] },
     { id: 'float', label: 'Float', type: 'code', files: [{ path: 'f1.js' }] },
     { id: 'dup', label: 'Dup', type: 'code', files: [{ path: 'a1.js' }] },
+    { id: 'e', label: 'E', type: 'code', files: [{ path: 'e1.js' }] },
+    { id: 'f', label: 'F', type: 'code', files: [{ path: 'f2.js' }] },
   ],
   edges: [
     { from: 'n:a', to: 'n:b', label: '调用' },
     { from: 'n:c', to: 'n:d', label: '依赖' },
+    { from: 'n:e', to: 'n:f', label: '反向样本' },
   ],
 }
 
@@ -43,6 +46,16 @@ const facts = [
     text: 'a1.js:2 import b from ./b1',
     object: 'b',
     relatedPaths: ['a1.js', 'b1.js'],
+  },
+  {
+    id: 'field:f1:e1',
+    kind: 'import',
+    path: 'f2.js',
+    line: 1,
+    quote: "import e from './e1'",
+    text: 'f2.js:1 import e from ./e1',
+    object: 'e',
+    relatedPaths: ['f2.js', 'e1.js'],
   },
   {
     id: 'field:c1:d1',
@@ -67,6 +80,11 @@ const expanded = withEvidence.edges.find((edge) => edge.label === '依赖')
 check('unique group edge expands from', expanded.from, 'f:c1.js')
 check('unique group edge expands to', expanded.to, 'f:d1.js')
 check('unique group edge verified', expanded.confidence, 'verified')
+
+const reversed = withEvidence.edges.find((edge) => edge.label === '反向样本')
+check('reverse edge stays group', reversed.from, 'n:e')
+check('reverse edge is partial', reversed.confidence, 'partial')
+check('reverse edge keeps note', reversed.note.includes('方向和图上的边相反'), true)
 
 const enriched = attachGraphIntegrity(withEvidence, ['a1.js', 'a2.js', 'b1.js', 'b2.js', 'c1.js', 'd1.js', 'f1.js', 'missing.js'])
 check('unowned file found', enriched.unownedFiles, ['missing.js'])

@@ -140,7 +140,13 @@ export function attachGraphEvidence(
     const evidence = uniqueEvidence(pairs.flatMap((pair) => pair.evidence))
     const totalPairs = fromFiles.length * toFiles.length
     const confidence: ProjectGraphEdge['confidence'] =
-      evidence.length === 0 ? 'inferred' : pairs.length === totalPairs ? 'verified' : 'partial'
+      evidence.length === 0
+        ? 'inferred'
+        : reverse
+          ? 'partial'
+          : pairs.length === totalPairs
+            ? 'verified'
+            : 'partial'
 
     const next: ProjectGraphEdge = {
       ...edge,
@@ -148,9 +154,8 @@ export function attachGraphEvidence(
       confidence,
     }
 
-    if (reverse) {
-      next.note = '程序事实的方向和图上的边相反'
-    }
+    const notes: string[] = []
+    if (reverse) notes.push('程序事实的方向和图上的边相反')
 
     if (pairs.length) {
       // 两端都是只有一个文件的分组，且事实唯一：直接落到文件边
@@ -159,19 +164,20 @@ export function attachGraphEvidence(
         edge.to.startsWith('n:') &&
         fromFiles.length === 1 &&
         toFiles.length === 1 &&
-        pairs.length === 1
+        pairs.length === 1 &&
+        !reverse
       ) {
         next.from = `f:${pairs[0]!.from}`
         next.to = `f:${pairs[0]!.to}`
-        next.note = undefined
       } else if (edge.from.startsWith('n:') || edge.to.startsWith('n:')) {
         next.filePairs = pairs
-        next.note = `分组关系，涉及 ${pairs.length} 对文件`
+        notes.push(`分组关系，涉及 ${pairs.length} 对文件`)
       }
     } else if (edge.from.startsWith('n:') && edge.to.startsWith('n:')) {
-      next.note = '分组关系，未找到文件级依据'
+      notes.push('分组关系，未找到文件级依据')
     }
 
+    next.note = notes.length ? notes.join('；') : undefined
     return next
   })
 

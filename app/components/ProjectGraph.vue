@@ -440,9 +440,9 @@ onBeforeUnmount(() => {
         >
           {{
             selectedEdge.confidence === 'verified'
-              ? '已核实'
+              ? '依据已核实'
               : selectedEdge.confidence === 'partial'
-                ? '部分核实'
+                ? '部分依据'
                 : '推断'
           }}
         </span>
@@ -455,6 +455,12 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div v-if="selectedEdge.note" class="mt-1 text-amber-700">{{ selectedEdge.note }}</div>
+      <div
+        v-if="selectedEdge.evidence?.length"
+        class="mt-1 text-[10px] text-slate-400"
+      >
+        程序依据核对的是文件关系；边上的文字仍是模型解释。
+      </div>
       <div v-if="selectedEdge.evidence?.length" class="mt-1 space-y-0.5">
         <div
           v-for="item in selectedEdge.evidence.slice(0, 4)"
