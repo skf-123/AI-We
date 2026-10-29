@@ -93,6 +93,39 @@ const verifiedPlan = buildSelfCheckPlan(
 check('verified edge stays out of model', verifiedPlan.items.length, 0)
 check('verified edge counts as supported', verifiedPlan.supported, 1)
 
+const inferredPlan = buildSelfCheckPlan(
+  { ...graph, edges: [{ ...graph.edges[0], confidence: 'inferred' }] },
+  [],
+)
+check('inferred edge enters plan', inferredPlan.items.length, 1)
+check('inferred edge kind', inferredPlan.items[0]?.kind, 'inferred')
+
+const reversedPlan = buildSelfCheckPlan(
+  {
+    ...graph,
+    edges: [{ ...graph.edges[0], confidence: 'partial', note: '程序事实的方向和图上的边相反' }],
+  },
+  [],
+)
+check('reverse note enters plan', reversedPlan.items.length, 1)
+check('reverse note kind', reversedPlan.items[0]?.kind, 'reversed')
+
+const groupOnlyPlan = buildSelfCheckPlan(
+  {
+    ...graph,
+    edges: [
+      {
+        ...graph.edges[0],
+        confidence: 'partial',
+        filePairs: [{ from: 'Article.java', to: 'ArticleMapper.java', evidence: [] }],
+      },
+    ],
+  },
+  [],
+)
+check('group file pairs handled by program', groupOnlyPlan.items.length, 0)
+check('group file pairs counted supported', groupOnlyPlan.supported, 1)
+
 const budget = createSelfCheckBudget()
 check('初始批池', budget.pool, 125_000)
 const first = plan.batches[0]

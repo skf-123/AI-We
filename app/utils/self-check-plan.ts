@@ -2,7 +2,7 @@
  * 分批图自检的清单与批次。
  *
  * 只做纯数据：
- *   · 每条边一项，只把 reversed / unsupported 的边送模型；
+ *   · 每条边一项：reversed / unsupported / inferred / partial 送模型；
  *   · 按起点所在分组聚类，每批最多 8 条；
  *   · 给每批算需求分和工具额度，供预算分配用。
  *
@@ -71,6 +71,25 @@ function kindOf(suspicion: GraphSuspicion | undefined): SelfCheckItemKind | null
   return null
 }
 
+/**
+ * 图证据本身也能产生可疑项：没有依据、只有部分依据、方向相反。
+ *
+ * 分组边不送模型：唯一文件对已经展开，多对保留聚合，程序不硬拆。
+ */
+function kindFromEdge(edge: ProjectGraphEdge): SelfCheckItemKind | null {
+  if (edge.filePairs?.length) return null
+  if (edge.note?.includes('方向和图上的边相反')) return 'reversed'
+  if (edge.confidence === 'inferred') return 'inferred'
+  if (edge.confidence === 'partial') return 'partial'
+  return null
+}
+
+function edgeDetail(edge: ProjectGraphEdge, kind: SelfCheckItemKind): string {
+  if (kind === 'inferred') return '程序没有找到这条边的文件级依据'
+  if (kind === 'partial') return '只有部分文件对找到了程序依据'
+  return edge.note ?? ''
+}
+
 export interface SelfCheckPlan {
   /** 所有边；没进批的也在里面，status 由 supported 表示 */
   items: SelfCheckItem[]
@@ -99,7 +118,12 @@ export function buildSelfCheckPlan(
       return
     }
     const suspicion = byKey.get(edgeKey(edge))
-    const kind = kindOf(suspicion)
+    // group-only 由程序聚合处理，不送模型拆边
+    if (suspicion?.kind === 'group-only') {
+      supported++
+      return
+    }
+    const kind = kindOf(suspicion) ?? kindFromEdge(edge)
     if (!kind) {
       supported++
       return
@@ -111,7 +135,7 @@ export function buildSelfCheckPlan(
       to: edge.to,
       label: edge.label,
       kind,
-      detail: suspicion?.detail ?? '',
+      detail: suspicion?.detail || edgeDetail(edge, kind),
       batch: 0,
     })
   })
@@ -145,6 +169,7 @@ export function buildSelfCheckPlan(
       const score =
         slice.filter((item) => item.kind === 'reversed').length * 2 +
         slice.filter((item) => item.kind === 'unsupported').length * 2 +
+        slice.filter((item) => item.kind === 'inferred' || item.kind === 'partial').length +
         (crossGroup ? 1 : 0)
 
       batches.push({

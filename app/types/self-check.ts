@@ -5,7 +5,13 @@
  * 具体解析、预算和合并都在 app/utils/self-check-* 里。
  */
 
-export type SelfCheckItemKind = 'reversed' | 'unsupported' | 'unknown' | 'other'
+export type SelfCheckItemKind =
+  | 'reversed'
+  | 'unsupported'
+  | 'inferred'
+  | 'partial'
+  | 'unknown'
+  | 'other'
 
 export interface SelfCheckItem {
   /** 稳定 id，例如 E12；模型只按这个 id 回决定 */
