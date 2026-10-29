@@ -1,0 +1,25 @@
+{
+  "description": "add-node 定向场景：现有节点没有文件，未归属文件没有合适候选",
+  "graph": {
+    "nodes": [
+      {
+        "id": "legacy",
+        "label": "旧模块",
+        "type": "code",
+        "detail": "没有文件，也没有连线"
+      }
+    ],
+    "edges": [],
+    "unownedFiles": [
+      "newmodule/Feature.java"
+    ]
+  },
+  "files": [
+    {
+      "path": "newmodule/Feature.java",
+      "name": "Feature.java",
+      "content": "package newmodule;\n\npublic class Feature {\n  public String name() { return \"feature\"; }\n}\n"
+    }
+  ],
+  "projectContext": "旧模块是一个空壳，没有文件。newmodule/Feature.java 是一个新模块的入口类，现有节点没有适合它的职责；如果必须保留它，应该考虑新建一个「新模块」节点。"
+}

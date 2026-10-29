@@ -19,7 +19,9 @@ const fixtureUrl =
     ? '/dev/self-check-fixture-187.json'
     : route.query.fixture === 'structural'
       ? '/dev/self-check-fixture-structural.json'
-      : '/dev/self-check-fixture.json'
+      : route.query.fixture === 'addnode'
+        ? '/dev/self-check-fixture-addnode.json'
+        : '/dev/self-check-fixture.json'
 
 interface Fixture {
   graph: ProjectGraphData

@@ -209,7 +209,7 @@ export const PROJECT_SELF_CHECK_BATCH_SYSTEM_PROMPT = `你是「麦穗 · 代码
 - connect：用 to 指向目标端点（n:节点 id 或 f:文件路径）；候选节点在结构项里列出；
 - split：用 pairs 列出要保留的文件对，每对是 {"from":"路径","to":"路径"}；
 - move-file：用 path 指定文件，用 toNode 指定目标节点；
-- add-node：用 node 给出 {"id","label","type","files":["路径"]}；只有候选节点都不合适时才用；
+- add-node：用 node 给出 {"id","label","type","files":["路径"]}；type 只能是 code / tech / concept；只有候选节点都不合适时才用；
 - 结构项如果缺少目标，先读文件或候选节点再判断，不要凭空编造路径或节点 id。
 
 # 工具
