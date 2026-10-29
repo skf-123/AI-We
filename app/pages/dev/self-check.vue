@@ -9,6 +9,7 @@ import type { ProjectFileEntry, ProjectGraphData } from '~/types/project'
 import type { SelfCheckPlan } from '~/utils/self-check-plan'
 import { buildSelfCheckPlan } from '~/utils/self-check-plan'
 import { useProjectAgent } from '~/composables/useProjectAgent'
+import { mergeSelfCheckDecisions } from '~/utils/self-check-merge'
 
 definePageMeta({ layout: false })
 
@@ -16,7 +17,9 @@ const route = useRoute()
 const fixtureUrl =
   route.query.fixture === '187'
     ? '/dev/self-check-fixture-187.json'
-    : '/dev/self-check-fixture.json'
+    : route.query.fixture === 'structural'
+      ? '/dev/self-check-fixture-structural.json'
+      : '/dev/self-check-fixture.json'
 
 interface Fixture {
   graph: ProjectGraphData
@@ -30,6 +33,7 @@ const entries = ref<ProjectFileEntry[]>([])
 const fileMap = new Map<string, File>()
 const loadError = ref('')
 const result = ref<Awaited<ReturnType<ReturnType<typeof useProjectAgent>['runSelfCheckBatch']>>>(null)
+const merged = ref<ReturnType<typeof mergeSelfCheckDecisions> | null>(null)
 const agent = useProjectAgent()
 const running = agent.running
 const error = agent.error
@@ -67,6 +71,15 @@ async function run() {
     readablePaths: entries.value.map((entry) => entry.path),
     getFile: (path) => fileMap.get(path),
   })
+  if (result.value) {
+    merged.value = mergeSelfCheckDecisions(
+      fixture.value.graph,
+      plan.value.items,
+      result.value.decisions,
+      plan.value.supported,
+      entries.value.map((entry) => entry.path),
+    )
+  }
 }
 </script>
 
@@ -110,6 +123,11 @@ async function run() {
           return counts
         }, {} as Record<string, number>),
       }, null, 2) }}</pre>
+
+      <pre
+        v-if="merged"
+        class="mt-3 max-h-[50vh] overflow-auto rounded bg-slate-950 p-3 text-[11px] leading-5 text-slate-100"
+      >{{ JSON.stringify(merged.applied, null, 2) }}</pre>
     </template>
     <p v-else class="mt-4 text-sm text-slate-500">正在读取固定夹具…</p>
   </main>

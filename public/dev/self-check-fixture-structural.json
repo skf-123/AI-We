@@ -1,0 +1,116 @@
+{
+  "description": "结构动作验证夹具：分组边、浮节点、未归属、重复归属",
+  "graph": {
+    "nodes": [
+      {
+        "id": "a",
+        "label": "A 分组",
+        "type": "code",
+        "files": [
+          {
+            "path": "a.java",
+            "role": "A"
+          }
+        ]
+      },
+      {
+        "id": "b",
+        "label": "B 分组",
+        "type": "code",
+        "files": [
+          {
+            "path": "b.java",
+            "role": "B"
+          },
+          {
+            "path": "d.java",
+            "role": "D"
+          }
+        ]
+      },
+      {
+        "id": "c",
+        "label": "C 分组",
+        "type": "code",
+        "files": [
+          {
+            "path": "c.java",
+            "role": "C"
+          }
+        ]
+      },
+      {
+        "id": "z",
+        "label": "Z 浮节点",
+        "type": "code",
+        "files": [
+          {
+            "path": "z.java",
+            "role": "Z"
+          }
+        ],
+        "floating": true
+      }
+    ],
+    "edges": [
+      {
+        "from": "n:a",
+        "to": "n:b",
+        "label": "A 与 B 的分组关系",
+        "filePairs": [
+          {
+            "from": "a.java",
+            "to": "b.java",
+            "evidence": []
+          }
+        ],
+        "note": "分组关系，涉及 1 对文件"
+      }
+    ],
+    "unownedFiles": [
+      "orphan.java"
+    ],
+    "duplicateFiles": [
+      {
+        "path": "d.java",
+        "nodes": [
+          "a",
+          "b"
+        ]
+      }
+    ]
+  },
+  "files": [
+    {
+      "path": "a.java",
+      "name": "a.java",
+      "content": "public class A { B b; }\n"
+    },
+    {
+      "path": "b.java",
+      "name": "b.java",
+      "content": "public class B {}\n"
+    },
+    {
+      "path": "c.java",
+      "name": "c.java",
+      "content": "public class C {}\n"
+    },
+    {
+      "path": "z.java",
+      "name": "z.java",
+      "content": "public class Z {}\n"
+    },
+    {
+      "path": "orphan.java",
+      "name": "orphan.java",
+      "content": "public class Orphan {}\n"
+    },
+    {
+      "path": "d.java",
+      "name": "d.java",
+      "content": "public class D {}\n"
+    }
+  ],
+  "projectContext": "这是结构动作验证夹具：A/B 是分组关系，Z 是浮节点，orphan.java 未归属，d.java 同时属于 A 和 B。请优先判断是否需要 connect / split / move-file / add-node。"
+}
