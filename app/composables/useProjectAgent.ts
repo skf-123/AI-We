@@ -86,7 +86,8 @@ export interface BatchSelfCheckInput {
 }
 
 const MAX_ROUNDS_HARD = 100
-const MAX_SELF_CHECK_ROUNDS = 100
+const MAX_SELF_CHECK_ROUNDS = 20
+const MAX_SELF_CHECK_TOOL_CALLS = 12
 const MAX_CONTEXT_CHARS = 1_400_000
 const MAX_TREE_CHARS = 150_000
 const MAX_CONTEXT_TEXT = 100_000
@@ -769,7 +770,7 @@ ${programSection ? `\n${programSection}` : ''}
 
 请检查这张图：有没有文件节点浮着没有连线、有没有只有分组到分组的边、有没有写反或编造的关系。需要时读代码确认，最后输出修正后的图 JSON。`,
       maxRounds: Math.max(1, Math.min(input.parseCount || 1, MAX_SELF_CHECK_ROUNDS)),
-      maxToolCalls: input.maxToolCalls,
+      maxToolCalls: input.maxToolCalls ?? MAX_SELF_CHECK_TOOL_CALLS,
       executor,
       parse: (content) =>
         sanitizeProjectGraph(
