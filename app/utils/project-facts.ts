@@ -10,6 +10,19 @@
 
 import type { FactCheck, FactClaim, FactFix, VerifiedFact } from '~/types/facts'
 import type { HardFact } from '~/types/structure'
+import {
+  buildFactBindings,
+  boundedPositions,
+  hasBoundedToken,
+  hasFactNameContext,
+  hasFileReferenceBefore,
+  isDiagnosticMention,
+  isNamespaceMention,
+  isProtectedValueMention,
+  namesCurrentFile,
+  normalizeFactPath,
+  simpleNameOf,
+} from './fact-binding.ts'
 
 export const FACTS_START = '<!--facts'
 export const FACTS_END = '-->'
@@ -24,9 +37,7 @@ export interface FactsBlockResult {
   error?: string
 }
 
-function normalizePath(path: string): string {
-  return path.replace(/\\/g, '/').replace(/^\.\//, '')
-}
+const normalizePath = normalizeFactPath
 
 function normalizeWhitespace(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
@@ -105,12 +116,6 @@ export function stripFactsBlock(text: string): FactsBlockResult {
   }
 }
 
-function simpleNameOf(value: string): string {
-  const clean = value.replace(/<.*>/g, '').trim()
-  const index = clean.lastIndexOf('.')
-  return index === -1 ? clean : clean.slice(index + 1)
-}
-
 function quoteMatches(left: string, right: string): boolean {
   const a = normalizeWhitespace(left)
   const b = normalizeWhitespace(right)
@@ -174,18 +179,10 @@ function findContradiction(
   }
   if (/namespace|xml|配置/i.test(text)) return null
 
-  const symbols = hardFacts.filter((fact) => fact.kind === 'fqn' && fact.object)
-  const aliases = hardFacts.filter(
-    (fact) =>
-      (fact.kind === 'xml-namespace' || fact.kind === 'import' || fact.kind === 'field-type') &&
-      fact.object,
-  )
-
+  const { aliasPairs } = buildFactBindings(hardFacts)
   for (const token of text.match(FQN_RE) ?? []) {
-    const simple = simpleNameOf(token)
-    const correct = symbols.find((fact) => simpleNameOf(fact.object ?? '') === simple)
-    if (!correct || token === correct.object) continue
-    if (aliases.some((fact) => fact.object === token)) return correct
+    const pair = aliasPairs.find((item) => item.alias === token)
+    if (pair) return pair.correct
   }
   return null
 }
@@ -303,37 +300,6 @@ export function verifyFacts(
  * 按句切，不按行切 —— 中文长段落一行里经常同时出现对的和错的名字。
  * 每个名字只看前后 40 字，避免整句只要出现 namespace 就全部放过。
  */
-function boundedPositions(text: string, token: string): number[] {
-  const positions: number[] = []
-  if (!token) return positions
-  let index = text.indexOf(token)
-  while (index !== -1) {
-    const before = index > 0 ? text[index - 1] : ''
-    const after = index + token.length < text.length ? text[index + token.length] : ''
-    if (!/[A-Za-z0-9_.$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) positions.push(index)
-    index = text.indexOf(token, index + token.length)
-  }
-  return positions
-}
-
-/** 已知的「另一个全限定名」：XML namespace、import、字段类型，映射到真正的符号 */
-function buildAliasPairs(hardFacts: HardFact[]): { alias: string; correct: HardFact }[] {
-  const symbols = hardFacts.filter((fact) => fact.kind === 'fqn' && fact.object)
-  const aliases = hardFacts.filter(
-    (fact) =>
-      (fact.kind === 'xml-namespace' || fact.kind === 'import' || fact.kind === 'field-type') &&
-      fact.object,
-  )
-  const pairs: { alias: string; correct: HardFact }[] = []
-  for (const alias of aliases) {
-    const simple = simpleNameOf(alias.object ?? '')
-    const correct = symbols.find((fact) => simpleNameOf(fact.object ?? '') === simple)
-    if (!correct || correct.object === alias.object) continue
-    pairs.push({ alias: alias.object!, correct })
-  }
-  return pairs
-}
-
 const IGNORED_INJECTION_TOKENS = new Set([
   'null',
   'undefined',
@@ -355,9 +321,12 @@ const IGNORED_INJECTION_TOKENS = new Set([
 export function findBodyFactConflicts(body: string, hardFacts: HardFact[]): string[] {
   if (hardFacts.length === 0) return []
 
-  const aliasPairs = buildAliasPairs(hardFacts)
-  const fields = hardFacts.filter((fact) => fact.kind === 'field-type' && fact.object)
-  const servletFacts = hardFacts.filter((fact) => fact.kind === 'web-servlet')
+  const {
+    aliasPairs,
+    ambiguousAliases,
+    fields,
+    servlets: servletFacts,
+  } = buildFactBindings(hardFacts)
   const warnings: string[] = []
 
   const add = (message: string) => {
@@ -382,19 +351,39 @@ export function findBodyFactConflicts(body: string, hardFacts: HardFact[]): stri
       continue
     }
 
-    // 1) 已知的另一个全限定名，被当成接口、类型或 import
+    // 1) 已知的另一个全限定名，被当成接口、类型、注入、import 或实现
     for (const { alias, correct } of aliasPairs) {
+      if (hasBoundedToken(sentence, correct.object ?? '')) continue
       for (const index of boundedPositions(sentence, alias)) {
         const before = sentence.slice(Math.max(0, index - 30), index)
         const after = sentence.slice(index + alias.length, index + alias.length + 14)
-        if (/namespace\s*(是|为|=|:)\s*[`"']?$/i.test(before)) continue
+        if (isNamespaceMention(sentence, index, alias)) continue
+        if (isProtectedValueMention(sentence, index, alias)) continue
+        if (isDiagnosticMention(sentence, index, alias)) continue
         const window = `${before}${alias}${after}`
-        if (!/(接口|类型|调用|调|实现|import|注入|字段)/i.test(window)) continue
+        if (!hasFactNameContext(window)) continue
         add(`正文写的是 ${alias}，已核实的事实是 ${correct.object}（${correct.path}:${correct.line}）`)
       }
     }
 
-    // 2) 注入类型：只认「注入类型是/为/写成/用」和「注入类型上」两种明确说法
+    // 2) 同一个名字有多个候选：不改，但要说清楚为什么没改
+    for (const { alias, candidates } of ambiguousAliases) {
+      for (const index of boundedPositions(sentence, alias)) {
+        if (isNamespaceMention(sentence, index, alias)) continue
+        if (isProtectedValueMention(sentence, index, alias)) continue
+        const before = sentence.slice(Math.max(0, index - 30), index)
+        const after = sentence.slice(index + alias.length, index + alias.length + 14)
+        const window = `${before}${alias}${after}`
+        if (!hasFactNameContext(window)) continue
+        const names = candidates
+          .slice(0, 3)
+          .map((fact) => `${fact.object}（${fact.path}:${fact.line}）`)
+          .join('、')
+        add(`正文里的 ${alias} 有多个候选：${names}；程序没有自动更正`)
+      }
+    }
+
+    // 3) 注入类型：只认「注入类型是/为/写成/用」和「注入类型上」两种明确说法
     for (const field of fields) {
       const correct = field.object ?? ''
       if (!correct) continue
@@ -457,18 +446,19 @@ export function applyFactFixes(
 ): { text: string; fixes: FactFix[] } {
   if (hardFacts.length === 0) return { text: body, fixes: [] }
 
-  const aliasPairs = buildAliasPairs(hardFacts)
-  const fields = hardFacts.filter((fact) => fact.kind === 'field-type' && fact.object)
+  const { aliasPairs, fields } = buildFactBindings(hardFacts)
   const fixes: FactFix[] = []
   let text = body
 
+  const sentenceStartAt = (value: string, offset: number): number =>
+    Math.max(
+      value.lastIndexOf('。', Math.max(0, offset - 1)),
+      value.lastIndexOf('；', Math.max(0, offset - 1)),
+      value.lastIndexOf('\n', Math.max(0, offset - 1)),
+    ) + 1
+
   const sentenceAround = (value: string, offset: number, length: number): string => {
-    const start =
-      Math.max(
-        value.lastIndexOf('。', Math.max(0, offset - 1)),
-        value.lastIndexOf('；', Math.max(0, offset - 1)),
-        value.lastIndexOf('\n', Math.max(0, offset - 1)),
-      ) + 1
+    const start = sentenceStartAt(value, offset)
     const ends = [
       value.indexOf('。', offset + length),
       value.indexOf('；', offset + length),
@@ -485,14 +475,19 @@ export function applyFactFixes(
     fixes.push({ from, to, path: fact.path, line: fact.line, reason, before, after })
   }
 
-  // 1) 把已知的另一个全限定名（例如 XML namespace）当成接口/类型
+  // 1) 把已知的另一个全限定名当成接口、类型、注入、import 或实现
   for (const { alias, correct } of aliasPairs) {
     for (const pos of boundedPositions(text, alias).reverse()) {
+      const sentence = sentenceAround(text, pos, alias.length)
+      const sentenceOffset = Math.max(0, pos - sentenceStartAt(text, pos))
+      if (hasBoundedToken(sentence, correct.object ?? '')) continue
+      if (isNamespaceMention(sentence, sentenceOffset, alias)) continue
+      if (isProtectedValueMention(sentence, sentenceOffset, alias)) continue
+      if (isDiagnosticMention(sentence, sentenceOffset, alias)) continue
       const before = text.slice(Math.max(0, pos - 30), pos)
       const after = text.slice(pos + alias.length, pos + alias.length + 30)
-      if (/namespace\s*(是|为|=|:)\s*[`"']?$/i.test(before)) continue
       const window = `${before}${alias}${after}`
-      if (!/(接口|类型|调用|调|实现|import|注入|字段)/i.test(window)) continue
+      if (!hasFactNameContext(window)) continue
       const replacement = correct.object ?? alias
       pushFix(alias, replacement, correct, '把已知的另一个全限定名当成了接口/类型', pos)
       text = text.slice(0, pos) + replacement + text.slice(pos + alias.length)
@@ -535,7 +530,11 @@ export function applyFactFixes(
     if (!correct) continue
     text = text.replace(importSentenceRe, (sentence: string, _match: string, offset: number) => {
       if (!/(应该是|按 XML|推断)/.test(sentence)) return sentence
-      if (!sentence.includes(correct)) return sentence
+      const namesAlias = aliasPairs.some(
+        ({ alias, correct: pairCorrect }) =>
+          pairCorrect.object === correct && boundedPositions(sentence, alias).length > 0,
+      )
+      if (!sentence.includes(correct) && !namesAlias) return sentence
       const owner = field.path.split('/').pop()?.replace(/\.[^.]+$/, '') ?? '这个类'
       const replacement = `${owner} 实际引用的是 ${correct}；这个结论来自源码里的声明，不是从 XML namespace 推断的`
       pushFix(sentence.trim(), replacement, field, '导入关系的推断依据不在事实里', offset)
@@ -605,6 +604,7 @@ export function applyFactFixes(
       sentence: string,
       filePath: string,
     ): { line: number; fact: HardFact } | null => {
+      const matches: HardFact[] = []
       for (const fact of factsByPath.get(filePath) ?? []) {
         if (!fact.line || fact.line < 1) continue
         if (fact.kind === 'field-type' && !/注入|字段|属性/.test(sentence)) continue
@@ -623,9 +623,11 @@ export function applyFactFixes(
         )
           continue
         const simple = simpleNameOf(fact.object ?? fact.subject ?? '')
-        if (simple.length >= 4 && sentence.includes(simple)) return { line: fact.line, fact }
+        if (simple.length >= 4 && hasBoundedToken(sentence, simple)) matches.push(fact)
       }
-      return null
+      const lines = new Set(matches.map((fact) => fact.line))
+      if (lines.size !== 1) return null
+      return { line: matches[0]!.line, fact: matches[0]! }
     }
     const replaceFileLine = (
       match: string,
@@ -637,30 +639,30 @@ export function applyFactFixes(
       const filePath = resolvePath(rawPath)
       if (!filePath) return match
       const line = Number(lineText)
+      const count = lineCounts[filePath]
+      if (!count || (line >= 1 && line <= count)) return match
+
+      // 行号已经越界，才用文件自己的唯一事实回填；行号没越界时不猜
       const sentence = sentenceAround(text, offset, match.length)
       const factLine = factLineFor(sentence, filePath)
-      if (factLine && factLine.line !== line) {
+      if (factLine && factLine.line !== line && factLine.line <= count) {
         const replacement =
           style === 'colon' ? `${rawPath}:${factLine.line}` : `${rawPath} 第 ${factLine.line} 行`
-        pushFix(match, replacement, factLine.fact, '行号和程序事实不一致', offset)
+        pushFix(match, replacement, factLine.fact, '行号越界，按程序事实回填', offset)
         return replacement
       }
-      const count = lineCounts[filePath]
-      if (count && (line < 1 || line > count)) {
-        const replacement = `${rawPath}（行号超出文件）`
-        const raw = sentenceAround(text, offset, match.length)
-        fixes.push({
-          from: match,
-          to: replacement,
-          path: filePath,
-          line,
-          reason: '行号不在文件范围内',
-          before: raw.trim(),
-          after: raw.split(match).join(replacement).trim(),
-        })
-        return replacement
-      }
-      return match
+      const replacement = `${rawPath}（行号超出文件）`
+      const raw = sentenceAround(text, offset, match.length)
+      fixes.push({
+        from: match,
+        to: replacement,
+        path: filePath,
+        line,
+        reason: '行号不在文件范围内',
+        before: raw.trim(),
+        after: raw.split(match).join(replacement).trim(),
+      })
+      return replacement
     }
     const colonRe = /([\w./-]+\.(?:java|xml|jsp|js|ts|vue))\s*[:：]\s*(\d+)/g
     text = text.replace(colonRe, (match, rawPath: string, lineText: string, offset: number) =>
@@ -671,31 +673,35 @@ export function applyFactFixes(
       replaceFileLine(match, rawPath, lineText, offset, 'cn'),
     )
     if (context.currentPath && context.currentLineCount) {
+      const currentPath = context.currentPath
+      const currentLineCount = context.currentLineCount
+      const knownPaths = [...new Set([...Object.keys(lineCounts), currentPath])]
       const bareRe = /第\s*(\d+)\s*行/g
       text = text.replace(bareRe, (match, lineText: string, offset: number) => {
-        const line = Number(lineText)
+        if (hasFileReferenceBefore(text, offset)) return match
         const sentence = sentenceAround(text, offset, match.length)
-        const factLine = factLineFor(sentence, context.currentPath!)
-        if (factLine && factLine.line !== line) {
+        if (!namesCurrentFile(sentence, currentPath, knownPaths)) return match
+
+        const line = Number(lineText)
+        if (line >= 1 && line <= currentLineCount) return match
+        const factLine = factLineFor(sentence, currentPath)
+        if (factLine && factLine.line !== line && factLine.line <= currentLineCount) {
           const replacement = `第 ${factLine.line} 行`
-          pushFix(match, replacement, factLine.fact, '行号和程序事实不一致', offset)
+          pushFix(match, replacement, factLine.fact, '行号越界，按程序事实回填', offset)
           return replacement
         }
-        if (line < 1 || line > context.currentLineCount!) {
-          const replacement = '（行号超出当前文件）'
-          const raw = sentenceAround(text, offset, match.length)
-          fixes.push({
-            from: match,
-            to: replacement,
-            path: context.currentPath!,
-            line,
-            reason: '行号不在当前文件范围内',
-            before: raw.trim(),
-            after: raw.split(match).join(replacement).trim(),
-          })
-          return replacement
-        }
-        return match
+        const replacement = '（行号超出当前文件）'
+        const raw = sentenceAround(text, offset, match.length)
+        fixes.push({
+          from: match,
+          to: replacement,
+          path: currentPath,
+          line,
+          reason: '行号不在当前文件范围内',
+          before: raw.trim(),
+          after: raw.split(match).join(replacement).trim(),
+        })
+        return replacement
       })
     }
   }

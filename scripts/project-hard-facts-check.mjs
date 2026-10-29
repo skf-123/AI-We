@@ -85,7 +85,7 @@ check(
 )
 check(
   'controller body would warn',
-  findBodyFactConflicts('后者再调 com.mapper.BookMapper，然后返回。', controllerFacts).length,
+  findBodyFactConflicts('后者再调 com.mapper.BookMapper 接口，然后返回。', controllerFacts).length,
   1,
 )
 

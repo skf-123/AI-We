@@ -13,6 +13,7 @@ import {
   summaryRoleForFile,
   verifyFacts,
 } from '../app/utils/project-facts.ts'
+import { buildFactBindings } from '../app/utils/fact-binding.ts'
 
 let failed = 0
 
@@ -208,7 +209,7 @@ const namespaceClaim = verifyFacts(
 check('namespace claim is not contradiction', namespaceClaim.contradictions, 0)
 
 const bodyWarnings = findBodyFactConflicts(
-  '往下，它调用 com.service.BookService 接口，实际执行的是 BookServiceImpl，后者再调 com.mapper.BookMapper。',
+  '往下，它调用 com.service.BookService 接口，实际执行的是 BookServiceImpl，后者再调 com.mapper.BookMapper 接口。',
   hardFacts,
 )
 check('body warning for wrong interface', bodyWarnings.length, 1)
@@ -260,7 +261,7 @@ check('empty facts format', formatVerifiedFacts([]), '')
 check('facts format includes text', formatVerifiedFacts(hardFacts).includes('BookMapper.java:1'), true)
 
 // ---- 名字级更正 ----
-const fixedCall = applyFactFixes('后者再调 com.mapper.BookMapper，然后返回。', hardFacts)
+const fixedCall = applyFactFixes('后者再调 com.mapper.BookMapper 接口，然后返回。', hardFacts)
 check('fix wrong interface name', fixedCall.text.includes('com.com.mapper.BookMapper'), true)
 check('fix records one replacement', fixedCall.fixes.length, 1)
 check(
@@ -327,12 +328,19 @@ const lineOut = applyFactFixes('BookController.java 第 99 行讲的是别的东
 })
 check('line out of range handled', lineOut.text.includes('行号超出文件'), true)
 
-const bareOut = applyFactFixes('这里第 99 行讲的是别的东西。', hardFacts, {
+const bareOut = applyFactFixes('本文件第 99 行讲的是别的东西。', hardFacts, {
   lineCounts: { 'BookController.java': 23 },
   currentPath: 'BookController.java',
   currentLineCount: 23,
 })
 check('bare line out of range handled', bareOut.text.includes('行号超出当前文件'), true)
+
+const vagueLine = applyFactFixes('这里第 99 行讲的是别的东西。', hardFacts, {
+  lineCounts: { 'BookController.java': 23 },
+  currentPath: 'BookController.java',
+  currentLineCount: 23,
+})
+check('vague line reference left alone', vagueLine.text.includes('这里第 99 行'), true)
 
 check(
   'uncovered relationship flagged',
@@ -362,6 +370,197 @@ check(
   findUncoveredClaims('BookController 是 Web 层控制器。', [], hardFacts).length,
   0,
 )
+
+// ---- 事实绑定：namespace、已正确全限定名、多候选、跨文件行号 ----
+
+for (const sentence of [
+  'BookMapper.xml 的 namespace 写的是 com.mapper.BookMapper。',
+  'BookMapper.xml 里写着 <mapper namespace="com.mapper.BookMapper">。',
+  'XML 配置里 namespace 是 `com.mapper.BookMapper`。',
+  'BookMapper.xml 的 namespace `com.mapper.BookMapper` 和接口对不上。',
+]) {
+  const fixed = applyFactFixes(sentence, hardFacts)
+  check(`namespace value untouched: ${sentence.slice(0, 12)}`, fixed.fixes.length, 0)
+  check(`namespace value not warned: ${sentence.slice(0, 12)}`, findBodyFactConflicts(sentence, hardFacts).length, 0)
+}
+
+const alreadyCorrect = applyFactFixes(
+  '接口是 com.com.mapper.BookMapper，XML 里写的是 com.mapper.BookMapper。',
+  hardFacts,
+)
+check('already correct fqn untouched', alreadyCorrect.fixes.length, 0)
+
+const diagnostic = applyFactFixes(
+  'MyBatis 找不到 com.mapper.BookMapper 这个接口，因为接口实际在 com.com.mapper 下。',
+  hardFacts,
+)
+check('diagnostic sentence untouched', diagnostic.fixes.length, 0)
+check(
+  'diagnostic sentence not warned',
+  findBodyFactConflicts(
+    'MyBatis 找不到 com.mapper.BookMapper 这个接口，因为接口实际在 com.com.mapper 下。',
+    hardFacts,
+  ).length,
+  0,
+)
+
+const ambiguousFacts = [
+  {
+    id: 'fqn:BookMapper:a',
+    kind: 'fqn',
+    path: 'a/BookMapper.java',
+    line: 1,
+    quote: 'package com.a;',
+    text: 'a/BookMapper.java:1 interface com.a.BookMapper',
+    object: 'com.a.BookMapper',
+  },
+  {
+    id: 'fqn:BookMapper:b',
+    kind: 'fqn',
+    path: 'b/BookMapper.java',
+    line: 1,
+    quote: 'package com.b;',
+    text: 'b/BookMapper.java:1 interface com.b.BookMapper',
+    object: 'com.b.BookMapper',
+  },
+  {
+    id: 'ns:BookMapper.xml',
+    kind: 'xml-namespace',
+    path: 'BookMapper.xml',
+    line: 3,
+    quote: '<mapper namespace="com.mapper.BookMapper">',
+    text: 'BookMapper.xml:3 namespace="com.mapper.BookMapper"',
+    object: 'com.mapper.BookMapper',
+  },
+]
+check('ambiguous symbols produce no pair', buildFactBindings(ambiguousFacts).aliasPairs.length, 0)
+check('ambiguous symbols are recorded', buildFactBindings(ambiguousFacts).ambiguousAliases.length, 1)
+check(
+  'ambiguous symbol untouched',
+  applyFactFixes('后者再调 com.mapper.BookMapper。', ambiguousFacts).text.includes(
+    'com.mapper.BookMapper',
+  ),
+  true,
+)
+check(
+  'ambiguous symbol not warned',
+  findBodyFactConflicts('后者再调 com.mapper.BookMapper。', ambiguousFacts).length,
+  0,
+)
+const ambiguousWarnings = findBodyFactConflicts('后者再调 com.mapper.BookMapper 接口。', ambiguousFacts)
+check('ambiguous symbol marked', ambiguousWarnings.length, 1)
+check('ambiguous symbol names candidates', ambiguousWarnings[0].includes('多个候选'), true)
+
+for (const sentence of [
+  'MyBatisConfig 的扫描包写的是 com.mapper.BookMapper。',
+  'application-mapper.xml 里配置的接口是 com.mapper.BookMapper。',
+]) {
+  const fixed = applyFactFixes(sentence, hardFacts)
+  check(`scan/config value untouched: ${sentence.slice(0, 10)}`, fixed.fixes.length, 0)
+  check(
+    `scan/config value not warned: ${sentence.slice(0, 10)}`,
+    findBodyFactConflicts(sentence, hardFacts).length,
+    0,
+  )
+}
+
+const lineContext = {
+  lineCounts: {
+    'BookController.java': 23,
+    'BookServiceImpl.java': 40,
+    'BookMapper.java': 20,
+  },
+  currentPath: 'BookController.java',
+  currentLineCount: 23,
+}
+const crossLine = applyFactFixes('BookServiceImpl.java 第 11 行调用 BookMapper。', hardFacts, lineContext)
+check('cross-file valid line untouched', crossLine.text.includes('BookServiceImpl.java 第 11 行'), true)
+check('cross-file valid line records no fix', crossLine.fixes.length, 0)
+
+const crossColon = applyFactFixes('BookServiceImpl.java:15 调用 BookMapper。', hardFacts, lineContext)
+check('cross-file colon line untouched', crossColon.text.includes('BookServiceImpl.java:15'), true)
+check('cross-file colon line records no fix', crossColon.fixes.length, 0)
+
+const crossBare = applyFactFixes(
+  'BookServiceImpl.java 里，第 11 行调用 BookMapper。',
+  hardFacts,
+  lineContext,
+)
+check('bare line after other file untouched', crossBare.text.includes('第 11 行'), true)
+check('bare line after other file records no fix', crossBare.fixes.length, 0)
+
+const crossOut = applyFactFixes('BookServiceImpl.java 第 99 行调用 BookMapper。', hardFacts, lineContext)
+check('cross-file out-of-range names that file', crossOut.text.includes('BookServiceImpl.java（行号超出文件）'), true)
+check(
+  'cross-file out-of-range not called current file',
+  crossOut.text.includes('当前文件'),
+  false,
+)
+
+const duplicateLineFacts = [
+  ...hardFacts,
+  {
+    id: 'field:BookController:16',
+    kind: 'field-type',
+    path: 'BookController.java',
+    line: 16,
+    quote: 'private com.service.BookService service;',
+    text: 'BookController.java:16 service : com.service.BookService',
+    object: 'com.service.BookService',
+  },
+]
+const ambiguousLine = applyFactFixes(
+  'BookController.java 第 28 行注入 BookService。',
+  duplicateLineFacts,
+  lineContext,
+)
+check('ambiguous line not guessed', ambiguousLine.text.includes('第 14 行'), false)
+check('ambiguous line marked out of range', ambiguousLine.text.includes('行号超出文件'), true)
+
+const explicitCurrent = applyFactFixes('本文件第 28 行注入 BookService。', hardFacts, lineContext)
+check('explicit current file line corrected', explicitCurrent.text.includes('第 14 行'), true)
+
+// ---- 第 98 条 14 处错误更正：逐条反例 ----
+// 2 处 namespace + 4 处跨文件行号 + 8 处「行号超出当前文件」。
+// 当前文件故意设成 12 行的 BookService.java，让旧逻辑把这些行号当成当前文件。
+
+const fourteenContext = {
+  lineCounts: {
+    'BookController.java': 23,
+    'BookService.java': 12,
+    'BookServiceImpl.java': 40,
+    'MyBatisConfig.java': 60,
+    'BookMapper.java': 20,
+    'BookMapper.xml': 30,
+    'book.jsp': 30,
+    'BookTest.java': 30,
+    'SpringConfig.java': 30,
+  },
+  currentPath: 'BookService.java',
+  currentLineCount: 12,
+}
+const fourteenCases = [
+  ['namespace 写的是', 'BookMapper.xml 的 namespace 写的是 com.mapper.BookMapper。'],
+  ['namespace 是', 'BookMapper.xml 的 namespace 是 com.mapper.BookMapper。'],
+  ['跨文件行号 1', 'BookServiceImpl.java 第 11 行调用 BookMapper。'],
+  ['跨文件行号 2', 'MyBatisConfig.java 第 28 行扫描 com.mapper。'],
+  ['跨文件行号 3', 'BookMapper.java 第 1 行写的是 package com.com.mapper;'],
+  ['跨文件行号 4', 'BookTest.java 第 12 行用的是 XML 配置。'],
+  ['当前文件误判 1', 'BookController.java 第 18 行注入 BookService。'],
+  ['当前文件误判 2', 'BookServiceImpl.java 第 15 行调用 BookMapper。'],
+  ['当前文件误判 3', 'book.jsp 第 13 行写的是 ${book.id}。'],
+  ['当前文件误判 4', 'BookMapper.java 第 14 行声明接口。'],
+  ['当前文件误判 5', 'BookMapper.xml 第 18 行写的是 namespace。'],
+  ['当前文件误判 6', 'BookTest.java 第 14 行加载配置。'],
+  ['当前文件误判 7', 'SpringConfig.java 第 22 行扫描包。'],
+  ['当前文件误判 8', 'MyBatisConfig.java 第 15 行设置扫描包。'],
+]
+check('14 counterexamples present', fourteenCases.length, 14)
+for (const [label, sentence] of fourteenCases) {
+  const fixed = applyFactFixes(sentence, hardFacts, fourteenContext)
+  check(`14反例 ${label} 不改`, fixed.fixes.length, 0)
+  check(`14反例 ${label} 不写当前文件`, fixed.text.includes('当前文件'), false)
+}
 
 if (failed > 0) {
   console.error(`\n${failed} 项失败`)
