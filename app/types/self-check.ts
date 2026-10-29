@@ -12,11 +12,15 @@ export type SelfCheckItemKind =
   | 'partial'
   | 'unknown'
   | 'other'
+  | 'floating'
+  | 'group-only'
+  | 'unowned'
+  | 'duplicate'
 
 export interface SelfCheckItem {
   /** 稳定 id，例如 E12；模型只按这个 id 回决定 */
   id: string
-  /** 原始图 edges 数组的下标，合并时用 */
+  /** 原始图 edges 数组的下标；结构项是 -1 */
   edgeIndex: number
   from: string
   to: string
@@ -24,8 +28,12 @@ export interface SelfCheckItem {
   kind: SelfCheckItemKind
   /** 程序预检给出的依据；给模型看 */
   detail: string
-  /** 这条边所属的批号，1 起 */
+  /** 这条边 / 结构项所属的批号，1 起 */
   batch: number
+  /** 分组边可拆的文件对 */
+  pairs?: { from: string; to: string }[]
+  /** 浮节点 / 未归属 / 重复归属涉及的文件 */
+  paths?: string[]
 }
 
 export interface SelfCheckNodeSummary {
@@ -60,7 +68,16 @@ export interface SelfCheckBatch {
   toolAllowance: number
 }
 
-export type SelfCheckAction = 'keep' | 'remove' | 'reverse' | 'relabel' | 'unknown'
+export type SelfCheckAction =
+  | 'keep'
+  | 'remove'
+  | 'reverse'
+  | 'relabel'
+  | 'unknown'
+  | 'connect'
+  | 'split'
+  | 'move-file'
+  | 'add-node'
 
 export interface SelfCheckDecision {
   id: string
@@ -68,6 +85,21 @@ export interface SelfCheckDecision {
   label?: string
   reason?: string
   evidence?: string[]
+  /** connect 的目标端点 */
+  to?: string
+  /** move-file 的文件路径 */
+  path?: string
+  /** move-file / add-node 的目标节点 */
+  toNode?: string
+  /** split 要保留的文件对 */
+  pairs?: { from: string; to: string }[]
+  /** add-node 的新节点 */
+  node?: {
+    id: string
+    label: string
+    type?: string
+    files?: string[]
+  }
 }
 
 export interface SelfCheckCoverage {
@@ -81,6 +113,9 @@ export interface SelfCheckCoverage {
   groupOnly?: number
   unowned?: number
   duplicate?: number
+  /** 结构项数量 / 已处理数量；不计入边的 checked */
+  structural?: number
+  structuralChecked?: number
 }
 
 export interface SelfCheckEvidence {

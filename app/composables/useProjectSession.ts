@@ -1047,6 +1047,7 @@ export function useProjectSession() {
           plan.items,
           batchResult.decisions,
           plan.supported,
+          files.value.map((entry) => entry.path),
         )
         selfCheckGraph.value = merged.graph
         preSelfCheckGraph.value = graph
@@ -1107,6 +1108,9 @@ export function useProjectSession() {
         `未核 ${coverage.unknown}`,
         `冲突 ${coverage.conflict}`,
       ]
+      if (coverage.structural) {
+        parts.push(`结构项 ${coverage.structuralChecked ?? 0}/${coverage.structural}`)
+      }
       if (coverage.floating) parts.push(`浮节点 ${coverage.floating}`)
       if (coverage.groupOnly) parts.push(`分组边 ${coverage.groupOnly}`)
       if (coverage.unowned) parts.push(`未归属 ${coverage.unowned}`)

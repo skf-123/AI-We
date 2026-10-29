@@ -74,10 +74,11 @@ function kindOf(suspicion: GraphSuspicion | undefined): SelfCheckItemKind | null
 /**
  * 图证据本身也能产生可疑项：没有依据、只有部分依据、方向相反。
  *
- * 分组边不送模型：唯一文件对已经展开，多对保留聚合，程序不硬拆。
+ * 有 filePairs 的分组边也进清单，让模型决定拆成哪些文件对；
+ * 程序不再把“多对聚合”直接当成已解决。
  */
 function kindFromEdge(edge: ProjectGraphEdge): SelfCheckItemKind | null {
-  if (edge.filePairs?.length) return null
+  if (edge.filePairs?.length) return 'group-only'
   if (edge.note?.includes('方向和图上的边相反')) return 'reversed'
   if (edge.confidence === 'inferred') return 'inferred'
   if (edge.confidence === 'partial') return 'partial'
@@ -87,15 +88,18 @@ function kindFromEdge(edge: ProjectGraphEdge): SelfCheckItemKind | null {
 function edgeDetail(edge: ProjectGraphEdge, kind: SelfCheckItemKind): string {
   if (kind === 'inferred') return '程序没有找到这条边的文件级依据'
   if (kind === 'partial') return '只有部分文件对找到了程序依据'
+  if (kind === 'group-only') return edge.note ?? `分组边，涉及 ${edge.filePairs?.length ?? 0} 对文件`
   return edge.note ?? ''
 }
 
 export interface SelfCheckPlan {
-  /** 所有边；没进批的也在里面，status 由 supported 表示 */
+  /** 所有边和结构项；没进批的边也在里面，status 由 supported 表示 */
   items: SelfCheckItem[]
   batches: SelfCheckBatch[]
   supported: number
   total: number
+  /** 清单里的结构项数量；不计入 total（total 只数边） */
+  structural: number
   overview: SelfCheckOverview
 }
 
@@ -118,11 +122,6 @@ export function buildSelfCheckPlan(
       return
     }
     const suspicion = byKey.get(edgeKey(edge))
-    // group-only 由程序聚合处理，不送模型拆边
-    if (suspicion?.kind === 'group-only') {
-      supported++
-      return
-    }
     const kind = kindOf(suspicion) ?? kindFromEdge(edge)
     if (!kind) {
       supported++
@@ -137,8 +136,51 @@ export function buildSelfCheckPlan(
       kind,
       detail: suspicion?.detail || edgeDetail(edge, kind),
       batch: 0,
+      pairs: edge.filePairs?.map((pair) => ({ from: pair.from, to: pair.to })),
     })
   })
+
+  // 结构项：浮节点、未归属、重复归属。
+  // 它们不是边，不能混进 edges 总数；单独计数、单独合并。
+  let structuralIndex = 0
+  for (const node of graph.nodes) {
+    if (!node.floating || !node.files?.length) continue
+    items.push({
+      id: `S${++structuralIndex}`,
+      edgeIndex: -1,
+      from: `n:${node.id}`,
+      to: '',
+      label: node.label,
+      kind: 'floating',
+      detail: '节点有文件，但没有任何外部连线',
+      batch: 0,
+      paths: node.files.map((file) => file.path),
+    })
+  }
+  for (const [index, path] of (graph.unownedFiles ?? []).entries()) {
+    items.push({
+      id: `U${index + 1}`,
+      edgeIndex: -1,
+      from: `f:${path}`,
+      to: '',
+      kind: 'unowned',
+      detail: '文件没有出现在任何节点的 files 列表里',
+      batch: 0,
+      paths: [path],
+    })
+  }
+  for (const [index, row] of (graph.duplicateFiles ?? []).entries()) {
+    items.push({
+      id: `D${index + 1}`,
+      edgeIndex: -1,
+      from: `f:${row.path}`,
+      to: '',
+      kind: 'duplicate',
+      detail: `文件同时属于：${row.nodes.map((id) => `n:${id}`).join('、')}`,
+      batch: 0,
+      paths: [row.path],
+    })
+  }
 
   // 按起点分组聚类，再按 edgeIndex 保留稳定顺序
   const grouped = new Map<string, SelfCheckItem[]>()
@@ -159,8 +201,9 @@ export function buildSelfCheckPlan(
 
       const endpoints = new Set<string>()
       for (const item of slice) {
-        endpoints.add(item.from)
-        endpoints.add(item.to)
+        if (item.from) endpoints.add(item.from)
+        if (item.to) endpoints.add(item.to)
+        for (const path of item.paths ?? []) endpoints.add(`f:${path}`)
       }
 
       const crossGroup = slice.some(
@@ -170,6 +213,7 @@ export function buildSelfCheckPlan(
         slice.filter((item) => item.kind === 'reversed').length * 2 +
         slice.filter((item) => item.kind === 'unsupported').length * 2 +
         slice.filter((item) => item.kind === 'inferred' || item.kind === 'partial').length +
+        slice.filter((item) => item.edgeIndex < 0).length * 2 +
         (crossGroup ? 1 : 0)
 
       batches.push({
@@ -193,6 +237,7 @@ export function buildSelfCheckPlan(
     batches,
     supported,
     total: graph.edges.length,
+    structural: items.filter((item) => item.edgeIndex < 0).length,
     overview: {
       groups: graph.nodes
         .filter((node) => node.files && node.files.length > 0)
@@ -217,10 +262,18 @@ export function formatBatchContent(
   projectContext: string,
   overview: SelfCheckOverview,
 ): string {
-  const edges = batch.items
+  const edgeItems = batch.items.filter((item) => item.edgeIndex >= 0)
+  const structuralItems = batch.items.filter((item) => item.edgeIndex < 0)
+  const edges = edgeItems
     .map(
       (item) =>
         `- ${item.id}：${item.from} -> ${item.to}${item.label ? `（当前标签：${item.label}）` : ''}\n  预检：${item.kind}${item.detail ? `；${item.detail}` : ''}`,
+    )
+    .join('\n')
+  const structures = structuralItems
+    .map(
+      (item) =>
+        `- ${item.id}：${item.kind}；${item.from}${item.paths?.length ? `；文件：${item.paths.join('、')}` : ''}\n  预检：${item.detail}`,
     )
     .join('\n')
 
@@ -232,8 +285,11 @@ export function formatBatchContent(
 
   return `【全图摘要】节点 ${overview.nodes} 个，边 ${overview.edges} 条；程序已支持 ${overview.supported} 条；浮节点 ${overview.floating} 个，分组边 ${overview.groupOnly} 条，未归属文件 ${overview.unowned} 个，重复归属 ${overview.duplicate} 个；分组：${groups}
 
-【本批边】共 ${batch.items.length} 条，只处理这些
-${edges}
+【本批边】共 ${edgeItems.length} 条，只处理这些
+${edges || '（没有边）'}
+
+【本批结构项】共 ${structuralItems.length} 项
+${structures || '（没有结构项）'}
 
 【涉及的节点】
 ${nodes}
@@ -245,9 +301,12 @@ ${batch.paths.map((path) => `- ${path}`).join('\n') || '（没有文件端点）
 ${projectContext.slice(0, 20_000)}
 
 【规则】
-- 只对本批每条边回一个决定：keep / remove / reverse / relabel / unknown；
+- 边可以回：keep / remove / reverse / relabel / unknown；
+- 结构项可以回：keep / connect / split / move-file / add-node / unknown；
+- connect 用 to 指向目标端点；split 用 pairs 指定保留的文件对；
+- move-file 用 path + toNode 指定文件和新节点；add-node 用 node 指定新节点；
 - reverse 表示把 from/to 对调；relabel 只改标签；unknown 表示证据不足；
-- 没有证据就写 unknown，不要猜；不要输出完整图；
+- 没有证据就写 unknown，不要猜；不要输出完整图；不要编造文件路径或节点 id；
 - 需要读文件时，按工具格式申请，最多 ${batch.toolAllowance} 次；程序可能按预算拒绝。
 
 【输出】

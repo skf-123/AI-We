@@ -142,7 +142,17 @@ function parseBatchDecisions(
 ): SelfCheckDecision[] | null {
   const raw = extractJson(content) as { decisions?: unknown } | null
   if (!raw || !Array.isArray(raw.decisions)) return null
-  const actions = new Set(['keep', 'remove', 'reverse', 'relabel', 'unknown'])
+  const actions = new Set([
+    'keep',
+    'remove',
+    'reverse',
+    'relabel',
+    'unknown',
+    'connect',
+    'split',
+    'move-file',
+    'add-node',
+  ])
   const byId = new Map<string, SelfCheckDecision>()
   for (const item of raw.decisions) {
     if (!item || typeof item !== 'object') continue
@@ -152,9 +162,46 @@ function parseBatchDecisions(
       label?: unknown
       reason?: unknown
       evidence?: unknown
+      to?: unknown
+      path?: unknown
+      toNode?: unknown
+      pairs?: unknown
+      node?: unknown
     }
     if (typeof row.id !== 'string' || !allowedIds.has(row.id)) continue
     if (typeof row.action !== 'string' || !actions.has(row.action)) continue
+    const pairs = Array.isArray(row.pairs)
+      ? row.pairs
+          .filter(
+            (pair): pair is { from: string; to: string } =>
+              Boolean(pair) &&
+              typeof pair === 'object' &&
+              typeof (pair as { from?: unknown }).from === 'string' &&
+              typeof (pair as { to?: unknown }).to === 'string',
+          )
+          .slice(0, 20)
+          .map((pair) => ({ from: pair.from, to: pair.to }))
+      : undefined
+    const node =
+      row.node && typeof row.node === 'object'
+        ? (() => {
+            const value = row.node as {
+              id?: unknown
+              label?: unknown
+              type?: unknown
+              files?: unknown
+            }
+            if (typeof value.id !== 'string' || typeof value.label !== 'string') return undefined
+            return {
+              id: value.id,
+              label: value.label,
+              type: typeof value.type === 'string' ? value.type : undefined,
+              files: Array.isArray(value.files)
+                ? value.files.filter((file): file is string => typeof file === 'string').slice(0, 50)
+                : undefined,
+            }
+          })()
+        : undefined
     byId.set(row.id, {
       id: row.id,
       action: row.action as SelfCheckDecision['action'],
@@ -163,6 +210,11 @@ function parseBatchDecisions(
       evidence: Array.isArray(row.evidence)
         ? row.evidence.filter((value): value is string => typeof value === 'string').slice(0, 8)
         : undefined,
+      to: typeof row.to === 'string' ? row.to : undefined,
+      path: typeof row.path === 'string' ? row.path : undefined,
+      toNode: typeof row.toNode === 'string' ? row.toNode : undefined,
+      pairs,
+      node,
     })
   }
   const decisions = [...byId.values()]
@@ -624,7 +676,7 @@ export function useProjectAgent() {
           [
             {
               role: 'user',
-              content: `【最后补决定】下面这些边在批预算内没有拿到决定。不要再读文件，只根据已有预检信息给出 ${missingItems.length} 条决定；没有依据就写 unknown。\n${lines}\n\n只输出一个 JSON 对象：{"decisions":[{"id":"E12","action":"keep|remove|reverse|relabel|unknown","label":"可选","reason":"依据","evidence":["path:line"]}]}`,
+              content: `【最后补决定】下面这些项在批预算内没有拿到决定。不要再读文件，只根据已有预检信息给出 ${missingItems.length} 条决定；没有依据就写 unknown。\n${lines}\n\n只输出一个 JSON 对象：{"decisions":[{"id":"E12","action":"keep|remove|reverse|relabel|connect|split|move-file|add-node|unknown","label":"可选","reason":"依据","evidence":["path:line"]}]}`,
             },
           ],
           true,
@@ -639,12 +691,21 @@ export function useProjectAgent() {
       const plannedIds = new Set(input.plan.items.map((item) => item.id))
       const decisionById = new Map(decisions.map((decision) => [decision.id, decision]))
       const validDecisions = decisions.filter((decision) => plannedIds.has(decision.id))
+      const edgeItems = input.plan.items.filter((item) => item.edgeIndex >= 0)
+      const structuralItems = input.plan.items.filter((item) => item.edgeIndex < 0)
       const checked =
         input.plan.supported +
-        validDecisions.filter((decision) => decision.action !== 'unknown').length
-      const unknown = input.plan.items.filter((item) => {
+        edgeItems.filter((item) => {
+          const decision = decisionById.get(item.id)
+          return decision && decision.action !== 'unknown'
+        }).length
+      const unknown = edgeItems.filter((item) => {
         const decision = decisionById.get(item.id)
         return !decision || decision.action === 'unknown'
+      }).length
+      const structuralChecked = structuralItems.filter((item) => {
+        const decision = decisionById.get(item.id)
+        return decision && decision.action !== 'unknown'
       }).length
       const conflict = validDecisions.length === decisions.length ? 0 : decisions.length - validDecisions.length
 
@@ -657,6 +718,9 @@ export function useProjectAgent() {
           unknown,
           conflict,
           supported: input.plan.supported,
+          ...(structuralItems.length
+            ? { structural: structuralItems.length, structuralChecked }
+            : {}),
         },
         evidence,
         usedTokens: budget.used,

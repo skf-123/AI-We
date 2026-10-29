@@ -123,8 +123,9 @@ const groupOnlyPlan = buildSelfCheckPlan(
   },
   [],
 )
-check('group file pairs handled by program', groupOnlyPlan.items.length, 0)
-check('group file pairs counted supported', groupOnlyPlan.supported, 1)
+check('group file pairs enter plan', groupOnlyPlan.items.length, 1)
+check('group file pairs kind', groupOnlyPlan.items[0]?.kind, 'group-only')
+check('group file pairs not supported', groupOnlyPlan.supported, 0)
 
 const budget = createSelfCheckBudget()
 check('初始批池', budget.pool, 125_000)
@@ -184,3 +185,37 @@ if (failed > 0) {
   process.exit(1)
 }
 console.log('\n全部通过')
+
+const structuralGraph = {
+  nodes: [
+    { id: 'a', label: 'A', type: 'code', files: [{ path: 'a.java' }], floating: true },
+    { id: 'b', label: 'B', type: 'code', files: [{ path: 'b.java' }] },
+  ],
+  edges: [{ from: 'f:a.java', to: 'f:b.java', label: '旧关系' }],
+  unownedFiles: ['c.java'],
+  duplicateFiles: [{ path: 'd.java', nodes: ['a', 'b'] }],
+}
+const structuralItems = [
+  { id: 'S1', edgeIndex: -1, from: 'n:a', to: '', label: 'A', kind: 'floating', detail: '浮节点', batch: 1, paths: ['a.java'] },
+  { id: 'S2', edgeIndex: -1, from: 'n:b', to: '', label: 'B', kind: 'duplicate', detail: '重复归属', batch: 1, paths: ['d.java'] },
+  { id: 'S3', edgeIndex: -1, from: 'f:c.java', to: '', kind: 'unowned', detail: '未归属', batch: 1, paths: ['c.java'] },
+  { id: 'E0', edgeIndex: 0, from: 'f:a.java', to: 'f:b.java', label: '旧关系', kind: 'group-only', detail: '分组边', batch: 1, pairs: [{ from: 'a.java', to: 'b.java' }] },
+]
+const structuralMerged = mergeSelfCheckDecisions(
+  structuralGraph,
+  structuralItems,
+  [
+    { id: 'S1', action: 'connect', to: 'n:b', label: '连到 B' },
+    { id: 'S2', action: 'add-node', node: { id: 'c', label: '新分组', type: 'code', files: ['d.java'] } },
+    { id: 'S3', action: 'move-file', path: 'c.java', toNode: 'b' },
+    { id: 'E0', action: 'split', pairs: [{ from: 'a.java', to: 'b.java' }] },
+  ],
+  0,
+  ['d.java'],
+)
+check('connect 新增边', structuralMerged.graph.edges.some((e) => e.from === 'n:a' && e.to === 'n:b'), true)
+check('add-node 新增节点', structuralMerged.graph.nodes.some((n) => n.id === 'c'), true)
+check('move-file 改归属', structuralMerged.graph.nodes.find((n) => n.id === 'b')?.files?.some((f) => f.path === 'c.java'), true)
+check('split 产出文件边', structuralMerged.graph.edges.some((e) => e.from === 'f:a.java' && e.to === 'f:b.java'), true)
+check('结构项已处理', [structuralMerged.coverage.structural, structuralMerged.coverage.structuralChecked], [3, 3])
+check('结构动作无冲突', structuralMerged.coverage.conflict, 0)
