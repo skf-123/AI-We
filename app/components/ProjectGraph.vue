@@ -160,6 +160,8 @@ const layout = computed(() => {
           type: node.type,
           detail: node.detail,
           filesCount: node.files!.length,
+          floating: Boolean(node.floating),
+          ownershipNote: node.ownershipNote,
           expanded: true,
           active: Boolean(node.files?.some((f) => f.path === props.activePath)),
         },
@@ -215,6 +217,8 @@ const layout = computed(() => {
           type: node.type,
           detail: node.detail,
           filesCount: isGroup ? node.files!.length : 0,
+          floating: Boolean(node.floating),
+          ownershipNote: node.ownershipNote,
           expanded: false,
           active: Boolean(node.files?.some((f) => f.path === props.activePath)),
         },
@@ -471,7 +475,17 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div v-if="selectedEdge.filePairs?.length" class="mt-1 text-slate-500">
-        文件对：{{ selectedEdge.filePairs.length }} 对
+        <div>文件对：{{ selectedEdge.filePairs.length }} 对</div>
+        <div
+          v-for="pair in selectedEdge.filePairs.slice(0, 4)"
+          :key="`${pair.from}->${pair.to}`"
+          class="truncate text-slate-400"
+        >
+          {{ pair.from }} → {{ pair.to }}
+        </div>
+        <div v-if="selectedEdge.filePairs.length > 4" class="text-slate-400">
+          还有 {{ selectedEdge.filePairs.length - 4 }} 对
+        </div>
       </div>
       <div
         v-else-if="selectedEdge.confidence === 'inferred'"
@@ -547,6 +561,20 @@ onBeforeUnmount(() => {
                 class="mt-0.5 truncate text-[11px] leading-snug text-slate-500"
               >
                 {{ p.data.detail }}
+              </div>
+              <div
+                v-if="p.data.floating"
+                class="mt-0.5 truncate text-[10px] text-amber-700"
+                title="这个节点没有任何连线"
+              >
+                浮节点 · 无外部连线
+              </div>
+              <div
+                v-else-if="p.data.ownershipNote"
+                class="mt-0.5 truncate text-[10px] text-amber-700"
+                :title="p.data.ownershipNote"
+              >
+                {{ p.data.ownershipNote }}
               </div>
             </div>
           </template>
