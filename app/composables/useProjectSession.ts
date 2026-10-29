@@ -1105,7 +1105,17 @@ export function useProjectSession() {
     if (selfCheckBatchMode.value) {
       const coverage = selfCheckCoverage.value
       if (!coverage) return ''
-      return `自检完成：已核对 ${coverage.checked}/${coverage.total} 条边，${selfCheck.rounds.value} 批，未核 ${coverage.unknown}，冲突 ${coverage.conflict}`
+      const parts = [
+        `已核对 ${coverage.checked}/${coverage.total} 条边`,
+        `${selfCheck.rounds.value} 批`,
+        `未核 ${coverage.unknown}`,
+        `冲突 ${coverage.conflict}`,
+      ]
+      if (coverage.floating) parts.push(`浮节点 ${coverage.floating}`)
+      if (coverage.groupOnly) parts.push(`分组边 ${coverage.groupOnly}`)
+      if (coverage.unowned) parts.push(`未归属 ${coverage.unowned}`)
+      if (coverage.duplicate) parts.push(`重复归属 ${coverage.duplicate}`)
+      return `自检完成：${parts.join('，')}`
     }
 
     const diff = selfCheckDiff.value

@@ -126,6 +126,11 @@ export function mergeSelfCheckDecisions(
     if (!itemById.has(decision.id)) conflict++
   }
 
+  const floatingCount = graph.nodes.filter((node) => node.floating).length
+  const groupOnlyCount = graph.edges.filter(
+    (edge) => Boolean(edge.filePairs?.length) || Boolean(edge.note?.includes('分组关系')),
+  ).length
+
   return {
     graph: { ...graph, edges: resultEdges },
     coverage: {
@@ -134,6 +139,10 @@ export function mergeSelfCheckDecisions(
       unknown,
       conflict,
       supported,
+      ...(floatingCount ? { floating: floatingCount } : {}),
+      ...(groupOnlyCount ? { groupOnly: groupOnlyCount } : {}),
+      ...(graph.unownedFiles?.length ? { unowned: graph.unownedFiles.length } : {}),
+      ...(graph.duplicateFiles?.length ? { duplicate: graph.duplicateFiles.length } : {}),
     },
     applied,
   }

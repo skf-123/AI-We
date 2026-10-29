@@ -35,6 +35,10 @@ export interface SelfCheckOverview {
   edges: number
   supported: number
   total: number
+  floating: number
+  groupOnly: number
+  unowned: number
+  duplicate: number
 }
 
 export interface SelfCheckBatch {
@@ -66,6 +70,11 @@ export interface SelfCheckCoverage {
   unknown: number
   conflict: number
   supported: number
+  /** 程序检查项；只计入实际存在问题的情况 */
+  floating?: number
+  groupOnly?: number
+  unowned?: number
+  duplicate?: number
 }
 
 export interface SelfCheckEvidence {

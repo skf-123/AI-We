@@ -171,6 +171,12 @@ export function buildSelfCheckPlan(
       edges: graph.edges.length,
       supported,
       total: graph.edges.length,
+      floating: graph.nodes.filter((node) => node.floating).length,
+      groupOnly: graph.edges.filter(
+        (edge) => Boolean(edge.filePairs?.length) || Boolean(edge.note?.includes('分组关系')),
+      ).length,
+      unowned: graph.unownedFiles?.length ?? 0,
+      duplicate: graph.duplicateFiles?.length ?? 0,
     },
   }
 }
@@ -194,7 +200,7 @@ export function formatBatchContent(
 
   const groups = overview.groups.length > 0 ? overview.groups.join('、') : '（没有分组）'
 
-  return `【全图摘要】节点 ${overview.nodes} 个，边 ${overview.edges} 条；程序已支持 ${overview.supported} 条；分组：${groups}
+  return `【全图摘要】节点 ${overview.nodes} 个，边 ${overview.edges} 条；程序已支持 ${overview.supported} 条；浮节点 ${overview.floating} 个，分组边 ${overview.groupOnly} 条，未归属文件 ${overview.unowned} 个，重复归属 ${overview.duplicate} 个；分组：${groups}
 
 【本批边】共 ${batch.items.length} 条，只处理这些
 ${edges}

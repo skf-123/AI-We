@@ -110,6 +110,29 @@ const unknownMerge = mergeSelfCheckDecisions(graph, plan.items, [{ id: 'E0', act
 check('unknown 保留原边', unknownMerge.graph.edges.some((e) => e.from === 'f:Article.java' && e.to === 'f:ArticleMapper.java'), true)
 check('unknown 计入未核', [unknownMerge.coverage.unknown, unknownMerge.coverage.checked], [3, 2])
 
+const integrityMerged = mergeSelfCheckDecisions(
+  {
+    ...graph,
+    nodes: [{ ...graph.nodes[0], floating: true }, ...graph.nodes.slice(1)],
+    edges: [{ ...graph.edges[0], filePairs: [{ from: 'Article.java', to: 'ArticleMapper.java', evidence: [] }] }],
+    unownedFiles: ['Orphan.java'],
+    duplicateFiles: [{ path: 'Article.java', nodes: ['entity', 'mapper'] }],
+  },
+  [],
+  [],
+  0,
+)
+check(
+  'program issue counts in coverage',
+  [
+    integrityMerged.coverage.floating,
+    integrityMerged.coverage.groupOnly,
+    integrityMerged.coverage.unowned,
+    integrityMerged.coverage.duplicate,
+  ],
+  [1, 1, 1, 1],
+)
+
 if (failed > 0) {
   console.error(`\n${failed} 项失败`)
   process.exit(1)
