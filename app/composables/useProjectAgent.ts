@@ -271,6 +271,11 @@ export function useProjectAgent() {
   interface AskResult {
     message: AgentMessage
     finishReason: string
+    usage?: {
+      total?: number
+      total_tokens?: number
+      [key: string]: unknown
+    }
   }
 
   async function ask(
@@ -298,10 +303,15 @@ export function useProjectAgent() {
       throw new Error(msg)
     }
 
-    const data = (await res.json()) as { message?: AgentMessage; finishReason?: string }
+    const data = (await res.json()) as {
+      message?: AgentMessage
+      finishReason?: string
+      usage?: AskResult['usage']
+    }
     return {
       message: data.message ?? { role: 'assistant', content: '' },
       finishReason: data.finishReason ?? '',
+      usage: data.usage,
     }
   }
 

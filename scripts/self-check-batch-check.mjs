@@ -136,6 +136,11 @@ recordUsage(budget, Math.min(4_000, quota))
 check('实际用量扣池', budget.used, Math.min(4_000, quota))
 check('剩余回池', budget.pool, 125_000 - budget.used)
 
+const hardBudget = createSelfCheckBudget()
+recordUsage(hardBudget, 165_000)
+check('达到硬停后不能再开批', canStartBatch(hardBudget, 15_000), false)
+check('硬停用量如实累计', hardBudget.used, 165_000)
+
 const decisions = [
   { id: 'E0', action: 'reverse', label: 'BaseMapper 泛型操作对象' },
   { id: 'E1', action: 'remove', reason: '没有依据' },
