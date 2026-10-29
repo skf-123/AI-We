@@ -4,6 +4,7 @@ import { useProjectSession, type ProjectSelectionPayload } from '~/composables/u
 import { useSelectionAsk } from '~/composables/useSelectionAsk'
 import { useSystemIncludeHint } from '~/composables/useSystemIncludeHint'
 import { formatSize, PROJECT_LIMITS } from '~/utils/project-files'
+import { structureProfileLabel } from '~/utils/structure'
 
 useHead({ title: '整个项目 · 麦穗 · 代码理解助手' })
 
@@ -376,7 +377,7 @@ onBeforeUnmount(() => {
                   建议先读：{{ mapReadingPlan.slice(0, 3).join(' → ') }}
                 </p>
                 <p v-if="structure" class="mt-0.5 text-[11px] text-emerald-600">
-                  已识别：{{ structure.profile === 'java-spring' ? 'Java / Spring / MyBatis' : structure.profile }}
+                  已识别：{{ structureProfileLabel(structure.profile) }}
                   · 包名、import、namespace、扫描包、注入类型由程序核实
                 </p>
                 <p v-else class="mt-0.5 text-[11px] text-slate-400">

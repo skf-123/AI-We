@@ -12,7 +12,16 @@ export interface StructureSourceFile {
   text: string
 }
 
-export type StructureProfile = 'java-spring' | 'unsupported'
+export type StructureProfile =
+  | 'java-spring'
+  | 'js-ts'
+  | 'react'
+  | 'vue'
+  | 'python'
+  | 'sql'
+  | 'css'
+  | 'mixed'
+  | 'unsupported'
 
 export type HardFactKind =
   | 'package'
@@ -25,6 +34,14 @@ export type HardFactKind =
   | 'scan-package'
   | 'component-scan'
   | 'web-servlet'
+  | 'symbol'
+  | 'component'
+  | 'component-use'
+  | 'table'
+  | 'column'
+  | 'foreign-key'
+  | 'css-import'
+  | 'css-selector'
   | 'conflict'
 
 export interface HardFact {
@@ -61,7 +78,7 @@ export interface StructureSymbol {
   path: string
   /** 1 起 */
   line: number
-  kind: 'class' | 'interface' | 'enum'
+  kind: 'class' | 'interface' | 'enum' | 'function' | 'component' | 'variable' | 'table'
 }
 
 export interface HardFactGraph {

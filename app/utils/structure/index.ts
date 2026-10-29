@@ -6,9 +6,39 @@
  * 新增语言 = 在这里注册一个适配器，核心不改。
  */
 import type { HardFact, ProjectStructureAdapter, StructureSourceFile } from '~/types/structure'
-import { javaSpringAdapter } from './java-spring'
+import { javaSpringAdapter } from './java-spring.ts'
+import { jsTsAdapter, reactAdapter } from './js-ts.ts'
+import { vueAdapter } from './vue.ts'
+import { pythonAdapter } from './python.ts'
+import { sqlAdapter } from './sql.ts'
+import { cssAdapter } from './css.ts'
+import { mergeAdapterRuns, selectMergedFacts, type AdapterRun } from './multi.ts'
 
-const ADAPTERS: ProjectStructureAdapter[] = [javaSpringAdapter]
+const ADAPTERS: ProjectStructureAdapter[] = [
+  javaSpringAdapter,
+  jsTsAdapter,
+  reactAdapter,
+  vueAdapter,
+  pythonAdapter,
+  sqlAdapter,
+  cssAdapter,
+]
+
+const PROFILE_LABELS: Record<string, string> = {
+  'java-spring': 'Java / Spring / MyBatis',
+  'js-ts': 'JavaScript / TypeScript',
+  react: 'React',
+  vue: 'Vue',
+  python: 'Python',
+  sql: 'SQL',
+  css: 'CSS',
+  mixed: '多语言',
+  unsupported: '未识别',
+}
+
+export function structureProfileLabel(profile: string): string {
+  return PROFILE_LABELS[profile] ?? profile
+}
 
 export interface ProjectStructureResult {
   /** 用于页面显示和调试；不含页面/组件引用 */
@@ -36,17 +66,25 @@ export function structureFactsEnabled(): boolean {
 
 export function analyzeProjectStructure(files: StructureSourceFile[]): ProjectStructureResult | null {
   if (files.length === 0) return null
-  const adapter = ADAPTERS.find((item) => item.detect(files))
-  if (!adapter) return null
+  const runs: AdapterRun[] = ADAPTERS.filter((adapter) => adapter.detect(files)).map((adapter) => {
+    const graph = adapter.analyze(files)
+    return {
+      id: adapter.id,
+      profile: graph.profile,
+      graph,
+      select: (path: string) => adapter.selectFacts(graph, path),
+    }
+  })
+  if (runs.length === 0) return null
 
-  const graph = adapter.analyze(files)
+  const graph = mergeAdapterRuns(runs)
   return {
-    adapterId: adapter.id,
+    adapterId: runs.map((run) => run.id).join('+'),
     profile: graph.profile,
     allFacts: graph.facts,
     lineCounts: graph.lineCounts,
     selectFacts(path: string) {
-      return adapter.selectFacts(graph, path)
+      return selectMergedFacts(runs, path)
     },
   }
 }
