@@ -12,6 +12,12 @@ import { useProjectAgent } from '~/composables/useProjectAgent'
 
 definePageMeta({ layout: false })
 
+const route = useRoute()
+const fixtureUrl =
+  route.query.fixture === '187'
+    ? '/dev/self-check-fixture-187.json'
+    : '/dev/self-check-fixture.json'
+
 interface Fixture {
   graph: ProjectGraphData
   files: { path: string; name: string; content: string }[]
@@ -30,7 +36,7 @@ const error = agent.error
 
 onMounted(async () => {
   try {
-    const data = await $fetch<Fixture>('/dev/self-check-fixture.json')
+    const data = await $fetch<Fixture>(fixtureUrl)
     fixture.value = data
     entries.value = data.files.map((file) => ({
       path: file.path,
