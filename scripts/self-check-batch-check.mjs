@@ -73,6 +73,16 @@ check('批次号从 1 起', plan.batches[0]?.index, 1)
 check('工具额度不超过 6', plan.batches.every((b) => b.toolAllowance <= 6), true)
 check('反向/无依据都给额度', plan.batches[0]?.toolAllowance > 0, true)
 
+const verifiedPlan = buildSelfCheckPlan(
+  {
+    ...graph,
+    edges: [{ ...graph.edges[0], confidence: 'verified' }],
+  },
+  [suspicions[0]],
+)
+check('verified edge stays out of model', verifiedPlan.items.length, 0)
+check('verified edge counts as supported', verifiedPlan.supported, 1)
+
 const budget = createSelfCheckBudget()
 check('初始批池', budget.pool, 125_000)
 const first = plan.batches[0]

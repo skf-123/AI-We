@@ -86,6 +86,11 @@ export function buildSelfCheckPlan(
   let supported = 0
 
   graph.edges.forEach((edge, edgeIndex) => {
+    // 程序已经用事实核实过的边，不再送给模型；partial 和 inferred 仍然核。
+    if (edge.confidence === 'verified') {
+      supported++
+      return
+    }
     const suspicion = byKey.get(edgeKey(edge))
     const kind = kindOf(suspicion)
     if (!kind) {
