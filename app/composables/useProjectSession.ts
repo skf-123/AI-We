@@ -153,7 +153,7 @@ export function useProjectSession() {
   /** 自检修正后的图；没有自检结果时用汇总原图 */
   const selfCheckGraph = ref<ProjectGraphData | null>(null)
   const selfCheckStarted = ref(false)
-  /** 分批自检是否启用（?selfcheck=batch） */
+  /** 分批自检是否启用；默认开，?selfcheck=legacy 回旧路径 */
   const selfCheckBatchMode = ref(selfCheckBatchEnabled())
   /** 分批自检的覆盖率；旧路径为 null */
   const selfCheckCoverage = ref<SelfCheckCoverage | null>(null)

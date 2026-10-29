@@ -11,7 +11,11 @@ import {
   recordUsage,
   SELF_CHECK_BATCH_CAP_TOKENS,
 } from '../app/utils/self-check-budget.ts'
-import { buildSelfCheckPlan, formatBatchContent } from '../app/utils/self-check-plan.ts'
+import {
+  buildSelfCheckPlan,
+  formatBatchContent,
+  selfCheckBatchEnabledFromSearch,
+} from '../app/utils/self-check-plan.ts'
 import { mergeSelfCheckDecisions } from '../app/utils/self-check-merge.ts'
 
 let failed = 0
@@ -74,6 +78,10 @@ check('工具额度不超过 6', plan.batches.every((b) => b.toolAllowance <= 6)
 check('反向/无依据都给额度', plan.batches[0]?.toolAllowance > 0, true)
 check('plan overview counts', [plan.overview.nodes, plan.overview.edges, plan.overview.supported], [3, 5, 2])
 check('batch prompt carries overview', formatBatchContent(plan.batches[0], '上下文', plan.overview).includes('全图摘要'), true)
+
+check('default is batch', selfCheckBatchEnabledFromSearch(''), true)
+check('legacy query switches back', selfCheckBatchEnabledFromSearch('?selfcheck=legacy'), false)
+check('batch query stays batch', selfCheckBatchEnabledFromSearch('?selfcheck=batch'), true)
 
 const verifiedPlan = buildSelfCheckPlan(
   {

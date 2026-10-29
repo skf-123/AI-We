@@ -21,10 +21,15 @@ import type {
 export const SELF_CHECK_BATCH_SIZE = 8
 export const SELF_CHECK_MAX_TOOL_ALLOWANCE = 6
 
-/** 地址栏加 `?selfcheck=batch` 才启用分批；默认仍走原来的自检。 */
+/** 默认走分批；地址栏加 `?selfcheck=legacy` 才回到旧路径。 */
+export function selfCheckBatchEnabledFromSearch(search: string): boolean {
+  const mode = new URLSearchParams(search).get('selfcheck')
+  return mode !== 'legacy' && mode !== 'old'
+}
+
 export function selfCheckBatchEnabled(): boolean {
-  if (typeof window === 'undefined') return false
-  return new URLSearchParams(window.location.search).get('selfcheck') === 'batch'
+  if (typeof window === 'undefined') return true
+  return selfCheckBatchEnabledFromSearch(window.location.search)
 }
 
 function basename(path: string): string {
