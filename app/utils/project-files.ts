@@ -28,10 +28,17 @@ export const PROJECT_LIMITS = {
 const DEPENDENCY_DIRS = new Set([
   'node_modules',
   'bower_components',
+  'jspm_packages',
+  'web_modules',
   'vendor',
   '__pycache__',
   'venv',
   '.venv',
+  'virtualenv',
+  'site-packages',
+  'dist-packages',
+  '__pypackages__',
+  '.m2',
   'Pods',
   'DerivedData',
 ])
@@ -88,26 +95,8 @@ const LOCK_FILES = new Set([
 /** IDE / 系统生成的文件 */
 const IDE_FILES = new Set(['.DS_Store', 'Thumbs.db', '.gitignore', '.gitattributes'])
 
-/** 二进制与静态产物：只登记位置 */
-const BINARY_EXTS = new Set([
-  'class',
-  'jar',
-  'war',
-  'ear',
-  'pyc',
-  'pyo',
-  'o',
-  'obj',
-  'so',
-  'dylib',
-  'dll',
-  'exe',
-  'zip',
-  'tar',
-  'gz',
-  'tgz',
-  '7z',
-  'rar',
+/** 静态资源：图片、字体、音视频；只登记位置，不按文本解析 */
+const ASSET_EXTS = new Set([
   'png',
   'jpg',
   'jpeg',
@@ -157,6 +146,51 @@ const BINARY_EXTS = new Set([
   'ttc',
   'eot',
   'fnt',
+  'pfb',
+  'pfm',
+  'jxl',
+  'qoi',
+  'exr',
+  'hdr',
+  'dng',
+  'icns',
+  'cur',
+  'svgz',
+  'ogv',
+  '3g2',
+  'mts',
+  'm2ts',
+  'vob',
+  'asf',
+  'mid',
+  'midi',
+  'au',
+  'amr',
+  'm4b',
+  'mka',
+  'ra',
+])
+
+/** 二进制与打包产物：读不成文本，只登记位置 */
+const BINARY_EXTS = new Set([
+  'class',
+  'jar',
+  'war',
+  'ear',
+  'pyc',
+  'pyo',
+  'o',
+  'obj',
+  'so',
+  'dylib',
+  'dll',
+  'exe',
+  'zip',
+  'tar',
+  'gz',
+  'tgz',
+  '7z',
+  'rar',
   'wasm',
   'bin',
   'iso',
@@ -183,6 +217,35 @@ const BINARY_EXTS = new Set([
   'sqlite',
   'sqlite3',
   'lock',
+  'aar',
+  'dex',
+  'odex',
+  'vdex',
+  'pdb',
+  'lib',
+  'a',
+  'ko',
+  'elf',
+  'wasm',
+  'lz',
+  'lzma',
+  'z',
+  'br',
+  'tbz2',
+  'parquet',
+  'avro',
+  'orc',
+  'pkl',
+  'pickle',
+  'npy',
+  'npz',
+  'h5',
+  'hdf5',
+  'onnx',
+  'pt',
+  'pth',
+  'ckpt',
+  'safetensors',
 ])
 
 /** 浏览器 MIME 能直接判定为二进制的类型；只收确定不是文本的 */
@@ -193,6 +256,16 @@ const BINARY_MIME_TYPES = new Set([
   'application/java-archive',
   'application/vnd.android.package-archive',
   'application/wasm',
+  'application/x-7z-compressed',
+  'application/x-rar-compressed',
+  'application/x-tar',
+  'application/gzip',
+  'application/x-gzip',
+  'application/x-msdownload',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 ])
 
 /** 文档：能看，但不是代码，默认跳过 */
@@ -313,6 +386,10 @@ interface SystemDirMatch {
 
 /** 路径里是否踩中了系统目录；返回命中的目录与它属于哪一组 */
 function systemDirOf(path: string): SystemDirMatch | null {
+  // Java Web 应用的依赖不在 node_modules，而是在 WEB-INF/lib 下
+  if (path.toLowerCase().includes('web-inf/lib/')) {
+    return { dir: 'WEB-INF/lib', subtype: 'dependency', label: '依赖目录' }
+  }
   const parts = path.split('/').slice(0, -1)
   for (const part of parts) {
     for (const rule of DIR_RULES) {
@@ -337,26 +414,27 @@ export function isMinifiedOrMap(path: string): boolean {
  */
 export function isBinaryFile(path: string): boolean {
   const name = baseName(normalizePath(path))
-  return BINARY_EXTS.has(extOf(name))
+  const ext = extOf(name)
+  return ASSET_EXTS.has(ext) || BINARY_EXTS.has(ext)
 }
 
 /**
  * 扩展名不认识时，用浏览器给的 MIME 兜底。
- * 只看确定是媒体的类型；application/octet-stream 不当作二进制，
- * 因为有些系统会给未知的文本文件也标成它。
+ * 图片 / 字体 / 音视频算静态资源，其余确定是二进制的算 binary；
+ * application/octet-stream 不当作二进制，因为有些系统会给未知文本也标成它。
  */
-function isBinaryMime(mime: string): boolean {
+function mimeKind(mime: string): 'asset' | 'binary' | null {
   const value = mime.trim().toLowerCase()
-  if (!value) return false
+  if (!value) return null
   if (
     value.startsWith('image/') ||
     value.startsWith('video/') ||
     value.startsWith('audio/') ||
     value.startsWith('font/')
   ) {
-    return true
+    return 'asset'
   }
-  return BINARY_MIME_TYPES.has(value)
+  return BINARY_MIME_TYPES.has(value) ? 'binary' : null
 }
 
 export function classifyFile(
@@ -397,11 +475,19 @@ export function classifyFile(
       unrecorded: false,
     }
   }
+  if (ASSET_EXTS.has(ext)) {
+    return {
+      category: 'system',
+      subtype: 'asset',
+      skipReason: '静态资源：图片 / 字体 / 音视频',
+      unrecorded: false,
+    }
+  }
   if (BINARY_EXTS.has(ext)) {
     return {
       category: 'system',
       subtype: 'binary',
-      skipReason: '二进制或静态资源',
+      skipReason: '二进制文件，无法按文本解析',
       unrecorded: false,
     }
   }
@@ -422,11 +508,20 @@ export function classifyFile(
   }
 
   // 扩展名不认识时，浏览器可能还知道它是什么（avif、heic 这类新格式）
-  if (isBinaryMime(mime)) {
+  const byMime = mimeKind(mime)
+  if (byMime === 'asset') {
+    return {
+      category: 'system',
+      subtype: 'asset',
+      skipReason: '静态资源：图片 / 字体 / 音视频',
+      unrecorded: false,
+    }
+  }
+  if (byMime === 'binary') {
     return {
       category: 'system',
       subtype: 'binary',
-      skipReason: '二进制或静态资源',
+      skipReason: '二进制文件，无法按文本解析',
       unrecorded: false,
     }
   }

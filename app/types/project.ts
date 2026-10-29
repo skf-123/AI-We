@@ -30,6 +30,7 @@ export type ProjectFileSubtype =
   | 'tooling'
   | 'minified'
   | 'source-map'
+  | 'asset'
   | 'binary'
   | 'lockfile'
   | 'ide'

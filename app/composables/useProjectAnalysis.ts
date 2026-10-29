@@ -1,3 +1,4 @@
+import { projectAnalyzeTooLargeMessage } from '#shared/project-limits'
 import type { FileProgress } from '~/types/project'
 import { normalizePath } from '~/utils/project-files'
 import {
@@ -240,6 +241,10 @@ export function useProjectAnalysis() {
 
       const text = await file.text()
       texts.set(path, text)
+
+      // 先查字符数，再决定发不发；超限请求注定 400，不要让它占一个并发槽
+      const tooLarge = projectAnalyzeTooLargeMessage(text.length)
+      if (tooLarge) throw new Error(tooLarge)
 
       const p = progress[path]!
       p.factFixes = []
