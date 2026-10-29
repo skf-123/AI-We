@@ -1,0 +1,14 @@
+{
+  "description": "2026-10-29 187 分批预算修复后的单次记录；用于不重新解析 186 个文件的预算回放",
+  "total": 150000,
+  "reserve": 25000,
+  "batchCount": 12,
+  "batchUsage": [6945, 16983, 16911, 18500, 7487, 7264, 7010, 18690, 8025, 7857, 8297],
+  "expected": {
+    "used": 123969,
+    "poolLeft": 1031,
+    "processedBatches": 11,
+    "blockedBatch": 12,
+    "reserveLeftForFinalPass": 26031
+  }
+}
