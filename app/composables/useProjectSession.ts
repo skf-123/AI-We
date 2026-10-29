@@ -22,7 +22,10 @@ import { parseProjectSummary } from '~/utils/project-graph'
 import { diffProjectGraph, type ProjectGraphDiff } from '~/utils/project-graph-diff'
 import { enrichProjectGraph } from '~/utils/project-graph-enrich'
 import { scanCandidateEdges } from '~/utils/project-candidate-edges'
-import { compareGraphToCandidates } from '~/utils/project-graph-candidates'
+import {
+  compareGraphToCandidates,
+  filterVerifiedSuspicions,
+} from '~/utils/project-graph-candidates'
 import { buildSelfCheckPlan, selfCheckBatchEnabled } from '~/utils/self-check-plan'
 import { mergeSelfCheckDecisions } from '~/utils/self-check-merge'
 import type { SelfCheckCoverage, SelfCheckEvidence } from '~/types/self-check'
@@ -1012,14 +1015,7 @@ export function useProjectSession() {
     const parseCount = filesToParse(files.value).length
 
     // 程序已经用事实核实过的边，旧路径也不再重复审。
-    const edgeKey = (edge: { from: string; to: string; label?: string }) =>
-      `${edge.from}\u0000${edge.to}\u0000${edge.label ?? ''}`
-    const verifiedEdges = new Set(
-      graph.edges.filter((edge) => edge.confidence === 'verified').map(edgeKey),
-    )
-    const suspicions = candidateReport.suspicions.filter(
-      (item) => !verifiedEdges.has(edgeKey(item)),
-    )
+    const suspicions = filterVerifiedSuspicions(graph, candidateReport.suspicions)
 
     if (selfCheckBatchMode.value) {
       const plan = buildSelfCheckPlan(graph, suspicions)

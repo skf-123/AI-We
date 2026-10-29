@@ -5,6 +5,7 @@
  * 不判断业务语义，也不自动删边。程序给出的差异交给自检模型核对。
  */
 
+import type { ProjectGraphData } from '~/types/project'
 import type { CandidateScan } from './project-candidate-edges'
 import type { GraphLike } from './project-graph-diff'
 
@@ -167,4 +168,17 @@ export function compareGraphToCandidates(
     unknown,
     totalEdges: graph.edges.length,
   }
+}
+
+/** 程序已经用事实核实过的边，不再交给旧路径重复审 */
+export function filterVerifiedSuspicions(
+  graph: ProjectGraphData,
+  suspicions: GraphSuspicion[],
+): GraphSuspicion[] {
+  const key = (edge: { from: string; to: string; label?: string }) =>
+    `${edge.from}\u0000${edge.to}\u0000${edge.label ?? ''}`
+  const verified = new Set(
+    graph.edges.filter((edge) => edge.confidence === 'verified').map(key),
+  )
+  return suspicions.filter((item) => !verified.has(key(item)))
 }
