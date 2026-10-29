@@ -158,6 +158,7 @@ export function useProjectSession() {
   /** 分批自检的覆盖率；旧路径为 null */
   const selfCheckCoverage = ref<SelfCheckCoverage | null>(null)
   const selfCheckEvidence = ref<SelfCheckEvidence[]>([])
+  const selfCheckApplied = ref<ReturnType<typeof mergeSelfCheckDecisions>['applied']>([])
   /** 自检前的图：用于比较改动，以及“恢复自检前的图” */
   const preSelfCheckGraph = ref<ProjectGraphData | null>(null)
   const selfCheckDiff = ref<ProjectGraphDiff | null>(null)
@@ -936,6 +937,7 @@ export function useProjectSession() {
     selfCheckStarted.value = false
     selfCheckCoverage.value = null
     selfCheckEvidence.value = []
+    selfCheckApplied.value = []
     preSelfCheckGraph.value = null
     selfCheckDiff.value = null
     selfCheckRestored.value = false
@@ -975,6 +977,7 @@ export function useProjectSession() {
     selfCheckStarted.value = false
     selfCheckCoverage.value = null
     selfCheckEvidence.value = []
+    selfCheckApplied.value = []
     preSelfCheckGraph.value = null
     selfCheckDiff.value = null
     selfCheckRestored.value = false
@@ -1054,6 +1057,7 @@ export function useProjectSession() {
         selfCheckDiff.value = diffProjectGraph(graph, merged.graph)
         selfCheckCoverage.value = merged.coverage
         selfCheckEvidence.value = batchResult.evidence
+        selfCheckApplied.value = merged.applied
       }
       return
     }
@@ -1092,6 +1096,22 @@ export function useProjectSession() {
       !selfCheckRestored.value &&
       Boolean(preSelfCheckGraph.value) &&
       Boolean(selfCheckDiff.value?.changed),
+  )
+
+  /** 结构动作账本：每条决定是接受还是被拒，以及原因 */
+  const selfCheckLedger = computed(() =>
+    selfCheckApplied.value
+      .map((row) => {
+        const detail = row.conflictReason
+          ? `（${row.conflictReason}）`
+          : row.pairs?.length
+            ? `（${row.pairs.map((pair) => `${pair.from}→${pair.to}`).join('，')}）`
+            : row.path
+              ? `（${row.path} → ${row.toNode ?? ''}）`
+              : ''
+        return `${row.id} ${row.action} ${row.accepted ? '接受' : '拒绝'}${detail}`
+      })
+      .join('\n'),
   )
 
   /** 轨迹里的一行结果：读了多少文件、图有没有改动 */
@@ -1176,6 +1196,7 @@ export function useProjectSession() {
     selfCheckStarted.value = false
     selfCheckCoverage.value = null
     selfCheckEvidence.value = []
+    selfCheckApplied.value = []
     preSelfCheckGraph.value = null
     selfCheckDiff.value = null
     selfCheckRestored.value = false
@@ -1249,6 +1270,8 @@ export function useProjectSession() {
     selfCheckBatchMode,
     selfCheckCoverage,
     selfCheckEvidence,
+    selfCheckApplied,
+    selfCheckLedger,
     selfCheckRunning: selfCheck.running,
     selfCheckStopped: selfCheck.stopped,
     selfCheckError: selfCheck.error,

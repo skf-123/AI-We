@@ -219,3 +219,17 @@ check('move-file 改归属', structuralMerged.graph.nodes.find((n) => n.id === '
 check('split 产出文件边', structuralMerged.graph.edges.some((e) => e.from === 'f:a.java' && e.to === 'f:b.java'), true)
 check('结构项已处理', [structuralMerged.coverage.structural, structuralMerged.coverage.structuralChecked], [3, 3])
 check('结构动作无冲突', structuralMerged.coverage.conflict, 0)
+
+check(
+  '四个结构动作都记 accepted',
+  structuralMerged.applied.filter((row) => ['connect', 'split', 'move-file', 'add-node'].includes(row.action) && row.accepted).length,
+  4,
+)
+const rejectedMove = mergeSelfCheckDecisions(
+  structuralGraph,
+  [{ id: 'S9', edgeIndex: -1, from: 'f:c.java', to: '', kind: 'unowned', detail: '未归属', batch: 1, paths: ['c.java'] }],
+  [{ id: 'S9', action: 'move-file', path: 'c.java', toNode: 'missing-node' }],
+  0,
+)
+check('非法 move-file 被拒', rejectedMove.applied[0]?.accepted, false)
+check('非法 move-file 有原因', Boolean(rejectedMove.applied[0]?.conflictReason), true)

@@ -51,6 +51,7 @@ const {
   selfCheckRounds,
   selfCheckMaxRounds,
   selfCheckSummary,
+  selfCheckLedger,
   canRestoreSelfCheck,
   restoreSelfCheck,
   stopSelfCheck,
@@ -765,6 +766,7 @@ onBeforeUnmount(() => {
             :rerun="!selfCheckRunning"
             rerun-label="重新自检"
             :status-text="selfCheckSummary"
+            :ledger-text="selfCheckLedger"
             :can-restore="canRestoreSelfCheck"
             @stop="stopSelfCheck"
             @rerun="rerunSelfCheck"

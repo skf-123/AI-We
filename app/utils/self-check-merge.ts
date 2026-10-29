@@ -32,7 +32,7 @@ function validEndpoint(
 export interface MergeResult {
   graph: ProjectGraphData
   coverage: SelfCheckCoverage
-  /** 账本里每条边的最终状态，供页面/导出用 */
+  /** 账本里每条边 / 结构项的最终状态，供页面/导出用 */
   applied: {
     id: string
     action: SelfCheckDecision['action'] | 'missing'
@@ -40,6 +40,12 @@ export interface MergeResult {
     to: string
     label?: string
     reason?: string
+    accepted: boolean
+    conflictReason?: string
+    pairs?: { from: string; to: string }[]
+    path?: string
+    toNode?: string
+    node?: SelfCheckDecision['node']
   }[]
 }
 
@@ -103,20 +109,25 @@ export function mergeSelfCheckDecisions(
         to: edge.to,
         label: edge.label,
         reason: '模型没有给出决定',
+        accepted: false,
+        conflictReason: '模型没有给出决定',
       })
       addEdge(edge)
       return
     }
 
     const action = decision.action
-    applied.push({
+    const entry: MergeResult['applied'][number] = {
       id: item.id,
       action,
       from: action === 'reverse' ? edge.to : edge.from,
       to: action === 'reverse' ? edge.from : edge.to,
       label: decision.label ?? edge.label,
       reason: decision.reason,
-    })
+      accepted: true,
+      pairs: decision.pairs,
+    }
+    applied.push(entry)
 
     if (action === 'unknown') {
       unknown++
@@ -126,25 +137,31 @@ export function mergeSelfCheckDecisions(
 
     if (action === 'connect' || action === 'move-file' || action === 'add-node') {
       conflict++
+      entry.accepted = false
+      entry.conflictReason = '这个动作只能用在结构项上'
       addEdge(edge)
       return
     }
-
-    checked++
-    if (action === 'remove') return
 
     if (action === 'split') {
       const pairs = decision.pairs ?? item.pairs ?? []
       if (pairs.length === 0) {
         conflict++
+        entry.accepted = false
+        entry.conflictReason = 'split 没有文件对'
         addEdge(edge)
         return
       }
+      if (pairs.some((pair) => !paths.has(pair.from) || !paths.has(pair.to))) {
+        conflict++
+        entry.accepted = false
+        entry.conflictReason = 'split 文件对里有未知路径'
+        addEdge(edge)
+        return
+      }
+      checked++
+      entry.pairs = pairs
       for (const pair of pairs) {
-        if (!paths.has(pair.from) || !paths.has(pair.to)) {
-          conflict++
-          continue
-        }
         addEdge({
           from: `f:${pair.from}`,
           to: `f:${pair.to}`,
@@ -155,6 +172,9 @@ export function mergeSelfCheckDecisions(
       }
       return
     }
+
+    checked++
+    if (action === 'remove') return
 
     const next: ProjectGraphEdge =
       action === 'reverse'
@@ -179,13 +199,59 @@ export function mergeSelfCheckDecisions(
 
   for (const item of structuralItems) {
     const decision = decisionById.get(item.id)
-    if (!decision || decision.action === 'unknown') continue
+    if (!decision) {
+      applied.push({
+        id: item.id,
+        action: 'missing',
+        from: item.from,
+        to: item.to,
+        label: item.label,
+        reason: '模型没有给出决定',
+        accepted: false,
+        conflictReason: '模型没有给出决定',
+      })
+      continue
+    }
+    if (decision.action === 'unknown') {
+      applied.push({
+        id: item.id,
+        action: 'unknown',
+        from: item.from,
+        to: item.to,
+        label: item.label,
+        reason: decision.reason,
+        accepted: true,
+      })
+      continue
+    }
+    if (decision.action === 'keep' || decision.action === 'relabel') {
+      applied.push({
+        id: item.id,
+        action: decision.action,
+        from: item.from,
+        to: item.to,
+        label: decision.label ?? item.label,
+        reason: decision.reason,
+        accepted: true,
+      })
+      continue
+    }
     structuralChecked++
     const source = item.from
     if (decision.action === 'connect') {
       const to = decision.to ?? ''
       if (!canConnect(source, to)) {
         conflict++
+        applied.push({
+          id: item.id,
+          action: decision.action,
+          from: source,
+          to,
+          label: decision.label ?? item.label,
+          reason: decision.reason,
+          accepted: false,
+          conflictReason: 'connect 端点不存在、相同或不是已知文件/节点',
+        })
         continue
       }
       addEdge({
@@ -202,6 +268,7 @@ export function mergeSelfCheckDecisions(
         to,
         label: decision.label ?? item.label,
         reason: decision.reason,
+        accepted: true,
       })
       continue
     }
@@ -217,6 +284,17 @@ export function mergeSelfCheckDecisions(
         next.files.some((path) => !paths.has(path))
       ) {
         conflict++
+        applied.push({
+          id: item.id,
+          action: decision.action,
+          from: source,
+          to: next?.id ?? '',
+          label: next?.label ?? item.label,
+          reason: decision.reason,
+          accepted: false,
+          conflictReason: '新节点 id 重复、超过 12 个、type 不合法或文件不在已知路径',
+          node: next,
+        })
         continue
       }
       nodes.push({
@@ -233,6 +311,8 @@ export function mergeSelfCheckDecisions(
         to: next.id,
         label: next.label,
         reason: decision.reason,
+        accepted: true,
+        node: next,
       })
       continue
     }
@@ -242,6 +322,17 @@ export function mergeSelfCheckDecisions(
       const target = endpointOf(decision.toNode ?? '')
       if (!path || !paths.has(path) || !nodeIds.has(target)) {
         conflict++
+        applied.push({
+          id: item.id,
+          action: decision.action,
+          from: path ? `f:${path}` : source,
+          to: decision.toNode ?? '',
+          reason: decision.reason,
+          accepted: false,
+          conflictReason: 'move-file 的文件或目标节点不存在',
+          path,
+          toNode: decision.toNode,
+        })
         continue
       }
       for (const node of nodes) {
@@ -252,6 +343,17 @@ export function mergeSelfCheckDecisions(
       const targetNode = nodes.find((node) => node.id === target)
       if (!targetNode) {
         conflict++
+        applied.push({
+          id: item.id,
+          action: decision.action,
+          from: `f:${path}`,
+          to: `n:${target}`,
+          reason: decision.reason,
+          accepted: false,
+          conflictReason: 'move-file 目标节点不存在',
+          path,
+          toNode: decision.toNode,
+        })
         continue
       }
       targetNode.files = [...(targetNode.files ?? []), { path }]
@@ -261,12 +363,25 @@ export function mergeSelfCheckDecisions(
         from: `f:${path}`,
         to: `n:${target}`,
         reason: decision.reason,
+        accepted: true,
+        path,
+        toNode: decision.toNode,
       })
       continue
     }
 
     if (decision.action === 'split') {
       conflict++
+      applied.push({
+        id: item.id,
+        action: decision.action,
+        from: source,
+        to: item.to,
+        reason: decision.reason,
+        accepted: false,
+        conflictReason: 'split 只能用于分组边',
+        pairs: decision.pairs,
+      })
       continue
     }
   }
