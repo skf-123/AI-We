@@ -101,9 +101,11 @@ export function mergeSelfCheckDecisions(
     const next: ProjectGraphEdge =
       action === 'reverse'
         ? {
+            ...edge,
             from: edge.to,
             to: edge.from,
             label: decision.label ?? edge.label,
+            note: '自检把方向改回来了',
           }
         : {
             ...edge,

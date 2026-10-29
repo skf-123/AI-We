@@ -20,6 +20,7 @@ import {
 } from '~/utils/project-files'
 import { parseProjectSummary } from '~/utils/project-graph'
 import { diffProjectGraph, type ProjectGraphDiff } from '~/utils/project-graph-diff'
+import { enrichProjectGraph } from '~/utils/project-graph-enrich'
 import { scanCandidateEdges } from '~/utils/project-candidate-edges'
 import { compareGraphToCandidates } from '~/utils/project-graph-candidates'
 import { buildSelfCheckPlan, selfCheckBatchEnabled } from '~/utils/self-check-plan'
@@ -200,9 +201,20 @@ export function useProjectSession() {
   const summaryText = computed(() => summaryParsed.value.text)
   const summaryGraph = computed(() => summaryParsed.value.graph)
   const summaryHasResult = computed(() => summary.output.value.length > 0)
-  const displayGraph = computed(
-    () => selfCheckGraph.value ?? graphOverride.value ?? summaryGraph.value,
-  )
+
+  function withGraphEvidence(graph: ProjectGraphData): ProjectGraphData {
+    return enrichProjectGraph(
+      graph,
+      structure.value?.allFacts ?? [],
+      structure.value?.symbols ?? {},
+      filesForMap(files.value).map((entry) => entry.path),
+    )
+  }
+
+  const displayGraph = computed(() => {
+    const graph = selfCheckGraph.value ?? graphOverride.value ?? summaryGraph.value
+    return graph ? withGraphEvidence(graph) : null
+  })
 
   const doneFiles = computed(() =>
     queueFiles.value.filter((entry) => pool.progress[entry.path]?.status === 'done'),
@@ -983,6 +995,7 @@ export function useProjectSession() {
    * 自检失败/被停止就保留原图；整个过程在页面上有轨迹、可打断。
    */
   async function runSelfCheck(graph: ProjectGraphData) {
+    graph = withGraphEvidence(graph)
     preSelfCheckGraph.value = null
     selfCheckDiff.value = null
     selfCheckRestored.value = false

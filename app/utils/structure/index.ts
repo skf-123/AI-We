@@ -5,7 +5,12 @@
  * 不认识 Java / JS / Python，也不知道具体解析规则。
  * 新增语言 = 在这里注册一个适配器，核心不改。
  */
-import type { HardFact, ProjectStructureAdapter, StructureSourceFile } from '~/types/structure'
+import type {
+  HardFact,
+  HardFactGraph,
+  ProjectStructureAdapter,
+  StructureSourceFile,
+} from '~/types/structure'
 import { javaSpringAdapter } from './java-spring.ts'
 import { jsTsAdapter, reactAdapter } from './js-ts.ts'
 import { vueAdapter } from './vue.ts'
@@ -45,6 +50,8 @@ export interface ProjectStructureResult {
   adapterId: string
   /** 完整事实图：跨文件 claim 核对用，不直接进提示词 */
   allFacts: HardFact[]
+  /** 全限定名 / 符号 → 文件；图证据用 */
+  symbols: HardFactGraph['symbols']
   /** 文件 → 行数；正文行号引用核对用 */
   lineCounts: Record<string, number>
   /** 每个文件选事实；没有图就返回空数组 */
@@ -82,6 +89,7 @@ export function analyzeProjectStructure(files: StructureSourceFile[]): ProjectSt
     adapterId: runs.map((run) => run.id).join('+'),
     profile: graph.profile,
     allFacts: graph.facts,
+    symbols: graph.symbols,
     lineCounts: graph.lineCounts,
     selectFacts(path: string) {
       return selectMergedFacts(runs, path)

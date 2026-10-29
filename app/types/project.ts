@@ -165,6 +165,10 @@ export interface ProjectGraphNode {
   type: GraphNodeType
   detail?: string
   files?: ProjectGraphFile[]
+  /** 程序检查：这个节点没有任何连线 */
+  floating?: boolean
+  /** 程序检查出的归属说明；不改文件归属 */
+  ownershipNote?: string
 }
 
 /**
@@ -172,13 +176,48 @@ export interface ProjectGraphNode {
  * 端点写成 "n:<节点 id>" 或 "f:<文件相对路径>" —— 只存文件级关系，
  * 展开 / 收起时由前端换算，不存「展开版」和「收起版」两套边。
  */
+export type ProjectGraphEvidenceBasis =
+  | 'import'
+  | 'injection'
+  | 'xml-namespace'
+  | 'component-use'
+  | 'sql-foreign-key'
+  | 'css-import'
+  | 'inferred'
+
+export interface ProjectGraphEvidence {
+  basis: ProjectGraphEvidenceBasis
+  path: string
+  /** 1 起 */
+  line: number
+  text: string
+}
+
+export interface ProjectGraphFilePair {
+  from: string
+  to: string
+  evidence: ProjectGraphEvidence[]
+}
+
 export interface ProjectGraphEdge {
   from: string
   to: string
   label?: string
+  /** 程序找到的依据；没有就是 undefined */
+  evidence?: ProjectGraphEvidence[]
+  /** 已核实 / 只有部分文件对核实 / 模型推断 */
+  confidence?: 'verified' | 'partial' | 'inferred'
+  /** 分组边对应的文件对；唯一一对时会直接展开成文件边 */
+  filePairs?: ProjectGraphFilePair[]
+  /** 给人看的补充说明，例如“分组关系，涉及 3 对文件” */
+  note?: string
 }
 
 export interface ProjectGraphData {
   nodes: ProjectGraphNode[]
   edges: ProjectGraphEdge[]
+  /** 图里没有落到任何分组的文件 */
+  unownedFiles?: string[]
+  /** 同一个文件出现在多个分组 */
+  duplicateFiles?: { path: string; nodes: string[] }[]
 }

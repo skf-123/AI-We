@@ -212,7 +212,7 @@ export function resolveGraphEdges(
     const key = `${from}->${to}->${edge.label ?? ''}`
     if (seen.has(key)) continue
     seen.add(key)
-    result.push({ from, to, label: edge.label })
+    result.push({ ...edge, from, to, label: edge.label })
   }
 
   return result

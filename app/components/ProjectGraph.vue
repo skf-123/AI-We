@@ -9,7 +9,7 @@ import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
 
 import type { GraphNodeType } from '~/types/analysis'
-import type { ProjectGraphData } from '~/types/project'
+import type { ProjectGraphData, ProjectGraphEdge } from '~/types/project'
 import { defaultCollapsed, resolveGraphEdges } from '~/utils/project-graph'
 
 /**
@@ -64,6 +64,11 @@ const TYPE_STYLE: Record<GraphNodeType, { border: string; bg: string; text: stri
 
 /** 展开中的分组 id。默认：JSP / 页面类收起，其余展开 */
 const expanded = ref<Set<string>>(new Set())
+const selectedEdge = ref<ProjectGraphEdge | null>(null)
+
+function onEdgeClick(payload: { edge?: { data?: { edge?: ProjectGraphEdge } } }) {
+  selectedEdge.value = payload.edge?.data?.edge ?? null
+}
 
 const containerRef = ref<HTMLElement | null>(null)
 const isFullscreen = ref(false)
@@ -253,9 +258,10 @@ const layout = computed(() => {
     connected.add(edge.to)
   }
 
-  const edges: { from: string; to: string; label?: string; structural: boolean }[] = realEdges.map(
-    (edge) => ({ ...edge, structural: false }),
-  )
+  const edges: (ProjectGraphEdge & { structural: boolean })[] = realEdges.map((edge) => ({
+    ...edge,
+    structural: false,
+  }))
 
   for (const group of groupChildren) {
     for (const childId of group.childIds) {
@@ -304,6 +310,7 @@ const layout = computed(() => {
     style: edge.structural ? { stroke: '#cbd5e1', strokeDasharray: '5 4' } : { stroke: '#cbd5e1' },
     labelStyle: { fill: edge.structural ? '#94a3b8' : '#64748b', fontSize: 10 },
     labelBgStyle: { fill: '#ffffff', fillOpacity: 0.92 },
+    data: { edge },
   }))
 
   return { nodes, edges: flowEdges, realEdgeCount: realEdges.length }
@@ -311,6 +318,9 @@ const layout = computed(() => {
 
 const hasGroups = computed(() => props.data.nodes.some((n) => n.files && n.files.length > 0))
 const hasEdges = computed(() => layout.value.realEdgeCount > 0)
+const unownedCount = computed(() => props.data.unownedFiles?.length ?? 0)
+const duplicateCount = computed(() => props.data.duplicateFiles?.length ?? 0)
+const floatingCount = computed(() => props.data.nodes.filter((node) => node.floating).length)
 
 // ---------------------------------------------------------------- 全屏与尺寸
 
@@ -381,6 +391,9 @@ onBeforeUnmount(() => {
       <span class="hidden text-slate-400 sm:inline">虚线「归属」表示源码里没有外部调用</span>
 
       <span v-if="!hasEdges" class="text-amber-700">模型没有给出可用的关系线</span>
+      <span v-if="unownedCount" class="text-amber-700">未归属文件 {{ unownedCount }}</span>
+      <span v-if="duplicateCount" class="text-amber-700">归属冲突 {{ duplicateCount }}</span>
+      <span v-if="floatingCount" class="text-slate-500">浮节点 {{ floatingCount }}</span>
 
       <div class="ml-auto flex items-center gap-3 text-[11px]">
         <button
@@ -411,6 +424,57 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
+    <div v-if="selectedEdge" class="border-b border-slate-100 bg-white px-3 py-2 text-[11px]">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="font-mono text-slate-700">{{ selectedEdge.from }} → {{ selectedEdge.to }}</span>
+        <span v-if="selectedEdge.label" class="text-slate-400">{{ selectedEdge.label }}</span>
+        <span
+          class="rounded px-1.5 py-0.5"
+          :class="
+            selectedEdge.confidence === 'verified'
+              ? 'bg-emerald-50 text-emerald-700'
+              : selectedEdge.confidence === 'partial'
+                ? 'bg-amber-50 text-amber-700'
+                : 'bg-slate-100 text-slate-500'
+          "
+        >
+          {{
+            selectedEdge.confidence === 'verified'
+              ? '已核实'
+              : selectedEdge.confidence === 'partial'
+                ? '部分核实'
+                : '推断'
+          }}
+        </span>
+        <button
+          type="button"
+          class="ml-auto text-slate-400 hover:text-slate-700"
+          @click="selectedEdge = null"
+        >
+          关闭
+        </button>
+      </div>
+      <div v-if="selectedEdge.note" class="mt-1 text-amber-700">{{ selectedEdge.note }}</div>
+      <div v-if="selectedEdge.evidence?.length" class="mt-1 space-y-0.5">
+        <div
+          v-for="item in selectedEdge.evidence.slice(0, 4)"
+          :key="`${item.basis}:${item.path}:${item.line}`"
+          class="truncate text-slate-500"
+        >
+          {{ item.basis }} · {{ item.path }}:{{ item.line }} · {{ item.text }}
+        </div>
+      </div>
+      <div v-if="selectedEdge.filePairs?.length" class="mt-1 text-slate-500">
+        文件对：{{ selectedEdge.filePairs.length }} 对
+      </div>
+      <div
+        v-else-if="selectedEdge.confidence === 'inferred'"
+        class="mt-1 text-slate-400"
+      >
+        程序没有找到这条边的文件级依据；结论来自模型推断。
+      </div>
+    </div>
+
     <div :class="isFullscreen ? 'h-[calc(100vh-44px)] w-full' : 'h-[420px] w-full sm:h-[520px]'">
       <ClientOnly>
         <VueFlow
@@ -422,6 +486,7 @@ onBeforeUnmount(() => {
           :max-zoom="1.8"
           :nodes-connectable="false"
           :elements-selectable="true"
+          @edge-click="onEdgeClick"
         >
           <Background :gap="18" pattern-color="#dbe2ea" />
           <Controls />
