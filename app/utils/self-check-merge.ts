@@ -46,6 +46,10 @@ export interface MergeResult {
     path?: string
     toNode?: string
     node?: SelfCheckDecision['node']
+    /** 节点动作的目标节点 id（不带 n: 前缀） */
+    nodeId?: string
+    /** remove-node 时文件的去处 */
+    moveFilesTo?: string
   }[]
 }
 
@@ -135,7 +139,14 @@ export function mergeSelfCheckDecisions(
       return
     }
 
-    if (action === 'connect' || action === 'move-file' || action === 'add-node') {
+    if (
+      action === 'connect' ||
+      action === 'move-file' ||
+      action === 'add-node' ||
+      action === 'remove-node' ||
+      action === 'rename-node' ||
+      action === 'update-node'
+    ) {
       conflict++
       entry.accepted = false
       entry.conflictReason = '这个动作只能用在结构项上'
@@ -381,6 +392,148 @@ export function mergeSelfCheckDecisions(
         accepted: false,
         conflictReason: 'split 只能用于分组边',
         pairs: decision.pairs,
+      })
+      continue
+    }
+
+    if (
+      decision.action === 'remove-node' ||
+      decision.action === 'rename-node' ||
+      decision.action === 'update-node'
+    ) {
+      const rawId = decision.nodeId ?? (source.startsWith('n:') ? source : '')
+      const targetId = rawId ? endpointOf(rawId) : ''
+      const target = targetId ? nodes.find((node) => node.id === targetId) : undefined
+      const reject = (reason: string): void => {
+        conflict++
+        applied.push({
+          id: item.id,
+          action: decision.action,
+          from: targetId ? `n:${targetId}` : source,
+          to: decision.moveFilesTo ?? '',
+          label: decision.label ?? item.label,
+          reason: decision.reason,
+          accepted: false,
+          conflictReason: reason,
+          nodeId: targetId || undefined,
+          moveFilesTo: decision.moveFilesTo,
+        })
+      }
+
+      if (!target) {
+        reject(targetId ? '节点动作的目标节点不存在' : '这个动作只能用在节点项上')
+        continue
+      }
+
+      if (decision.action === 'remove-node') {
+        // 删节点不能留下悬空边，也不能直接丢文件。
+        if (
+          resultEdges.some(
+            (edge) =>
+              endpointOf(edge.from) === targetId || endpointOf(edge.to) === targetId,
+          )
+        ) {
+          reject('节点还被边引用，先删边或改边再删节点')
+          continue
+        }
+        const files = target.files ?? []
+        if (files.length > 0) {
+          const destId = endpointOf(decision.moveFilesTo ?? '')
+          if (!destId) {
+            reject('节点还有文件，用 moveFilesTo 指定文件去处')
+            continue
+          }
+          const dest = nodes.find((node) => node.id === destId && node.id !== targetId)
+          if (!dest) {
+            reject('remove-node 的文件去处不是已有节点')
+            continue
+          }
+          const existing = new Set((dest.files ?? []).map((file) => file.path))
+          for (const file of files) {
+            if (existing.has(file.path)) continue
+            dest.files = [...(dest.files ?? []), { ...file }]
+            existing.add(file.path)
+          }
+        }
+        const index = nodes.indexOf(target)
+        if (index >= 0) nodes.splice(index, 1)
+        nodeIds.delete(targetId)
+        applied.push({
+          id: item.id,
+          action: decision.action,
+          from: `n:${targetId}`,
+          to: decision.moveFilesTo ?? '',
+          label: target.label,
+          reason: decision.reason,
+          accepted: true,
+          nodeId: targetId,
+          moveFilesTo: decision.moveFilesTo,
+          node: {
+            id: targetId,
+            label: target.label,
+            type: target.type,
+            files: files.map((file) => file.path),
+          },
+        })
+        continue
+      }
+
+      if (decision.action === 'rename-node') {
+        const label = decision.label?.trim()
+        if (!label) {
+          reject('rename-node 没有给出新名称')
+          continue
+        }
+        target.label = label
+        applied.push({
+          id: item.id,
+          action: decision.action,
+          from: `n:${targetId}`,
+          to: '',
+          label,
+          reason: decision.reason,
+          accepted: true,
+          nodeId: targetId,
+          node: {
+            id: targetId,
+            label,
+            type: target.type,
+            files: target.files?.map((file) => file.path),
+          },
+        })
+        continue
+      }
+
+      // update-node：只改名称 / 类型 / 说明，不动文件归属。
+      const label = decision.label?.trim()
+      const type = decision.type?.trim()
+      const detail = decision.detail?.trim()
+      if (!label && !type && !detail) {
+        reject('update-node 没有给出要修改的字段')
+        continue
+      }
+      if (type && !['code', 'tech', 'concept'].includes(type)) {
+        reject('update-node 的类型不在 code / tech / concept 里')
+        continue
+      }
+      if (label) target.label = label
+      if (type) target.type = type as ProjectGraphNode['type']
+      if (detail) target.detail = detail
+      applied.push({
+        id: item.id,
+        action: decision.action,
+        from: `n:${targetId}`,
+        to: '',
+        label: target.label,
+        reason: decision.reason,
+        accepted: true,
+        nodeId: targetId,
+        node: {
+          id: targetId,
+          label: target.label,
+          type: target.type,
+          files: target.files?.map((file) => file.path),
+        },
       })
       continue
     }

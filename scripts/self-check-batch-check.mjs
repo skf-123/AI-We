@@ -182,12 +182,6 @@ check(
   [1, 1, 1, 1],
 )
 
-if (failed > 0) {
-  console.error(`\n${failed} 项失败`)
-  process.exit(1)
-}
-console.log('\n全部通过')
-
 const structuralGraph = {
   nodes: [
     { id: 'a', label: 'A', type: 'code', files: [{ path: 'a.java' }], floating: true },
@@ -235,3 +229,145 @@ const rejectedMove = mergeSelfCheckDecisions(
 )
 check('非法 move-file 被拒', rejectedMove.applied[0]?.accepted, false)
 check('非法 move-file 有原因', Boolean(rejectedMove.applied[0]?.conflictReason), true)
+
+// 节点项：程序能看出的名称 / 类型 / 空代码分组问题才进清单。
+const nodeIssueGraph = {
+  nodes: [
+    { id: 'core', label: '核心', type: 'code', files: [{ path: 'core.java' }] },
+    { id: 'legacy', label: '核心', type: 'code', files: [{ path: 'legacy.java' }] },
+    { id: 'empty', label: '空壳', type: 'code' },
+    { id: 'weird', label: 'weird', type: 'module', files: [{ path: 'w.java' }] },
+    { id: 'fine', label: '正常分组', type: 'tech' },
+  ],
+  edges: [],
+}
+const nodeIssuePlan = buildSelfCheckPlan(nodeIssueGraph, [])
+check('节点项只送有问题的节点', nodeIssuePlan.overview.nodeIssues, 4)
+check('节点项互相不重复', new Set(nodeIssuePlan.items.map((item) => item.id)).size, nodeIssuePlan.items.length)
+const nodeIssueText = formatBatchContent(nodeIssuePlan.batches[0], '上下文', nodeIssuePlan.overview)
+check('批次内容带上待改节点数', nodeIssueText.includes('待改节点 4 个'), true)
+check('批次规则说明节点动作', nodeIssueText.includes('remove-node') && nodeIssueText.includes('rename-node'), true)
+
+const nodeMergeGraph = {
+  nodes: [
+    { id: 'a', label: '甲', type: 'code', files: [{ path: 'a.java' }] },
+    { id: 'b', label: '乙', type: 'tech' },
+    { id: 'c', label: '丙', type: 'code', files: [{ path: 'c.java' }] },
+  ],
+  edges: [],
+}
+const nodeItem = (id, nodeId, paths = []) => ({
+  id,
+  edgeIndex: -1,
+  from: `n:${nodeId}`,
+  to: '',
+  label: nodeId,
+  kind: 'node',
+  detail: '',
+  batch: 1,
+  paths,
+})
+const nodeItems = [nodeItem('N1', 'a', ['a.java']), nodeItem('N2', 'c', ['c.java'])]
+
+const renamedNode = mergeSelfCheckDecisions(
+  nodeMergeGraph,
+  [nodeItems[0]],
+  [{ id: 'N1', action: 'rename-node', label: '核心甲' }],
+  0,
+)
+check('rename-node 改名称', renamedNode.graph.nodes.find((n) => n.id === 'a')?.label, '核心甲')
+check(
+  'rename-node 不改文件',
+  renamedNode.graph.nodes.find((n) => n.id === 'a')?.files?.map((f) => f.path),
+  ['a.java'],
+)
+check('rename-node accepted', renamedNode.applied[0]?.accepted, true)
+
+const removedNoTarget = mergeSelfCheckDecisions(
+  nodeMergeGraph,
+  [nodeItems[1]],
+  [{ id: 'N2', action: 'remove-node' }],
+  0,
+)
+check('remove-node 有文件且没去处被拒', removedNoTarget.applied[0]?.accepted, false)
+check(
+  'remove-node 拒绝原因',
+  removedNoTarget.applied[0]?.conflictReason,
+  '节点还有文件，用 moveFilesTo 指定文件去处',
+)
+check('被拒后节点仍在', removedNoTarget.graph.nodes.some((n) => n.id === 'c'), true)
+
+const removedNode = mergeSelfCheckDecisions(
+  nodeMergeGraph,
+  [nodeItems[1]],
+  [{ id: 'N2', action: 'remove-node', moveFilesTo: 'n:a' }],
+  0,
+)
+check('remove-node 删掉节点', removedNode.graph.nodes.some((n) => n.id === 'c'), false)
+check(
+  'remove-node 把文件移走',
+  removedNode.graph.nodes.find((n) => n.id === 'a')?.files?.map((f) => f.path),
+  ['a.java', 'c.java'],
+)
+check('remove-node accepted', removedNode.applied[0]?.accepted, true)
+
+const edgeReferenced = mergeSelfCheckDecisions(
+  { ...nodeMergeGraph, edges: [{ from: 'n:c', to: 'n:b' }] },
+  [nodeItems[1]],
+  [{ id: 'N2', action: 'remove-node', moveFilesTo: 'n:a' }],
+  0,
+)
+check('被边引用的节点不能删', edgeReferenced.applied[0]?.accepted, false)
+check(
+  '被边引用拒绝原因',
+  edgeReferenced.applied[0]?.conflictReason,
+  '节点还被边引用，先删边或改边再删节点',
+)
+
+const badType = mergeSelfCheckDecisions(
+  nodeMergeGraph,
+  [nodeItems[0]],
+  [{ id: 'N1', action: 'update-node', type: 'module' }],
+  0,
+)
+check('update-node 非法类型被拒', badType.applied[0]?.accepted, false)
+
+const updatedNode = mergeSelfCheckDecisions(
+  nodeMergeGraph,
+  [nodeItems[0]],
+  [{ id: 'N1', action: 'update-node', type: 'tech', detail: '基础设施' }],
+  0,
+)
+check(
+  'update-node 改类型和说明',
+  [
+    updatedNode.graph.nodes.find((n) => n.id === 'a')?.type,
+    updatedNode.graph.nodes.find((n) => n.id === 'a')?.detail,
+  ],
+  ['tech', '基础设施'],
+)
+
+const nodeOnFileItem = mergeSelfCheckDecisions(
+  nodeMergeGraph,
+  [
+    {
+      id: 'U1',
+      edgeIndex: -1,
+      from: 'f:x.java',
+      to: '',
+      kind: 'unowned',
+      detail: '',
+      batch: 1,
+      paths: ['x.java'],
+    },
+  ],
+  [{ id: 'U1', action: 'rename-node', label: 'x' }],
+  0,
+)
+check('文件项不能做节点动作', nodeOnFileItem.applied[0]?.conflictReason, '这个动作只能用在节点项上')
+
+if (failed > 0) {
+  console.error(`\n${failed} 项失败`)
+  process.exit(1)
+}
+console.log('\n全部通过')

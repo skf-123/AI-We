@@ -190,10 +190,48 @@ export function buildSelfCheckPlan(
     })
   }
 
+  // 节点项：只送程序能看出问题的节点，不把所有节点都交给模型。
+  // 浮节点已经有 S 项，这里跳过，避免同一个节点出现两次。
+  const labelCounts = new Map<string, number>()
+  for (const node of graph.nodes) {
+    const label = (node.label ?? '').trim()
+    if (label) labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1)
+  }
+  let nodeIndex = 0
+  for (const node of graph.nodes) {
+    if (node.floating) continue
+    const label = (node.label ?? '').trim()
+    const reasons: string[] = []
+    if (!label) reasons.push('节点没有名称')
+    else if (label === node.id) reasons.push('节点名称就是 id')
+    else if ((labelCounts.get(label) ?? 0) > 1) reasons.push(`有多个节点同名「${label}」`)
+    if (node.type === 'code' && !node.files?.length) {
+      reasons.push('标记为代码分组，但没有归属任何文件')
+    }
+    // 类型缺省不算问题：旧数据 / 测试夹具没有 type，不能因此把所有节点都送进清单。
+    if (node.type && !['code', 'tech', 'concept'].includes(node.type)) {
+      reasons.push(`类型 ${node.type} 不在 code / tech / concept 里`)
+    }
+    if (!reasons.length) continue
+    items.push({
+      id: `N${++nodeIndex}`,
+      edgeIndex: -1,
+      from: `n:${node.id}`,
+      to: '',
+      label: node.label,
+      kind: 'node',
+      detail: reasons.join('；'),
+      batch: 0,
+      paths: (node.files ?? []).map((file) => file.path),
+      candidates: groupCandidates.filter((candidate) => candidate.id !== `n:${node.id}`),
+    })
+  }
+
   // 按起点分组聚类，再按 edgeIndex 保留稳定顺序
   const grouped = new Map<string, SelfCheckItem[]>()
   for (const item of items) {
-    const key = groupOf(item.from, graph)
+    // 节点项单独归一组，不按节点 id 分；否则每个有问题节点都会自成一整批。
+    const key = item.kind === 'node' ? '\u0000node-items' : groupOf(item.from, graph)
     const list = grouped.get(key) ?? []
     list.push(item)
     grouped.set(key, list)
@@ -269,6 +307,7 @@ export function buildSelfCheckPlan(
       ).length,
       unowned: graph.unownedFiles?.length ?? 0,
       duplicate: graph.duplicateFiles?.length ?? 0,
+      nodeIssues: items.filter((item) => item.kind === 'node').length,
     },
   }
 }
@@ -313,7 +352,7 @@ export function formatBatchContent(
 
   const groups = overview.groups.length > 0 ? overview.groups.join('、') : '（没有分组）'
 
-  return `【全图摘要】节点 ${overview.nodes} 个，边 ${overview.edges} 条；程序已支持 ${overview.supported} 条；浮节点 ${overview.floating} 个，分组边 ${overview.groupOnly} 条，未归属文件 ${overview.unowned} 个，重复归属 ${overview.duplicate} 个；分组：${groups}
+  return `【全图摘要】节点 ${overview.nodes} 个，边 ${overview.edges} 条；程序已支持 ${overview.supported} 条；浮节点 ${overview.floating} 个，分组边 ${overview.groupOnly} 条，未归属文件 ${overview.unowned} 个，重复归属 ${overview.duplicate} 个，待改节点 ${overview.nodeIssues} 个；分组：${groups}
 
 【本批边】共 ${edgeItems.length} 条，只处理这些
 ${edges || '（没有边）'}
@@ -332,11 +371,14 @@ ${projectContext.slice(0, 20_000)}
 
 【规则】
 - 边可以回：keep / remove / reverse / relabel / unknown；
-- 结构项可以回：keep / connect / split / move-file / add-node / unknown；
+- 结构项可以回：keep / connect / split / move-file / add-node / remove-node / rename-node / update-node / unknown；
 - 结构项不是必须产生动作：先判断是否真的需要修，不需要就 keep，证据不足就 unknown；
 - connect 用 to 指向目标端点；split 用 pairs 指定保留的文件对；move-file 用 path + toNode 指定文件和新节点；add-node 用 node 指定新节点；
 - split 只在分组边掩盖两个以上不同文件级关系、拆开能让对象更具体时使用；只有一对或语义一致时保留分组边；
 - add-node 只在候选节点都不合适、且新节点职责清楚时使用；已有节点能容纳就 move-file 或 keep；
+- remove-node 用 nodeId 指定要删的节点；节点还有文件时用 moveFilesTo 先移到目标节点，不能直接丢文件；
+- rename-node 用 nodeId + label 只改节点名称；update-node 用 nodeId + label / type / detail 改节点，type 只能是 code / tech / concept；
+- rename-node / update-node 不改文件归属；节点仍被边引用时不要删；
 - reverse 表示把 from/to 对调；relabel 只改标签；unknown 表示证据不足；
 - 没有证据就写 unknown，不要猜；不要输出完整图；不要编造文件路径或节点 id；
 - 需要读文件时，按工具格式申请，最多 ${batch.toolAllowance} 次；程序可能按预算拒绝。

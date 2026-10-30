@@ -16,6 +16,8 @@ export type SelfCheckItemKind =
   | 'group-only'
   | 'unowned'
   | 'duplicate'
+  /** 节点本身有问题：名称不清、类型不合法、代码分组没有文件 */
+  | 'node'
 
 export interface SelfCheckItem {
   /** 稳定 id，例如 E12；模型只按这个 id 回决定 */
@@ -55,6 +57,8 @@ export interface SelfCheckOverview {
   groupOnly: number
   unowned: number
   duplicate: number
+  /** 程序看出名称 / 类型 / 空代码分组的节点数 */
+  nodeIssues: number
 }
 
 export interface SelfCheckBatch {
@@ -80,6 +84,9 @@ export type SelfCheckAction =
   | 'split'
   | 'move-file'
   | 'add-node'
+  | 'remove-node'
+  | 'rename-node'
+  | 'update-node'
 
 export interface SelfCheckDecision {
   id: string
@@ -102,6 +109,14 @@ export interface SelfCheckDecision {
     type?: string
     files?: string[]
   }
+  /** remove-node / rename-node / update-node 的目标节点 */
+  nodeId?: string
+  /** remove-node 时把节点里的文件移到这个节点 */
+  moveFilesTo?: string
+  /** update-node 要改成的类型；只能是 code / tech / concept */
+  type?: string
+  /** update-node 要改成的说明 */
+  detail?: string
 }
 
 export interface SelfCheckCoverage {

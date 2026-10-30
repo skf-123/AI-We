@@ -1104,11 +1104,13 @@ export function useProjectSession() {
       .map((row) => {
         const detail = row.conflictReason
           ? `（${row.conflictReason}）`
-          : row.pairs?.length
-            ? `（${row.pairs.map((pair) => `${pair.from}→${pair.to}`).join('，')}）`
-            : row.path
-              ? `（${row.path} → ${row.toNode ?? ''}）`
-              : ''
+          : row.nodeId
+            ? `（${row.nodeId}${row.node?.label ? ` → ${row.node.label}` : ''}${row.moveFilesTo ? `，文件移到 ${row.moveFilesTo}` : ''}）`
+            : row.pairs?.length
+              ? `（${row.pairs.map((pair) => `${pair.from}→${pair.to}`).join('，')}）`
+              : row.path
+                ? `（${row.path} → ${row.toNode ?? ''}）`
+                : ''
         return `${row.id} ${row.action} ${row.accepted ? '接受' : '拒绝'}${detail}`
       })
       .join('\n'),

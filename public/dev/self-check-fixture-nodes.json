@@ -1,0 +1,53 @@
+{
+  "description": "节点动作场景：同名节点、空代码节点、类型写错的配置节点；描述只给事实，不给动作",
+  "graph": {
+    "nodes": [
+      {
+        "id": "core",
+        "label": "核心",
+        "type": "code",
+        "detail": "核心业务",
+        "files": [{ "path": "core/Core.java", "role": "核心入口" }]
+      },
+      {
+        "id": "legacy",
+        "label": "核心",
+        "type": "code",
+        "detail": "旧实现",
+        "files": [{ "path": "legacy/Old.java", "role": "旧版入口" }]
+      },
+      {
+        "id": "empty",
+        "label": "空壳",
+        "type": "code",
+        "detail": ""
+      },
+      {
+        "id": "cfg",
+        "label": "配置",
+        "type": "module",
+        "detail": "读取 application.yml",
+        "files": [{ "path": "config/AppConfig.java", "role": "读取配置" }]
+      }
+    ],
+    "edges": []
+  },
+  "files": [
+    {
+      "path": "core/Core.java",
+      "name": "Core.java",
+      "content": "package core;\npublic class Core { public void run() {} }\n"
+    },
+    {
+      "path": "legacy/Old.java",
+      "name": "Old.java",
+      "content": "package legacy;\nimport core.Core;\npublic class Old extends Core { }\n"
+    },
+    {
+      "path": "config/AppConfig.java",
+      "name": "AppConfig.java",
+      "content": "package config;\nimport org.springframework.context.annotation.Configuration;\n@Configuration\npublic class AppConfig { }\n"
+    }
+  ],
+  "projectContext": "core 是核心模块，包含 core/Core.java。legacy 也叫「核心」，包含 legacy/Old.java，是接入 core 之前的旧实现，类上继承 core.Core。empty 没有任何文件，也不在代码里出现。cfg 的 AppConfig.java 只读 application.yml，不承担业务代码，项目里把配置类算作技术节点。"
+}
