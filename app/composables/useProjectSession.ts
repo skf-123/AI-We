@@ -1129,6 +1129,17 @@ export function useProjectSession() {
       .join('\n'),
   )
 
+  /** 没拿到决定的项：账本里是 missing / unknown，单独列出来，别只留一个数字 */
+  const selfCheckUnchecked = computed(() =>
+    selfCheckApplied.value
+      .filter((row) => row.action === 'missing' || row.action === 'unknown')
+      .map((row) => {
+        const reason = row.conflictReason || row.reason || '模型没有给出决定'
+        return `${row.id} ${row.action}（${reason}）`
+      })
+      .join('\n'),
+  )
+
   /** 轨迹里的一行结果：读了多少文件、图有没有改动 */
   const selfCheckSummary = computed(() => {
     if (selfCheck.running.value || selfCheck.error.value) return ''
@@ -1287,6 +1298,7 @@ export function useProjectSession() {
     selfCheckEvidence,
     selfCheckApplied,
     selfCheckLedger,
+    selfCheckUnchecked,
     selfCheckRunning: selfCheck.running,
     selfCheckStopped: selfCheck.stopped,
     selfCheckError: selfCheck.error,

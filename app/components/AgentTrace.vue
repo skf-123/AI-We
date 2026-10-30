@@ -43,6 +43,8 @@ const props = defineProps<{
   statusText?: string
   /** 结构动作账本：每条决定是接受还是被拒 */
   ledgerText?: string
+  /** 没拿到决定的项：missing / unknown，单独列出来 */
+  uncheckedText?: string
   /** 是否显示「恢复自检前的图」 */
   canRestore?: boolean
   restoreLabel?: string
@@ -152,6 +154,11 @@ function stepSummary(step: AgentStep): string {
     <details v-if="props.ledgerText" class="mt-1.5 text-[11px] text-slate-600">
       <summary class="cursor-pointer select-none text-slate-500">结构动作账本</summary>
       <pre class="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-[10px] leading-relaxed text-slate-600">{{ props.ledgerText }}</pre>
+    </details>
+
+    <details v-if="props.uncheckedText" class="mt-1.5 text-[11px] text-slate-600">
+      <summary class="cursor-pointer select-none text-slate-500">未核项</summary>
+      <pre class="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-[10px] leading-relaxed text-slate-600">{{ props.uncheckedText }}</pre>
     </details>
 
     <!-- 阅读版：同一批工具调用的人话翻译，按轮分组 -->
