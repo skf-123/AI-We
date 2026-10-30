@@ -72,6 +72,10 @@ export interface SelfCheckBatch {
   score: number
   /** 程序分配的工具次数上限，0–6 */
   toolAllowance: number
+  /** 越小越先跑：0 关键边，1 重要结构项，2 普通边，3 未归属 */
+  rank: number
+  /** 边批次还是结构项批次；结构项有单独的预算上限 */
+  category: 'edge' | 'structural'
 }
 
 export type SelfCheckAction =

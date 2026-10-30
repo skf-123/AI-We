@@ -20,6 +20,16 @@ import type {
 
 export const SELF_CHECK_BATCH_SIZE = 8
 export const SELF_CHECK_MAX_TOOL_ALLOWANCE = 6
+/** 未归属文件一条一项太贵；最多送这么多，剩下的继续显示未归属 */
+export const SELF_CHECK_MAX_UNOWNED = 16
+/** 收尾调用不读文件，只允许这些边动作 */
+export const SELF_CHECK_FINAL_ACTIONS = [
+  'keep',
+  'remove',
+  'reverse',
+  'relabel',
+  'unknown',
+] as const
 
 /** 默认走分批；地址栏加 `?selfcheck=legacy` 才回到旧路径。 */
 export function selfCheckBatchEnabledFromSearch(search: string): boolean {
@@ -69,6 +79,33 @@ function kindOf(suspicion: GraphSuspicion | undefined): SelfCheckItemKind | null
   if (suspicion.kind === 'reversed') return 'reversed'
   if (suspicion.kind === 'unsupported') return 'unsupported'
   return null
+}
+
+/**
+ * 批次优先级：数字越小越先跑。
+ *
+ * 0 关键边（方向反、没依据）—— 最可能错，最值钱；
+ * 1 重要结构项（重复归属、浮节点、节点问题）；
+ * 2 普通边（推断、部分依据、分组边）；
+ * 3 未归属文件——重要但一条一项太贵，放最后。
+ */
+function rankOf(item: SelfCheckItem): number {
+  if (item.edgeIndex < 0) {
+    if (item.kind === 'duplicate' || item.kind === 'floating' || item.kind === 'node') {
+      return 1
+    }
+    return 3
+  }
+  if (item.kind === 'reversed' || item.kind === 'unsupported') return 0
+  return 2
+}
+
+/** 收尾调用只处理没拿到决定的边，不再把结构项送进去 */
+export function selectFinalReserveItems(
+  items: SelfCheckItem[],
+  decidedIds: Set<string>,
+): SelfCheckItem[] {
+  return items.filter((item) => item.edgeIndex >= 0 && !decidedIds.has(item.id))
 }
 
 /**
@@ -161,7 +198,8 @@ export function buildSelfCheckPlan(
       candidates: groupCandidates.filter((candidate) => candidate.id !== `n:${node.id}`),
     })
   }
-  for (const [index, path] of (graph.unownedFiles ?? []).entries()) {
+  const unowned = (graph.unownedFiles ?? []).slice(0, SELF_CHECK_MAX_UNOWNED)
+  for (const [index, path] of unowned.entries()) {
     items.push({
       id: `U${index + 1}`,
       edgeIndex: -1,
@@ -230,8 +268,8 @@ export function buildSelfCheckPlan(
   // 按起点分组聚类，再按 edgeIndex 保留稳定顺序
   const grouped = new Map<string, SelfCheckItem[]>()
   for (const item of items) {
-    // 节点项单独归一组，不按节点 id 分；否则每个有问题节点都会自成一整批。
-    const key = item.kind === 'node' ? '\u0000node-items' : groupOf(item.from, graph)
+    // 结构项单独归组，不跟边混；这样批次类别和预算上限才能算清。
+    const key = item.edgeIndex < 0 ? `\u0000structural:${item.kind}` : groupOf(item.from, graph)
     const list = grouped.get(key) ?? []
     list.push(item)
     grouped.set(key, list)
@@ -283,9 +321,20 @@ export function buildSelfCheckPlan(
           SELF_CHECK_MAX_TOOL_ALLOWANCE,
           Math.max(1, score),
         ),
+        rank: Math.min(...slice.map(rankOf)),
+        category: slice.every((item) => item.edgeIndex < 0) ? 'structural' : 'edge',
       })
     }
   }
+
+  // 先按优先级，再按原 edgeIndex 稳定排序；排序后重新编号
+  batches.sort(
+    (a, b) => a.rank - b.rank || a.items[0]!.edgeIndex - b.items[0]!.edgeIndex,
+  )
+  batches.forEach((batch, i) => {
+    batch.index = i + 1
+    for (const item of batch.items) item.batch = batch.index
+  })
 
   return {
     items,

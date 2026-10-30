@@ -17,6 +17,8 @@ export const SELF_CHECK_RESERVE_TOKENS = 25_000
 export const SELF_CHECK_BATCH_CAP_TOKENS = 15_000
 export const SELF_CHECK_HARD_TOKENS = 165_000
 export const SELF_CHECK_MIN_BATCH_TOKENS = 1_500
+/** 结构项最多用这么多批池；超出的结构项留到未核清单，不挤占边 */
+export const SELF_CHECK_STRUCTURAL_TOKENS = 25_000
 
 export interface SelfCheckBudget {
   total: number

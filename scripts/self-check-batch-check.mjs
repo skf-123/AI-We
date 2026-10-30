@@ -10,11 +10,15 @@ import {
   createSelfCheckBudget,
   recordUsage,
   SELF_CHECK_BATCH_CAP_TOKENS,
+  SELF_CHECK_STRUCTURAL_TOKENS,
 } from '../app/utils/self-check-budget.ts'
 import {
   buildSelfCheckPlan,
   formatBatchContent,
+  selectFinalReserveItems,
   selfCheckBatchEnabledFromSearch,
+  SELF_CHECK_FINAL_ACTIONS,
+  SELF_CHECK_MAX_UNOWNED,
 } from '../app/utils/self-check-plan.ts'
 import { mergeSelfCheckDecisions } from '../app/utils/self-check-merge.ts'
 
@@ -481,6 +485,43 @@ const nodeOnFileItem = mergeSelfCheckDecisions(
   0,
 )
 check('文件项不能做节点动作', nodeOnFileItem.applied[0]?.conflictReason, '这个动作只能用在节点项上')
+
+// 批次优先级、结构项类别、未归属限量、收尾只处理边
+const priorityGraph = {
+  nodes: [
+    { id: 'a', label: 'A', type: 'code', files: [{ path: 'a.java' }] },
+    { id: 'b', label: 'B', type: 'code', files: [{ path: 'b.java' }] },
+    { id: 'float', label: '浮', type: 'code', files: [{ path: 'f.java' }], floating: true },
+  ],
+  edges: [
+    { from: 'f:a.java', to: 'f:b.java', label: '反向' },
+    { from: 'f:b.java', to: 'f:a.java', label: '无依据' },
+    { from: 'f:a.java', to: 'n:float', label: '推断', confidence: 'inferred' },
+  ],
+  unownedFiles: Array.from({ length: 20 }, (_, i) => `u${i}.java`),
+  duplicateFiles: [{ path: 'a.java', nodes: ['a', 'b'] }],
+}
+const prioritySuspicions = [
+  { kind: 'reversed', from: 'f:a.java', to: 'f:b.java', label: '反向', detail: '方向相反' },
+  { kind: 'unsupported', from: 'f:b.java', to: 'f:a.java', label: '无依据', detail: '没有 import' },
+]
+const priorityPlan = buildSelfCheckPlan(priorityGraph, prioritySuspicions)
+check('批次优先级单调', priorityPlan.batches.every((b, i, all) => i === 0 || all[i - 1].rank <= b.rank), true)
+check('第一条先跑关键边', [priorityPlan.batches[0]?.rank, priorityPlan.batches[0]?.category], [0, 'edge'])
+check('结构批次标记为 structural', priorityPlan.batches.filter((b) => b.category === 'structural').length > 0, true)
+check(
+  '未归属只送前 N 个',
+  priorityPlan.items.filter((item) => item.kind === 'unowned').length,
+  SELF_CHECK_MAX_UNOWNED,
+)
+check('批次号连续', priorityPlan.batches.every((b, i) => b.index === i + 1), true)
+check(
+  '收尾只含边',
+  selectFinalReserveItems(priorityPlan.items, new Set(['E0'])).every((item) => item.edgeIndex >= 0),
+  true,
+)
+check('收尾动作不含结构动作', SELF_CHECK_FINAL_ACTIONS.includes('move-file'), false)
+check('结构项预算上限', SELF_CHECK_STRUCTURAL_TOKENS, 25_000)
 
 if (failed > 0) {
   console.error(`\n${failed} 项失败`)

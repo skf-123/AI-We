@@ -10,12 +10,17 @@ import { formatStepResult } from '~/utils/agent-trace'
 import type { GraphSuspicion } from '~/utils/project-graph-candidates'
 import type { SelfCheckBatchResult, SelfCheckDecision, SelfCheckEvidence } from '~/types/self-check'
 import type { SelfCheckPlan } from '~/utils/self-check-plan'
-import { formatBatchContent } from '~/utils/self-check-plan'
+import {
+  formatBatchContent,
+  selectFinalReserveItems,
+  SELF_CHECK_FINAL_ACTIONS,
+} from '~/utils/self-check-plan'
 import {
   allocateBatchQuota,
   canStartBatch,
   createSelfCheckBudget,
   recordUsage,
+  SELF_CHECK_STRUCTURAL_TOKENS,
   SELF_CHECK_TOTAL_TOKENS,
 } from '~/utils/self-check-budget'
 
@@ -543,13 +548,17 @@ export function useProjectAgent() {
     const evidence: SelfCheckEvidence[] = []
     let modelCalls = 0
     let toolCalls = 0
+    let structuralUsed = 0
 
     try {
       for (let batchIndex = 0; batchIndex < input.plan.batches.length; batchIndex++) {
         if (stopped.value) break
         const batch = input.plan.batches[batchIndex]!
+        const isStructural = batch.category === 'structural'
+        if (isStructural && structuralUsed >= SELF_CHECK_STRUCTURAL_TOKENS) continue
         const remainingBatches = input.plan.batches.slice(batchIndex)
         const quota = allocateBatchQuota(budget, batch, remainingBatches)
+        if (isStructural && structuralUsed + quota > SELF_CHECK_STRUCTURAL_TOKENS) continue
         if (!canStartBatch(budget, quota)) break
 
         rounds.value = batch.index
@@ -667,14 +676,15 @@ export function useProjectAgent() {
           })
         }
 
+        if (isStructural) structuralUsed += batchUsed
         decisions.push(...batchDecisions)
         if (budget.used >= 165_000) break
       }
 
       // 批池用完后，用预留额度做最后一次“只给决定”的收尾。
-      // 这时不再读文件，避免把预留又花在工具上。
+      // 这时不再读文件，所以只处理边，不给结构项做 move-file / add-node 这类改动。
       const decidedIds = new Set(decisions.map((decision) => decision.id))
-      const missingItems = input.plan.items.filter((item) => !decidedIds.has(item.id))
+      const missingItems = selectFinalReserveItems(input.plan.items, decidedIds)
       if (!stopped.value && missingItems.length > 0 && budget.used < SELF_CHECK_TOTAL_TOKENS) {
         const missingIds = new Set(missingItems.map((item) => item.id))
         const lines = missingItems
@@ -689,7 +699,7 @@ export function useProjectAgent() {
           [
             {
               role: 'user',
-              content: `【最后补决定】下面这些项在批预算内没有拿到决定。不要再读文件，只根据已有预检信息给出 ${missingItems.length} 条决定；没有依据就写 unknown。\n${lines}\n\n只输出一个 JSON 对象：{"decisions":[{"id":"E12","action":"keep|remove|reverse|relabel|connect|split|move-file|add-node|remove-node|rename-node|update-node|unknown","label":"可选","reason":"依据","evidence":["path:line"]}]}`,
+              content: `【最后补决定】下面这些边在批预算内没有拿到决定。不要再读文件，只根据已有预检信息给出 ${missingItems.length} 条决定；没有依据就写 unknown。\n${lines}\n\n只输出一个 JSON 对象：{"decisions":[{"id":"E12","action":"keep|remove|reverse|relabel|unknown","label":"可选","reason":"依据","evidence":["path:line"]}]}`,
             },
           ],
           true,
@@ -698,7 +708,8 @@ export function useProjectAgent() {
         recordUsage(budget, usage)
         modelCalls++
         const parsed = parseBatchDecisions(response.message.content, missingIds)
-        if (parsed) decisions.push(...parsed)
+        const allowed = new Set<string>(SELF_CHECK_FINAL_ACTIONS)
+        if (parsed) decisions.push(...parsed.filter((decision) => allowed.has(decision.action)))
       }
 
       const plannedIds = new Set(input.plan.items.map((item) => item.id))
