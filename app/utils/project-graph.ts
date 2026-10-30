@@ -115,9 +115,14 @@ export function sanitizeProjectGraph(raw: unknown, knownPaths: string[]): Projec
     })
   }
 
-  if (nodes.length === 0) return null
+  // 代码分组必须落到文件；没有文件的 code 节点只是空壳，不画出来。
+  // tech / concept 节点没有文件是正常的，保留。
+  const usableNodes = nodes.filter(
+    (node) => node.type !== 'code' || (node.files?.length ?? 0) > 0,
+  )
+  if (usableNodes.length === 0) return null
 
-  const nodeIds = new Set(nodes.map((n) => n.id))
+  const nodeIds = new Set(usableNodes.map((n) => n.id))
   const edges: ProjectGraphEdge[] = []
   const seenEdges = new Set<string>()
 
@@ -139,7 +144,7 @@ export function sanitizeProjectGraph(raw: unknown, knownPaths: string[]): Projec
     }
   }
 
-  return { nodes, edges }
+  return { nodes: usableNodes, edges }
 }
 
 /** 汇总输出 → 项目文字 + 项目图。图 JSON 还没流完时 graph 为 null */

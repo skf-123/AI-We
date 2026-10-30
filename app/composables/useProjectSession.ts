@@ -203,6 +203,8 @@ export function useProjectSession() {
    * 生成完再改勾选，不能让 summaryParsed 这个 computed 把已经画出来的图重算掉。
    */
   const summaryPaths = ref<string[]>([])
+  /** 上一次建项目地图时的勾选签名；勾选变了，生成前要按新选择重建地图 */
+  const mapSignature = ref('')
   const summaryAllowedPaths = computed(() =>
     summaryPaths.value.length > 0
       ? summaryPaths.value
@@ -634,6 +636,23 @@ export function useProjectSession() {
     return { ...result, crossFileEvidence: verifyEvidence(evidence, texts) }
   }
 
+  /** 当前勾选的签名；只比路径，顺序无关 */
+  function selectedSignature(): string {
+    return filesForMap(files.value)
+      .map((entry) => entry.path)
+      .sort()
+      .join('\n')
+  }
+
+  /**
+   * 勾选和上次建地图时不一样，就按当前选择重建地图。
+   * 地图结论是整个汇总 / 图的背景，不跟着勾选走，图里就会出现没选中的层。
+   */
+  async function ensureMapForSelection(): Promise<void> {
+    if (mapSignature.value === selectedSignature()) return
+    await loadNotes()
+  }
+
   /**
    * 项目地图：只发目录树 + 每个文件头部几行。
    * 最多发 300 个文件的头部 —— 再多的项目，说明留白好过把一次调用撑爆。
@@ -641,6 +660,8 @@ export function useProjectSession() {
   async function loadNotes() {
     const selected = filesForMap(files.value)
     const readablePaths = selected.map((entry) => entry.path)
+    // 记住这次建地图用的是哪批勾选；地图运行期间勾选如果再变，下次还会重建
+    const signature = [...readablePaths].sort().join('\n')
 
     // 先让 Agent 自己决定看什么；失败或超预算时回退到原来的固定地图
     const agentResult = await agent.run({
@@ -683,6 +704,8 @@ export function useProjectSession() {
           ? '未识别：AI 没有返回说明'
           : undefined
     }
+
+    mapSignature.value = signature
   }
 
   // ---------------------------------------------------------------- 勾选
@@ -821,6 +844,7 @@ export function useProjectSession() {
   /** 只解析当前勾选里新增的、从来没解析过的文件；旧结果不动，也不自动汇总 */
   async function parseNewSelected(): Promise<void> {
     if (parsingAdditional.value) return
+    await ensureMapForSelection()
 
     const sources = newSelected.value
       .map((entry) => ({ path: entry.path, file: fileHandles.get(entry.path) }))
@@ -925,6 +949,9 @@ export function useProjectSession() {
     }
 
     if (partial && doneFiles.value.length < 2) return
+
+    // 勾选变了，先把项目结构结论按当前选择重建；否则图里会出现没选中的层
+    await ensureMapForSelection()
 
     phase.value = 'summary'
 

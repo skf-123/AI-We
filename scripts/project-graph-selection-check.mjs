@@ -23,6 +23,7 @@ const raw = {
     { id: 'a', label: 'A', type: 'code', files: [{ path: 'a.java', role: '入口' }] },
     { id: 'b', label: 'B', type: 'code', files: [{ path: 'b.java', role: '保存' }] },
     { id: 'c', label: 'C', type: 'code', files: [{ path: 'c.java', role: '未勾选' }] },
+    { id: 'empty', label: '空层', type: 'code' },
     { id: 'tech', label: 'SQL', type: 'tech' },
   ],
   edges: [
@@ -30,6 +31,7 @@ const raw = {
     { from: 'f:a.java', to: 'f:c.java', label: '调用' },
     { from: 'f:c.java', to: 'n:tech', label: 'SQL' },
     { from: 'n:a', to: 'n:tech', label: '依赖' },
+    { from: 'n:empty', to: 'n:tech', label: '依赖' },
   ],
 }
 
@@ -39,6 +41,7 @@ check('保留勾选文件的节点', graph?.nodes.find((node) => node.id === 'a'
 check('未勾选文件从节点里消失', graph?.nodes.find((node) => node.id === 'c')?.files, undefined)
 check('只保留勾选文件之间的边', graph?.edges.map((edge) => `${edge.from}->${edge.to}`), ['f:a.java->f:b.java', 'n:a->n:tech'])
 check('技术节点不受影响', graph?.nodes.some((node) => node.id === 'tech'), true)
+check('没有文件的代码节点被丢掉', graph?.nodes.some((node) => node.id === 'empty'), false)
 
 const noneSelected = sanitizeProjectGraph(raw, [])
 check(
