@@ -12,7 +12,6 @@ import {
   canStartBatch,
   createSelfCheckBudget,
   recordUsage,
-  SELF_CHECK_TOTAL_TOKENS,
 } from '../app/utils/self-check-budget.ts'
 
 const fixture = JSON.parse(
@@ -57,7 +56,7 @@ check('第 12 批被拦', canStartBatch(budget, nextQuota), false)
 check('拦住时的下一批额度低于最低值', nextQuota < 1500, true)
 check(
   '留给最后补决定的额度',
-  SELF_CHECK_TOTAL_TOKENS - budget.used,
+  fixture.total - budget.used,
   fixture.expected.reserveLeftForFinalPass,
 )
 

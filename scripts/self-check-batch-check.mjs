@@ -10,7 +10,10 @@ import {
   createSelfCheckBudget,
   recordUsage,
   SELF_CHECK_BATCH_CAP_TOKENS,
+  SELF_CHECK_HARD_TOKENS,
+  SELF_CHECK_RESERVE_TOKENS,
   SELF_CHECK_STRUCTURAL_TOKENS,
+  SELF_CHECK_TOTAL_TOKENS,
 } from '../app/utils/self-check-budget.ts'
 import {
   buildSelfCheckPlan,
@@ -134,19 +137,19 @@ check('group file pairs kind', groupOnlyPlan.items[0]?.kind, 'group-only')
 check('group file pairs not supported', groupOnlyPlan.supported, 0)
 
 const budget = createSelfCheckBudget()
-check('初始批池', budget.pool, 125_000)
+check('初始批池', budget.pool, SELF_CHECK_TOTAL_TOKENS - SELF_CHECK_RESERVE_TOKENS)
 const first = plan.batches[0]
 const quota = allocateBatchQuota(budget, first, plan.batches)
 check('单批硬顶', quota <= SELF_CHECK_BATCH_CAP_TOKENS, true)
 check('可以开始', canStartBatch(budget, quota), true)
 recordUsage(budget, Math.min(4_000, quota))
 check('实际用量扣池', budget.used, Math.min(4_000, quota))
-check('剩余回池', budget.pool, 125_000 - budget.used)
+check('剩余回池', budget.pool, SELF_CHECK_TOTAL_TOKENS - SELF_CHECK_RESERVE_TOKENS - budget.used)
 
 const hardBudget = createSelfCheckBudget()
-recordUsage(hardBudget, 165_000)
+recordUsage(hardBudget, SELF_CHECK_HARD_TOKENS)
 check('达到硬停后不能再开批', canStartBatch(hardBudget, 15_000), false)
-check('硬停用量如实累计', hardBudget.used, 165_000)
+check('硬停用量如实累计', hardBudget.used, SELF_CHECK_HARD_TOKENS)
 
 const decisions = [
   { id: 'E0', action: 'reverse', label: 'BaseMapper 泛型操作对象' },

@@ -1,10 +1,10 @@
 /**
  * 分批图自检的 token 预算。
  *
- * 规则（2026-10-27 定稿，2026-10-29 补收尾决定）：
- *   · 总预算 150k，先留 25k 给最后补决定 / 冲突 / 异常；
- *   · 剩下的 125k 是批池；
- *   · 单批硬顶 15k（150k × 10%）；
+ * 规则（2026-10-27 定稿，2026-10-29 补收尾决定，2026-10-30 试提到 200k）：
+ *   · 总预算 200k，先留 25k 给最后补决定 / 冲突 / 异常；
+ *   · 剩下的 175k 是批池；
+ *   · 单批硬顶 15k；
  *   · 每批额度按需求权重分，用完的剩余回池；
  *   · 实际扣费按服务端 usage.total，不按字符数估。
  *
@@ -12,10 +12,10 @@
  */
 import type { SelfCheckBatch } from '~/types/self-check'
 
-export const SELF_CHECK_TOTAL_TOKENS = 150_000
+export const SELF_CHECK_TOTAL_TOKENS = 200_000
 export const SELF_CHECK_RESERVE_TOKENS = 25_000
 export const SELF_CHECK_BATCH_CAP_TOKENS = 15_000
-export const SELF_CHECK_HARD_TOKENS = 165_000
+export const SELF_CHECK_HARD_TOKENS = 215_000
 export const SELF_CHECK_MIN_BATCH_TOKENS = 1_500
 /** 结构项最多用这么多批池；超出的结构项留到未核清单，不挤占边 */
 export const SELF_CHECK_STRUCTURAL_TOKENS = 25_000
