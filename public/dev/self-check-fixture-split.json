@@ -1,0 +1,104 @@
+{
+  "description": "split 场景：一条分组边包含三对具体文件关系，不在描述里要求拆分",
+  "graph": {
+    "nodes": [
+      {
+        "id": "a",
+        "label": "模块 A",
+        "type": "code",
+        "files": [
+          {
+            "path": "modulea/A1.java",
+            "role": "入口"
+          },
+          {
+            "path": "modulea/A2.java",
+            "role": "保存"
+          },
+          {
+            "path": "modulea/A3.java",
+            "role": "读取"
+          }
+        ]
+      },
+      {
+        "id": "b",
+        "label": "模块 B",
+        "type": "code",
+        "files": [
+          {
+            "path": "moduleb/B1.java",
+            "role": "渲染"
+          },
+          {
+            "path": "moduleb/B2.java",
+            "role": "持久化"
+          },
+          {
+            "path": "moduleb/B3.java",
+            "role": "读取"
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "n:a",
+        "to": "n:b",
+        "label": "模块关系",
+        "confidence": "partial",
+        "filePairs": [
+          {
+            "from": "modulea/A1.java",
+            "to": "moduleb/B1.java",
+            "evidence": []
+          },
+          {
+            "from": "modulea/A2.java",
+            "to": "moduleb/B2.java",
+            "evidence": []
+          },
+          {
+            "from": "modulea/A3.java",
+            "to": "moduleb/B3.java",
+            "evidence": []
+          }
+        ],
+        "note": "分组关系，涉及 3 对文件"
+      }
+    ]
+  },
+  "files": [
+    {
+      "path": "modulea/A1.java",
+      "name": "A1.java",
+      "content": "package modulea;\nimport moduleb.B1;\npublic class A1 { public static void main(String[] args) { new B1().render(); } }\n"
+    },
+    {
+      "path": "modulea/A2.java",
+      "name": "A2.java",
+      "content": "package modulea;\nimport moduleb.B2;\npublic class A2 { public void save() { new B2().persist(); } }\n"
+    },
+    {
+      "path": "modulea/A3.java",
+      "name": "A3.java",
+      "content": "package modulea;\nimport moduleb.B3;\npublic class A3 { public void load() { new B3().read(); } }\n"
+    },
+    {
+      "path": "moduleb/B1.java",
+      "name": "B1.java",
+      "content": "package moduleb;\npublic class B1 { public String render() { return \"b1\"; } }\n"
+    },
+    {
+      "path": "moduleb/B2.java",
+      "name": "B2.java",
+      "content": "package moduleb;\npublic class B2 { public void persist() {} }\n"
+    },
+    {
+      "path": "moduleb/B3.java",
+      "name": "B3.java",
+      "content": "package moduleb;\npublic class B3 { public void read() {} }\n"
+    }
+  ],
+  "projectContext": "模块 A 有三个文件：A1 入口、A2 保存、A3 读取。模块 B 有三个文件：B1 渲染、B2 持久化、B3 读取。图上目前只有一条从模块 A 到模块 B 的分组关系，并记录了三对文件对应关系。"
+}

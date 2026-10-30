@@ -212,6 +212,10 @@ export function buildSelfCheckPlan(
         if (item.from) endpoints.add(item.from)
         if (item.to) endpoints.add(item.to)
         for (const path of item.paths ?? []) endpoints.add(`f:${path}`)
+        for (const pair of item.pairs ?? []) {
+          endpoints.add(`f:${pair.from}`)
+          endpoints.add(`f:${pair.to}`)
+        }
       }
 
       const crossGroup = slice.some(
@@ -221,6 +225,11 @@ export function buildSelfCheckPlan(
         slice.filter((item) => item.kind === 'reversed').length * 2 +
         slice.filter((item) => item.kind === 'unsupported').length * 2 +
         slice.filter((item) => item.kind === 'inferred' || item.kind === 'partial').length +
+        slice.reduce(
+          (sum, item) =>
+            sum + (item.kind === 'group-only' ? (item.pairs?.length ?? 1) : 0),
+          0,
+        ) +
         slice.filter((item) => item.edgeIndex < 0).length * 2 +
         (crossGroup ? 1 : 0)
 
@@ -270,8 +279,12 @@ export function formatBatchContent(
   projectContext: string,
   overview: SelfCheckOverview,
 ): string {
-  const edgeItems = batch.items.filter((item) => item.edgeIndex >= 0)
-  const structuralItems = batch.items.filter((item) => item.edgeIndex < 0)
+  const edgeItems = batch.items.filter(
+    (item) => item.edgeIndex >= 0 && item.kind !== 'group-only',
+  )
+  const structuralItems = batch.items.filter(
+    (item) => item.edgeIndex < 0 || item.kind === 'group-only',
+  )
   const edges = edgeItems
     .map(
       (item) =>
@@ -284,8 +297,12 @@ export function formatBatchContent(
         ? `
   候选节点：${item.candidates.map((node) => `${node.id}（${node.label}）`).join('、')}`
         : ''
+      const pairs = item.pairs?.length
+        ? `
+  文件对：${item.pairs.map((pair) => `${pair.from}→${pair.to}`).join('、')}`
+        : ''
       return `- ${item.id}：${item.kind}；${item.from}${item.paths?.length ? `；文件：${item.paths.join('、')}` : ''}
-  预检：${item.detail}${candidates}`
+  预检：${item.detail}${candidates}${pairs}`
     })
     .join('\n')
 

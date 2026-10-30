@@ -21,7 +21,9 @@ const fixtureUrl =
       ? '/dev/self-check-fixture-structural.json'
       : route.query.fixture === 'addnode'
         ? '/dev/self-check-fixture-addnode.json'
-        : '/dev/self-check-fixture.json'
+        : route.query.fixture === 'split'
+          ? '/dev/self-check-fixture-split.json'
+          : '/dev/self-check-fixture.json'
 
 interface Fixture {
   graph: ProjectGraphData
