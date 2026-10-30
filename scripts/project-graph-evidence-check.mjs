@@ -28,11 +28,14 @@ const graph = {
     { id: 'dup', label: 'Dup', type: 'code', files: [{ path: 'a1.js' }] },
     { id: 'e', label: 'E', type: 'code', files: [{ path: 'e1.js' }] },
     { id: 'f', label: 'F', type: 'code', files: [{ path: 'f2.js' }] },
+    { id: 'g', label: 'G', type: 'code', files: [{ path: 'g1.js' }] },
   ],
   edges: [
     { from: 'n:a', to: 'n:b', label: '调用' },
     { from: 'n:c', to: 'n:d', label: '依赖' },
     { from: 'n:e', to: 'n:f', label: '反向样本' },
+    // 只有文件端点，没有 n: 端点：这个节点不算浮着
+    { from: 'f:g1.js', to: 'n:a', label: '文件级依赖' },
   ],
 }
 
@@ -91,6 +94,11 @@ check('unowned file found', enriched.unownedFiles, ['missing.js'])
 check('duplicate file found', enriched.duplicateFiles, [{ path: 'a1.js', nodes: ['a', 'dup'] }])
 check('floating node marked', enriched.nodes.find((node) => node.id === 'float')?.floating, true)
 check('connected node not floating', enriched.nodes.find((node) => node.id === 'a')?.floating, false)
+check(
+  '只有文件端点的节点也不算浮着',
+  enriched.nodes.find((node) => node.id === 'g')?.floating,
+  false,
+)
 
 if (failed > 0) {
   console.error(`\n${failed} 项失败`)

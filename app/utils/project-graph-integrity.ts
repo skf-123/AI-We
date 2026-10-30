@@ -29,10 +29,23 @@ export function attachGraphIntegrity(
     .map(normalizePath)
     .filter((path) => !membership.has(path))
 
+  // 文件端点也算这个节点的连线：图里很多边直接连到 f:<路径>，
+  // 只数 n: 端点会把“文件已经连上外面的节点”误判成浮节点。
   const incident = new Set<string>()
+  const addEndpoint = (endpoint: string): void => {
+    if (endpoint.startsWith('n:')) {
+      incident.add(endpoint.slice(2))
+      return
+    }
+    if (endpoint.startsWith('f:')) {
+      for (const nodeId of membership.get(normalizePath(endpoint.slice(2))) ?? []) {
+        incident.add(nodeId)
+      }
+    }
+  }
   for (const edge of graph.edges) {
-    if (edge.from.startsWith('n:')) incident.add(edge.from.slice(2))
-    if (edge.to.startsWith('n:')) incident.add(edge.to.slice(2))
+    addEndpoint(edge.from)
+    addEndpoint(edge.to)
   }
 
   const nodes: ProjectGraphNode[] = graph.nodes.map((node) => {
