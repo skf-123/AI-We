@@ -267,25 +267,35 @@ const summaryPrimaryLabel = computed(() => {
   return '生成总览 + 思维导图 →'
 })
 
-const regenerateLabel = computed(() => {
-  if (summaryPreparing.value) return '正在准备…'
-  if (summaryAction.value === 'parsing-new') return '正在解析新增文件…'
-  if (summaryAction.value === 'retry-failed' || summaryAction.value === 'blocked')
-    return '没有可生成的文件'
-  return '重新生成总览 + 思维导图 →'
-})
-
 const canRunSummaryPrimary = computed(
   () =>
     !summaryPreparing.value &&
     (summaryAction.value === 'parse-new' || summaryAction.value === 'generate'),
 )
 
-/** 重新生成：全部完成后用完整输入，否则用已完成文件；新增文件由 runSummary 先补解析 */
-function onRegenerate() {
-  if (allSettled.value) void generateSummary()
-  else void generatePartialSummary()
-}
+/** 生成/重新生成按钮是否正在忙：准备中或正在流式汇总 */
+const primaryBusy = computed(() => summaryPreparing.value || summaryLoading.value)
+
+/** 绿色“重新生成”只在全部完成、或有新增可解析时可用；只剩在飞文件时先等，或走灰色按钮 */
+const canRunFullRegenerate = computed(
+  () =>
+    !primaryBusy.value &&
+    doneCount.value > 0 &&
+    (allSettled.value || newSelectedCount.value > 0),
+)
+
+const fullRegenerateLabel = computed(() => {
+  if (summaryLoading.value) return '正在生成汇总…'
+  if (summaryPreparing.value) {
+    return newSelectedCount.value > 0
+      ? `正在解析新增的 ${newSelectedCount.value} 个…`
+      : '正在生成汇总…'
+  }
+  if (!allSettled.value && newSelectedCount.value > 0) {
+    return `重新生成总览 + 思维导图（先解析新增的 ${newSelectedCount.value} 个）`
+  }
+  return '重新生成总览 + 思维导图'
+})
 
 /** 项目图在页面下方，从图里选中后把右侧面板带回视野 */
 function scrollToAnalysis(always = false) {
@@ -497,11 +507,12 @@ onBeforeUnmount(() => {
                   </button>
 
                   <button
-                    v-if="!summaryLoading && (summaryHasResult || !allSettled)"
+                    v-if="summaryHasResult || !allSettled"
                     type="button"
-                    class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium whitespace-nowrap text-white transition-colors duration-200 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                     :disabled="
-                      summaryHasResult ? !canRunSummaryPrimary : !canGeneratePartial
+                      primaryBusy ||
+                      (summaryHasResult ? !canRunFullRegenerate : !canGeneratePartial)
                     "
                     :title="
                       summaryHasResult
@@ -510,15 +521,29 @@ onBeforeUnmount(() => {
                           ? '用已完成文件生成项目总览和思维导图'
                           : '点击后会停止剩余解析，用已完成的文件生成'
                     "
-                    @click="summaryHasResult ? onRegenerate() : generatePartialSummary()"
+                    @click="summaryHasResult ? generateSummary() : generatePartialSummary()"
                   >
+                    <span
+                      v-if="primaryBusy"
+                      class="mr-1.5 inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white align-middle"
+                    />
                     {{
                       summaryHasResult
-                        ? regenerateLabel
+                        ? fullRegenerateLabel
                         : poolStopped
                           ? '生成项目总览 + 思维导图'
                           : `生成思维导图（用已完成的 ${doneCount} 个）`
                     }}
+                  </button>
+                  <button
+                    v-if="summaryHasResult && !allSettled && !primaryBusy"
+                    type="button"
+                    class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs whitespace-nowrap text-slate-600 transition-colors duration-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+                    :disabled="!canGeneratePartial"
+                    title="停掉剩余解析，用已经完成的文件生成总览和图"
+                    @click="generatePartialSummary"
+                  >
+                    用已完成的 {{ doneCount }} 个生成
                   </button>
                   <span v-else-if="!allSettled && doneCount === 1" class="text-xs text-slate-500">
                     再解析 1 个文件就可以生成项目图
@@ -685,7 +710,7 @@ onBeforeUnmount(() => {
               v-else-if="summaryPreparing"
               class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"
             >
-              正在准备
+              {{ newSelectedCount > 0 ? '正在解析新增' : '正在生成' }}
             </span>
             <span
               v-else-if="summaryDone && !summaryError"
@@ -730,7 +755,7 @@ onBeforeUnmount(() => {
             {{
               newSelectedCount > 0
                 ? `正在解析新增的 ${newSelectedCount} 个文件…`
-                : '正在准备汇总；勾选变过时会先重建项目地图。'
+                : '正在生成汇总…'
             }}
           </p>
           <p v-if="summarySkippedCount > 0" class="mb-3 text-[11px] text-amber-700">
