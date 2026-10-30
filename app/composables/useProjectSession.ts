@@ -180,6 +180,8 @@ export function useProjectSession() {
   // ---------------------------------------------------------------- 派生
 
   const tree = computed(() => buildTree(files.value, map.folderNotes))
+  /** 只含当前勾选文件的树；汇总、地图和图生成都用这棵，不再把未勾选文件名交给模型 */
+  const selectedTree = computed(() => buildTree(filesForMap(files.value), map.folderNotes))
   const stats = computed(() => computeStats(files.value))
   const queueFiles = computed(() => filesToParse(files.value))
   const activeEntry = computed(() => files.value.find((f) => f.path === activePath.value) ?? null)
@@ -196,11 +198,19 @@ export function useProjectSession() {
     return 2
   })
 
+  /**
+   * 生成汇总时冻结的路径。图只认这一批：
+   * 生成完再改勾选，不能让 summaryParsed 这个 computed 把已经画出来的图重算掉。
+   */
+  const summaryPaths = ref<string[]>([])
+  const summaryAllowedPaths = computed(() =>
+    summaryPaths.value.length > 0
+      ? summaryPaths.value
+      : filesForMap(files.value).map((entry) => entry.path),
+  )
+
   const summaryParsed = computed(() =>
-    parseProjectSummary(
-      summary.output.value,
-      files.value.map((f) => f.path),
-    ),
+    parseProjectSummary(summary.output.value, summaryAllowedPaths.value),
   )
   const summaryText = computed(() => summaryParsed.value.text)
   const summaryGraph = computed(() => summaryParsed.value.graph)
@@ -211,7 +221,7 @@ export function useProjectSession() {
       graph,
       structure.value?.allFacts ?? [],
       structure.value?.symbols ?? {},
-      filesForMap(files.value).map((entry) => entry.path),
+      summaryAllowedPaths.value,
     )
   }
 
@@ -635,8 +645,8 @@ export function useProjectSession() {
     // 先让 Agent 自己决定看什么；失败或超预算时回退到原来的固定地图
     const agentResult = await agent.run({
       projectName: projectName.value,
-      entries: files.value,
-      treeText: treeToText(tree.value),
+      entries: selected,
+      treeText: treeToText(selectedTree.value),
       parseCount: filesToParse(files.value).length,
       readablePaths,
       getFile: (path) => fileHandles.get(path),
@@ -654,7 +664,7 @@ export function useProjectSession() {
 
       await map.run(
         projectName.value,
-        treeToText(tree.value),
+        treeToText(selectedTree.value),
         heads.filter((h): h is { path: string; head: string } => h !== null),
       )
     }
@@ -878,7 +888,7 @@ export function useProjectSession() {
     return {
       projectName: projectName.value,
       projectContext: map.context(projectName.value),
-      treeText: treeToText(tree.value, 0, true),
+      treeText: treeToText(selectedTree.value, 0, true),
       files: payloadFiles,
       skipped,
     }
@@ -921,7 +931,8 @@ export function useProjectSession() {
     const input = buildSummaryInput()
     summarySkippedCount.value = input.skipped
 
-    // 冻结这一次的输入，供「只重画图」复用；两次调用用同一批文件
+    // 冻结这一次的路径和输入，供「只重画图」复用；两次调用用同一批文件
+    summaryPaths.value = filesForMap(files.value).map((entry) => entry.path)
     lastSummaryInput.value = {
       projectName: input.projectName,
       projectContext: input.projectContext,
@@ -966,10 +977,7 @@ export function useProjectSession() {
       ? { ...frozen, text: summaryText.value }
       : { ...buildSummaryInput(), text: summaryText.value }
 
-    const next = await graph.run(
-      input,
-      files.value.map((entry) => entry.path),
-    )
+    const next = await graph.run(input, summaryAllowedPaths.value)
     if (!next) return
 
     selfCheck.reset()
@@ -1006,16 +1014,21 @@ export function useProjectSession() {
     selfCheckDiff.value = null
     selfCheckRestored.value = false
 
-    // 候选边只从已经解析完的文件的原文里扫；没解析的文件不参与判断，
+    // 自检只认当前图里的文件：生成图之后再改勾选，也不把别的文件卷进候选和工具范围。
+    const graphPaths = new Set<string>([
+      ...graph.nodes.flatMap((node) => node.files?.map((file) => file.path) ?? []),
+      ...(graph.unownedFiles ?? []),
+    ])
+
+    // 候选边只从图里文件的原文里扫；没解析的文件不参与判断，
     // 避免把“没读到”误判成“没有关系”。
-    const candidateSources = files.value
-      .filter((entry) => pool.progress[entry.path]?.status === 'done')
-      .map((entry) => ({ path: entry.path, text: pool.textOf(entry.path) }))
+    const candidateSources = [...graphPaths]
+      .map((path) => ({ path, text: pool.textOf(path) }))
       .filter((entry) => entry.text)
 
     const candidateScan = scanCandidateEdges(candidateSources)
     const candidateReport = compareGraphToCandidates(graph, candidateScan)
-    const parseCount = filesToParse(files.value).length
+    const parseCount = graphPaths.size
 
     // 程序已经用事实核实过的边，旧路径也不再重复审。
     const suspicions = filterVerifiedSuspicions(graph, candidateReport.suspicions)
@@ -1039,8 +1052,8 @@ export function useProjectSession() {
       const batchResult = await selfCheck.runSelfCheckBatch({
         plan,
         projectContext: map.context(projectName.value),
-        entries: files.value,
-        readablePaths: filesForMap(files.value).map((entry) => entry.path),
+        entries: files.value.filter((entry) => graphPaths.has(entry.path)),
+        readablePaths: [...graphPaths],
         getFile: (path) => fileHandles.get(path),
       })
 
@@ -1050,7 +1063,7 @@ export function useProjectSession() {
           plan.items,
           batchResult.decisions,
           plan.supported,
-          files.value.map((entry) => entry.path),
+          [...graphPaths],
         )
         selfCheckGraph.value = merged.graph
         preSelfCheckGraph.value = graph
@@ -1065,9 +1078,9 @@ export function useProjectSession() {
     const result = await selfCheck.runSelfCheck({
       graph,
       projectContext: map.context(projectName.value),
-      entries: files.value,
+      entries: files.value.filter((entry) => graphPaths.has(entry.path)),
       parseCount,
-      readablePaths: filesForMap(files.value).map((entry) => entry.path),
+      readablePaths: [...graphPaths],
       getFile: (path) => fileHandles.get(path),
       suspicions,
       candidateSummary:

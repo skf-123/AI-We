@@ -10,7 +10,7 @@
  */
 
 import type { ProjectGraphData, ProjectGraphEdge, ProjectGraphNode } from '~/types/project'
-import { normalizePath } from './project-files'
+import { normalizePath } from './project-files.ts'
 
 /** 与 server/utils/project-prompt.ts 的 PROJECT_SUMMARY_TITLES 保持一致 */
 export const PROJECT_TEXT_TITLE = '一、整个项目是什么'

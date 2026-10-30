@@ -266,6 +266,52 @@ check(
   false,
 )
 
+const unknownPathMove = mergeSelfCheckDecisions(
+  { nodes: [{ id: 'a', label: 'A', type: 'code', files: [{ path: 'a.java' }] }], edges: [] },
+  [
+    {
+      id: 'U1',
+      edgeIndex: -1,
+      from: 'f:outside.java',
+      to: '',
+      kind: 'unowned',
+      detail: '',
+      batch: 1,
+      paths: ['outside.java'],
+    },
+  ],
+  [{ id: 'U1', action: 'move-file', path: 'outside.java', toNode: 'n:a' }],
+  0,
+  ['a.java'],
+)
+check('move-file 未勾选路径被拒', unknownPathMove.applied[0]?.accepted, false)
+
+const addNodeOutside = mergeSelfCheckDecisions(
+  { nodes: [{ id: 'a', label: 'A', type: 'code', files: [{ path: 'a.java' }] }], edges: [] },
+  [
+    {
+      id: 'N1',
+      edgeIndex: -1,
+      from: 'n:a',
+      to: '',
+      kind: 'node',
+      detail: '',
+      batch: 1,
+      paths: ['a.java'],
+    },
+  ],
+  [
+    {
+      id: 'N1',
+      action: 'add-node',
+      node: { id: 'c', label: 'C', type: 'code', files: ['outside.java'] },
+    },
+  ],
+  0,
+  ['a.java'],
+)
+check('add-node 未勾选路径被拒', addNodeOutside.applied[0]?.accepted, false)
+
 // 节点项：程序能看出的名称 / 类型 / 空代码分组问题才进清单。
 const nodeIssueGraph = {
   nodes: [
