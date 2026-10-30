@@ -180,8 +180,6 @@ export function useProjectSession() {
   // ---------------------------------------------------------------- 派生
 
   const tree = computed(() => buildTree(files.value, map.folderNotes))
-  /** 只含当前勾选文件的树；汇总、地图和图生成都用这棵，不再把未勾选文件名交给模型 */
-  const selectedTree = computed(() => buildTree(filesForMap(files.value), map.folderNotes))
   const stats = computed(() => computeStats(files.value))
   const queueFiles = computed(() => filesToParse(files.value))
   const activeEntry = computed(() => files.value.find((f) => f.path === activePath.value) ?? null)
@@ -636,12 +634,14 @@ export function useProjectSession() {
     return { ...result, crossFileEvidence: verifyEvidence(evidence, texts) }
   }
 
-  /** 当前勾选的签名；只比路径，顺序无关 */
-  function selectedSignature(): string {
-    return filesForMap(files.value)
+  /** 这批文件和上次建地图时不一样，就按这批重建地图 */
+  async function ensureMapForFiles(entries: ProjectFileEntry[]): Promise<void> {
+    const signature = entries
       .map((entry) => entry.path)
       .sort()
       .join('\n')
+    if (mapSignature.value === signature) return
+    await loadNotes(entries)
   }
 
   /**
@@ -649,25 +649,30 @@ export function useProjectSession() {
    * 地图结论是整个汇总 / 图的背景，不跟着勾选走，图里就会出现没选中的层。
    */
   async function ensureMapForSelection(): Promise<void> {
-    if (mapSignature.value === selectedSignature()) return
-    await loadNotes()
+    await ensureMapForFiles(filesForMap(files.value))
   }
 
   /**
    * 项目地图：只发目录树 + 每个文件头部几行。
    * 最多发 300 个文件的头部 —— 再多的项目，说明留白好过把一次调用撑爆。
+   *
+   * targets 默认是当前勾选；生成汇总时传的是「真的有职责摘要的文件」，
+   * 这样地图结论也不会提到解析失败的文件。
    */
-  async function loadNotes() {
-    const selected = filesForMap(files.value)
+  async function loadNotes(
+    targets: ProjectFileEntry[] = filesForMap(files.value),
+  ) {
+    const selected = targets
     const readablePaths = selected.map((entry) => entry.path)
-    // 记住这次建地图用的是哪批勾选；地图运行期间勾选如果再变，下次还会重建
+    // 记住这次建地图用的是哪批文件；运行期间集合如果再变，下次还会重建
     const signature = [...readablePaths].sort().join('\n')
+    const treeText = treeToText(buildTree(selected, map.folderNotes))
 
     // 先让 Agent 自己决定看什么；失败或超预算时回退到原来的固定地图
     const agentResult = await agent.run({
       projectName: projectName.value,
       entries: selected,
-      treeText: treeToText(selectedTree.value),
+      treeText,
       parseCount: filesToParse(files.value).length,
       readablePaths,
       getFile: (path) => fileHandles.get(path),
@@ -685,14 +690,19 @@ export function useProjectSession() {
 
       await map.run(
         projectName.value,
-        treeToText(selectedTree.value),
+        treeText,
         heads.filter((h): h is { path: string; head: string } => h !== null),
       )
     }
 
     // map 返回后把文件说明贴回登记项；树是 computed，会自动重建。
-    // 模型漏写说明时，补一句来源明确的提示，不替它编造用途。
+    // 只处理这次建地图用到的文件，解析失败的文件保留原来的状态。
+    const targetPaths = new Set(selected.map((entry) => entry.path))
     for (const entry of files.value) {
+      if (!targetPaths.has(entry.path)) {
+        entry.note = undefined
+        continue
+      }
       const note = map.fileNotes[entry.path]
       if (note) {
         entry.note = note
@@ -909,10 +919,15 @@ export function useProjectSession() {
       })
     }
 
+    // 树只放这次真的带上了职责摘要的文件；解析失败的和被预算跳过的都不进去，
+    // 否则模型会从树里看到它们，再把它们画进图。
+    const includedPaths = new Set(payloadFiles.map((file) => file.path))
+    const included = doneFiles.value.filter((entry) => includedPaths.has(entry.path))
+
     return {
       projectName: projectName.value,
       projectContext: map.context(projectName.value),
-      treeText: treeToText(selectedTree.value, 0, true),
+      treeText: treeToText(buildTree(included, map.folderNotes), 0, true),
       files: payloadFiles,
       skipped,
     }
@@ -950,16 +965,17 @@ export function useProjectSession() {
 
     if (partial && doneFiles.value.length < 2) return
 
-    // 勾选变了，先把项目结构结论按当前选择重建；否则图里会出现没选中的层
-    await ensureMapForSelection()
+    // 生成只认真的有职责摘要的文件：解析失败的不进地图、树和图
+    await ensureMapForFiles(doneFiles.value)
 
     phase.value = 'summary'
 
     const input = buildSummaryInput()
+    if (input.files.length === 0) return
     summarySkippedCount.value = input.skipped
 
-    // 冻结这一次的路径和输入，供「只重画图」复用；两次调用用同一批文件
-    summaryPaths.value = filesForMap(files.value).map((entry) => entry.path)
+    // 冻结这一次实际发送的文件路径，供清洗和「只重画图」复用
+    summaryPaths.value = input.files.map((file) => file.path)
     lastSummaryInput.value = {
       projectName: input.projectName,
       projectContext: input.projectContext,
