@@ -165,6 +165,15 @@ export function useProjectSession() {
   const selfCheckRestored = ref(false)
   /** 用户单独重画出来的图；优先于汇总原图，但排在自检结果之后 */
   const graphOverride = ref<ProjectGraphData | null>(null)
+  /** 点了生成、但还没真正开始流式汇总：可能在重建地图或补解析新增文件 */
+  const summaryPreparing = ref(false)
+  watch(
+    () => summary.loading.value,
+    (loading) => {
+      if (loading) summaryPreparing.value = false
+    },
+  )
+
   /** 上一次汇总时冻结的输入；重画图沿用它，保证图和正文用的是同一批文件 */
   const lastSummaryInput = ref<
     (Omit<ProjectGraphPayload, 'text'> & { skipped: number }) | null
@@ -967,16 +976,28 @@ export function useProjectSession() {
       return
     }
 
+    // 立即给出反馈：后面的重建地图、补解析新增文件都可能是秒级等待
+    summaryPreparing.value = true
+
     // 只有“全部解析完再生成”才补解析新增文件。
     // 部分生成（用当前已经完成的）点了就是要停掉剩余解析、直接用已完成文件生成，
     // 不能再走一遍补解析，否则池子已经停了，这里会直接 return，按钮看起来像点不动。
     if (hasNew && !partial) {
       await parseNewSelected()
-      if (pool.stopped.value) return
-      if (doneFiles.value.length === 0) return
+      if (pool.stopped.value) {
+        summaryPreparing.value = false
+        return
+      }
+      if (doneFiles.value.length === 0) {
+        summaryPreparing.value = false
+        return
+      }
     }
 
-    if (partial && doneFiles.value.length < 2) return
+    if (partial && doneFiles.value.length < 2) {
+      summaryPreparing.value = false
+      return
+    }
 
     // 生成只认真的有职责摘要的文件：解析失败的不进地图、树和图
     await ensureMapForFiles(doneFiles.value)
@@ -984,7 +1005,10 @@ export function useProjectSession() {
     phase.value = 'summary'
 
     const input = buildSummaryInput()
-    if (input.files.length === 0) return
+    if (input.files.length === 0) {
+      summaryPreparing.value = false
+      return
+    }
     summarySkippedCount.value = input.skipped
 
     // 冻结这一次实际发送的文件路径，供清洗和「只重画图」复用
@@ -1408,6 +1432,7 @@ export function useProjectSession() {
     graphScopeNote,
     summaryScopeLabel,
     summaryAction,
+    summaryPreparing,
     newSelectedCount,
     failedCount,
     parsingAdditional,

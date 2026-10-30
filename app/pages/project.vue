@@ -92,6 +92,7 @@ const {
   canGeneratePartial,
   graphScopeNote,
   summaryScopeLabel,
+  summaryPreparing,
   doneCount,
   selectedFolder,
   selectedGroup,
@@ -267,6 +268,7 @@ const summaryPrimaryLabel = computed(() => {
 })
 
 const regenerateLabel = computed(() => {
+  if (summaryPreparing.value) return '正在准备…'
   if (summaryAction.value === 'parsing-new') return '正在解析新增文件…'
   if (summaryAction.value === 'retry-failed' || summaryAction.value === 'blocked')
     return '没有可生成的文件'
@@ -274,7 +276,9 @@ const regenerateLabel = computed(() => {
 })
 
 const canRunSummaryPrimary = computed(
-  () => summaryAction.value === 'parse-new' || summaryAction.value === 'generate',
+  () =>
+    !summaryPreparing.value &&
+    (summaryAction.value === 'parse-new' || summaryAction.value === 'generate'),
 )
 
 /** 重新生成：全部完成后用完整输入，否则用已完成文件；新增文件由 runSummary 先补解析 */
@@ -618,7 +622,7 @@ onBeforeUnmount(() => {
 
         <!-- 全部解析完 → 手动生成项目总览与项目图 -->
         <section
-          v-if="started && allSettled && !summaryHasResult && !summaryLoading"
+          v-if="started && allSettled && !summaryHasResult && !summaryLoading && !summaryPreparing"
           class="mt-5 flex flex-wrap items-center gap-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3.5 sm:px-5"
         >
           <div class="min-w-0">
@@ -664,8 +668,9 @@ onBeforeUnmount(() => {
 
         <!-- 项目总览 -->
         <section
-          v-if="phase === 'summary' || summaryOutput || summaryError"
+          v-if="phase === 'summary' || summaryOutput || summaryError || summaryPreparing"
           class="mt-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+          :class="{ 'min-h-[96px]': summaryPreparing && !summaryOutput }"
         >
           <div class="mb-3 flex flex-wrap items-center gap-2">
             <h2 class="text-sm text-slate-500">项目总览</h2>
@@ -675,6 +680,12 @@ onBeforeUnmount(() => {
             >
               <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
               正在汇总
+            </span>
+            <span
+              v-else-if="summaryPreparing"
+              class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"
+            >
+              正在准备
             </span>
             <span
               v-else-if="summaryDone && !summaryError"
@@ -712,6 +723,16 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
+          <p
+            v-if="summaryPreparing && !summaryLoading && !summaryOutput"
+            class="mb-3 text-[11px] text-slate-500"
+          >
+            {{
+              newSelectedCount > 0
+                ? `正在解析新增的 ${newSelectedCount} 个文件…`
+                : '正在准备汇总；勾选变过时会先重建项目地图。'
+            }}
+          </p>
           <p v-if="summarySkippedCount > 0" class="mb-3 text-[11px] text-amber-700">
             另有 {{ summarySkippedCount }} 个文件超出本次汇总的输入预算，未纳入。
           </p>
