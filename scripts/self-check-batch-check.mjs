@@ -230,6 +230,42 @@ const rejectedMove = mergeSelfCheckDecisions(
 check('非法 move-file 被拒', rejectedMove.applied[0]?.accepted, false)
 check('非法 move-file 有原因', Boolean(rejectedMove.applied[0]?.conflictReason), true)
 
+const roleGraph = {
+  nodes: [
+    { id: 'a', label: 'A', type: 'code', files: [{ path: 'a.java', role: '入口' }] },
+    { id: 'b', label: 'B', type: 'tech' },
+  ],
+  edges: [],
+}
+const roleMove = mergeSelfCheckDecisions(
+  roleGraph,
+  [{ id: 'U1', edgeIndex: -1, from: 'f:a.java', to: '', kind: 'unowned', detail: '', batch: 1, paths: ['a.java'] }],
+  [{ id: 'U1', action: 'move-file', path: 'a.java', toNode: 'n:b' }],
+  0,
+  ['a.java'],
+)
+check('move-file 保留文件角色', roleMove.graph.nodes.find((n) => n.id === 'b')?.files?.[0]?.role, '入口')
+
+const roleLessGraph = {
+  nodes: [
+    { id: 'a', label: 'A', type: 'code', files: [{ path: 'a.java' }] },
+    { id: 'b', label: 'B', type: 'tech' },
+  ],
+  edges: [],
+}
+const roleLessMove = mergeSelfCheckDecisions(
+  roleLessGraph,
+  [{ id: 'U1', edgeIndex: -1, from: 'f:a.java', to: '', kind: 'unowned', detail: '', batch: 1, paths: ['a.java'] }],
+  [{ id: 'U1', action: 'move-file', path: 'a.java', toNode: 'n:b' }],
+  0,
+  ['a.java'],
+)
+check(
+  'move-file 不凭空造角色',
+  Boolean(roleLessMove.graph.nodes.find((n) => n.id === 'b')?.files?.[0]?.role),
+  false,
+)
+
 // 节点项：程序能看出的名称 / 类型 / 空代码分组问题才进清单。
 const nodeIssueGraph = {
   nodes: [

@@ -367,8 +367,13 @@ export function mergeSelfCheckDecisions(
         })
         continue
       }
+      // 先记下原文件的角色，再把它从所有节点移走；否则目标节点只剩路径，
+      // 节点上会冒出“有文件没有标注角色”。
+      let movedRole: string | undefined
       for (const node of nodes) {
         if (!node.files) continue
+        const match = node.files.find((file) => file.path === path)
+        if (match?.role) movedRole = match.role
         const nextFiles = node.files.filter((file) => file.path !== path)
         node.files = nextFiles.length ? nextFiles : undefined
       }
@@ -388,7 +393,10 @@ export function mergeSelfCheckDecisions(
         })
         continue
       }
-      targetNode.files = [...(targetNode.files ?? []), { path }]
+      targetNode.files = [
+        ...(targetNode.files ?? []),
+        movedRole ? { path, role: movedRole } : { path },
+      ]
       applied.push({
         id: item.id,
         action: decision.action,
