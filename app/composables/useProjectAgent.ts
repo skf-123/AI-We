@@ -20,6 +20,7 @@ import {
   canStartBatch,
   createSelfCheckBudget,
   recordUsage,
+  SELF_CHECK_HARD_TOKENS,
   SELF_CHECK_STRUCTURAL_TOKENS,
   SELF_CHECK_TOTAL_TOKENS,
 } from '~/utils/self-check-budget'
@@ -657,7 +658,7 @@ export function useProjectAgent() {
             } else {
               noProgress = 0
             }
-            if (budget.used >= 165_000 || batchUsed >= quota) break
+            if (budget.used >= SELF_CHECK_HARD_TOKENS || batchUsed >= quota) break
             continue
           }
 
@@ -678,7 +679,7 @@ export function useProjectAgent() {
 
         if (isStructural) structuralUsed += batchUsed
         decisions.push(...batchDecisions)
-        if (budget.used >= 165_000) break
+        if (budget.used >= SELF_CHECK_HARD_TOKENS) break
       }
 
       // 批池用完后，用预留额度做最后一次“只给决定”的收尾。
