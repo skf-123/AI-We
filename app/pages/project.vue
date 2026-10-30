@@ -366,7 +366,7 @@ onBeforeUnmount(() => {
           树达到上限后在卡片内部滚动，右侧跟着同一高度走。
           否则目录树越长，整页和右侧空白就被一起拉得越高。
         -->
-        <div class="grid gap-4 lg:grid-cols-2 lg:items-stretch">
+        <div class="grid gap-4 lg:grid-cols-2 lg:items-start">
           <section
             class="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:flex lg:flex-col"
           >
@@ -555,7 +555,7 @@ onBeforeUnmount(() => {
 
                 <span
                   v-if="summaryLateSelectionNote"
-                  class="w-full text-[10.5px] leading-relaxed text-amber-700"
+                  class="w-full text-xs leading-relaxed text-amber-700"
                 >
                   {{ summaryLateSelectionNote }}
                 </span>
@@ -572,7 +572,7 @@ onBeforeUnmount(() => {
             <p class="shrink-0 px-4 pb-3 text-[11px] text-slate-400">解析结果只保存在当前页面，刷新会丢。</p>
           </section>
 
-          <div class="relative min-w-0 lg:min-h-0">
+          <div class="relative min-w-0 lg:h-[calc(100dvh-200px)] lg:min-h-[420px]">
             <div class="flex min-w-0 flex-col gap-2 lg:absolute lg:inset-0 lg:min-h-0">
               <!-- 选中文件夹 / 项目图分组时，右侧先列出范围内的文件；点一下切过去 -->
               <div
