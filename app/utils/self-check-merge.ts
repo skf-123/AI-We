@@ -308,11 +308,32 @@ export function mergeSelfCheckDecisions(
         })
         continue
       }
+      const nextFiles = [...new Set(next.files)]
+      // 一个文件只能属于一个节点；已经归属过的文件要用 move-file，不能靠新建节点再占一次。
+      if (
+        nodes.some((node) =>
+          node.files?.some((file) => nextFiles.includes(file.path)),
+        )
+      ) {
+        conflict++
+        applied.push({
+          id: item.id,
+          action: decision.action,
+          from: source,
+          to: next.id,
+          label: next.label,
+          reason: decision.reason,
+          accepted: false,
+          conflictReason: 'add-node 的文件已属于其他节点，请用 move-file',
+          node: next,
+        })
+        continue
+      }
       nodes.push({
         id: next.id,
         label: next.label,
         type: (next.type ?? 'code') as ProjectGraphNode['type'],
-        files: [...new Set(next.files)].map((path) => ({ path })),
+        files: nextFiles.map((path) => ({ path })),
       })
       nodeIds.add(next.id)
       applied.push({

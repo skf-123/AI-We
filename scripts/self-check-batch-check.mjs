@@ -324,6 +324,40 @@ check(
   '节点还被边引用，先删边或改边再删节点',
 )
 
+const addNodeOwned = mergeSelfCheckDecisions(
+  nodeMergeGraph,
+  [nodeItems[0]],
+  [
+    {
+      id: 'N1',
+      action: 'add-node',
+      node: { id: 'd', label: 'D', type: 'code', files: ['a.java'] },
+    },
+  ],
+  0,
+)
+check('add-node 不能重复占文件', addNodeOwned.applied[0]?.accepted, false)
+check(
+  'add-node 重复占文件原因',
+  addNodeOwned.applied[0]?.conflictReason,
+  'add-node 的文件已属于其他节点，请用 move-file',
+)
+
+const addNodeFree = mergeSelfCheckDecisions(
+  nodeMergeGraph,
+  [nodeItems[0]],
+  [
+    {
+      id: 'N1',
+      action: 'add-node',
+      node: { id: 'd', label: 'D', type: 'code', files: ['new.java'] },
+    },
+  ],
+  0,
+  ['new.java'],
+)
+check('add-node 接受未归属文件', addNodeFree.applied[0]?.accepted, true)
+
 const badType = mergeSelfCheckDecisions(
   nodeMergeGraph,
   [nodeItems[0]],
