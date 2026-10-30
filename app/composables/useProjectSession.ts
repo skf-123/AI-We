@@ -167,6 +167,13 @@ export function useProjectSession() {
   const graphOverride = ref<ProjectGraphData | null>(null)
   /** 点了生成、但还没真正开始流式汇总：可能在重建地图或补解析新增文件 */
   const summaryPreparing = ref(false)
+  /** 这次生成开始时按多少个新增文件准备；生成中再勾选的不自动加入 */
+  const summaryRunNewCount = ref(0)
+  /** 这次生成开始时的勾选总数；用于判断生成中是否又改了勾选 */
+  const summaryRunSelectedCount = ref(0)
+  /** 这次生成开始时勾选的路径；用来识别生成中后来新勾的文件 */
+  const summaryRunSelectedPaths = ref<Set<string>>(new Set())
+  const summaryRunPartial = ref(false)
   watch(
     () => summary.loading.value,
     (loading) => {
@@ -353,6 +360,33 @@ export function useProjectSession() {
 
     const unparsed = Math.max(0, totalSelected - doneCount.value - failedCount.value)
     return `当前选中 ${totalSelected} 个：已完成 ${doneCount.value} 个、待解析 ${unparsed} 个、失败 ${failedCount.value} 个。`
+  })
+
+  /** 正在进行的这次生成：显示点击时冻结的新增数，不随之后勾选变化 */
+  const summaryRunLabel = computed(() => {
+    if (summary.loading.value) return '正在生成汇总…'
+    if (summaryRunPartial.value) return '正在用已完成的文件生成…'
+    if (summaryRunNewCount.value > 0) {
+      return `正在解析点击时的 ${summaryRunNewCount.value} 个新增文件…`
+    }
+    return '正在生成汇总…'
+  })
+
+  const summaryRunBadge = computed(() => {
+    if (summaryRunPartial.value) return '正在生成'
+    return summaryRunNewCount.value > 0 ? '正在解析新增' : '正在生成'
+  })
+
+  /** 这次生成开始后又改了勾选：告诉用户这些新勾选不保证加入本次 */
+  const summaryLateSelectionNote = computed(() => {
+    if (!summaryPreparing.value && !summary.loading.value) return ''
+    const lateNew = newSelected.value.filter(
+      (entry) => !summaryRunSelectedPaths.value.has(entry.path),
+    ).length
+    const selectionChanged = queueFiles.value.length !== summaryRunSelectedCount.value
+    if (lateNew === 0 && !selectionChanged) return ''
+    const added = lateNew > 0 ? `；之后又勾选了 ${lateNew} 个，不保证会加入本次` : ''
+    return `本次生成按点击时的文件范围准备${added}；等这次完成后再点一次，才会按新的勾选重新生成。`
   })
 
   /** 这次总览实际基于多少个已解析文件；全选且全部成功时不显示 */
@@ -978,6 +1012,10 @@ export function useProjectSession() {
 
     // 立即给出反馈：后面的重建地图、补解析新增文件都可能是秒级等待
     summaryPreparing.value = true
+    summaryRunNewCount.value = newSelectedCount.value
+    summaryRunSelectedCount.value = queueFiles.value.length
+    summaryRunSelectedPaths.value = new Set(queueFiles.value.map((entry) => entry.path))
+    summaryRunPartial.value = partial
 
     // 只有“全部解析完再生成”才补解析新增文件。
     // 部分生成（用当前已经完成的）点了就是要停掉剩余解析、直接用已完成文件生成，
@@ -1433,6 +1471,9 @@ export function useProjectSession() {
     summaryScopeLabel,
     summaryAction,
     summaryPreparing,
+    summaryRunLabel,
+    summaryRunBadge,
+    summaryLateSelectionNote,
     newSelectedCount,
     failedCount,
     parsingAdditional,

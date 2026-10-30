@@ -93,6 +93,9 @@ const {
   graphScopeNote,
   summaryScopeLabel,
   summaryPreparing,
+  summaryRunLabel,
+  summaryRunBadge,
+  summaryLateSelectionNote,
   doneCount,
   selectedFolder,
   selectedGroup,
@@ -285,12 +288,7 @@ const canRunFullRegenerate = computed(
 )
 
 const fullRegenerateLabel = computed(() => {
-  if (summaryLoading.value) return '正在生成汇总…'
-  if (summaryPreparing.value) {
-    return newSelectedCount.value > 0
-      ? `正在解析新增的 ${newSelectedCount.value} 个…`
-      : '正在生成汇总…'
-  }
+  if (primaryBusy.value) return summaryRunLabel.value
   if (!allSettled.value && newSelectedCount.value > 0) {
     return `重新生成总览 + 思维导图（先解析新增的 ${newSelectedCount.value} 个）`
   }
@@ -530,9 +528,11 @@ onBeforeUnmount(() => {
                     {{
                       summaryHasResult
                         ? fullRegenerateLabel
-                        : poolStopped
-                          ? '生成项目总览 + 思维导图'
-                          : `生成思维导图（用已完成的 ${doneCount} 个）`
+                        : primaryBusy
+                          ? summaryRunLabel
+                          : poolStopped
+                            ? '生成项目总览 + 思维导图'
+                            : `生成思维导图（用已完成的 ${doneCount} 个）`
                     }}
                   </button>
                   <button
@@ -552,6 +552,13 @@ onBeforeUnmount(() => {
                     还没有成功解析的文件
                   </span>
                 </template>
+
+                <span
+                  v-if="summaryLateSelectionNote"
+                  class="w-full text-[10.5px] leading-relaxed text-amber-700"
+                >
+                  {{ summaryLateSelectionNote }}
+                </span>
 
                 <NuxtLink
                   to="/"
@@ -710,7 +717,7 @@ onBeforeUnmount(() => {
               v-else-if="summaryPreparing"
               class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"
             >
-              {{ newSelectedCount > 0 ? '正在解析新增' : '正在生成' }}
+              {{ summaryRunBadge }}
             </span>
             <span
               v-else-if="summaryDone && !summaryError"
@@ -752,11 +759,7 @@ onBeforeUnmount(() => {
             v-if="summaryPreparing && !summaryLoading && !summaryOutput"
             class="mb-3 text-[11px] text-slate-500"
           >
-            {{
-              newSelectedCount > 0
-                ? `正在解析新增的 ${newSelectedCount} 个文件…`
-                : '正在生成汇总…'
-            }}
+            {{ summaryRunLabel }}
           </p>
           <p v-if="summarySkippedCount > 0" class="mb-3 text-[11px] text-amber-700">
             另有 {{ summarySkippedCount }} 个文件超出本次汇总的输入预算，未纳入。
