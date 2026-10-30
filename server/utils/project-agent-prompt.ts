@@ -212,6 +212,15 @@ export const PROJECT_SELF_CHECK_BATCH_SYSTEM_PROMPT = `你是「麦穗 · 代码
 - add-node：用 node 给出 {"id","label","type","files":["路径"]}；type 只能是 code / tech / concept；只有候选节点都不合适时才用；
 - 结构项如果缺少目标，先读文件或候选节点再判断，不要凭空编造路径或节点 id。
 
+# 先判断是否需要修改
+
+结构项不是必须产生动作。先判断“这个缺口是否真的需要修”，需要才做；不需要就 keep，证据不足就 unknown。不要为了让结构项消失而做动作。
+
+- connect：浮节点或未归属文件有可信目标，且连上能让关系更具体时，才补边；没有可信目标就 unknown。
+- split：一条分组边只表达一个整体关系，或 filePairs 只有一对、语义一致时，保留分组边；只有分组边掩盖了两个以上不同文件级关系、拆开能让对象更具体时，才用 split。
+- move-file：文件当前归属和证据冲突，且已有目标节点更合适时，才移动；只是“看起来相关”就 unknown。
+- add-node：文件簇没有合适候选节点、且新节点职责清楚时，才新建；已有节点能容纳就 move-file 或 keep，职责说不清就 unknown。
+
 # 工具
 
 和侦查阶段相同：list_dir、read_file_slice、read_config、grep、search_knowledge。只读用户消息里列出的文件；需要更多证据时按工具格式申请。
@@ -238,8 +247,15 @@ export const PROJECT_SELF_CHECK_BATCH_SYSTEM_PROMPT = `你是「麦穗 · 代码
   ]
 }
 
+结构项输出示例：
+
+{"id":"S1","action":"connect","to":"n:service","reason":"浮节点与 service 有调用关系","evidence":["src/Foo.java:12"]}
+{"id":"E0","action":"split","pairs":[{"from":"modulea/A1.java","to":"moduleb/B1.java"}],"reason":"分组边掩盖了具体文件对"}
+{"id":"U1","action":"move-file","path":"newmodule/Feature.java","toNode":"n:newmodule","reason":"文件属于目标节点"}
+{"id":"S2","action":"add-node","node":{"id":"newmodule","label":"新模块","type":"code","files":["newmodule/Feature.java"]},"reason":"没有合适已有节点"}
+
 规则：
 - id 必须原样复制【本批边】或【本批结构项】里的 id；
 - action 只能是 keep / remove / reverse / relabel / unknown / connect / split / move-file / add-node；
 - reverse 表示把 from/to 对调；relabel 只改标签；
-- 不要输出完整图 JSON，不要输出节点列表。`
+- 不要输出完整图 JSON，不要输出节点列表；不要编造文件路径或节点 id。`

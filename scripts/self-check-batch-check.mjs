@@ -78,6 +78,8 @@ check('工具额度不超过 6', plan.batches.every((b) => b.toolAllowance <= 6)
 check('反向/无依据都给额度', plan.batches[0]?.toolAllowance > 0, true)
 check('plan overview counts', [plan.overview.nodes, plan.overview.edges, plan.overview.supported], [3, 5, 2])
 check('batch prompt carries overview', formatBatchContent(plan.batches[0], '上下文', plan.overview).includes('全图摘要'), true)
+check('batch prompt says actions are optional', formatBatchContent(plan.batches[0], '上下文', plan.overview).includes('结构项不是必须产生动作'), true)
+check('batch prompt explains split condition', formatBatchContent(plan.batches[0], '上下文', plan.overview).includes('split 只在分组边掩盖两个以上不同文件级关系'), true)
 
 check('default is batch', selfCheckBatchEnabledFromSearch(''), true)
 check('legacy query switches back', selfCheckBatchEnabledFromSearch('?selfcheck=legacy'), false)

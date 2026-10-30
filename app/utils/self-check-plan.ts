@@ -324,7 +324,7 @@ ${structures || '（没有结构项）'}
 【涉及的节点】
 ${nodes}
 
-【可读文件】只列本批端点；工具仍按完整可读列表校验
+【可读文件】只列本批涉及的文件和文件对；工具仍按完整可读列表校验
 ${batch.paths.map((path) => `- ${path}`).join('\n') || '（没有文件端点）'}
 
 【项目结构结论（只作背景，不要据此编造）】
@@ -333,8 +333,10 @@ ${projectContext.slice(0, 20_000)}
 【规则】
 - 边可以回：keep / remove / reverse / relabel / unknown；
 - 结构项可以回：keep / connect / split / move-file / add-node / unknown；
-- connect 用 to 指向目标端点；split 用 pairs 指定保留的文件对；
-- move-file 用 path + toNode 指定文件和新节点；add-node 用 node 指定新节点；
+- 结构项不是必须产生动作：先判断是否真的需要修，不需要就 keep，证据不足就 unknown；
+- connect 用 to 指向目标端点；split 用 pairs 指定保留的文件对；move-file 用 path + toNode 指定文件和新节点；add-node 用 node 指定新节点；
+- split 只在分组边掩盖两个以上不同文件级关系、拆开能让对象更具体时使用；只有一对或语义一致时保留分组边；
+- add-node 只在候选节点都不合适、且新节点职责清楚时使用；已有节点能容纳就 move-file 或 keep；
 - reverse 表示把 from/to 对调；relabel 只改标签；unknown 表示证据不足；
 - 没有证据就写 unknown，不要猜；不要输出完整图；不要编造文件路径或节点 id；
 - 需要读文件时，按工具格式申请，最多 ${batch.toolAllowance} 次；程序可能按预算拒绝。
