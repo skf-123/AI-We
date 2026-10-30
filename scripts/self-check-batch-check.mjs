@@ -24,6 +24,12 @@ import {
   SELF_CHECK_MAX_UNOWNED,
 } from '../app/utils/self-check-plan.ts'
 import { mergeSelfCheckDecisions } from '../app/utils/self-check-merge.ts'
+import { findMissingEdges } from '../app/utils/project-graph-candidates.ts'
+import {
+  buildEvidencePacks,
+  checkEvidenceCitations,
+  chunkEvidencePacks,
+} from '../app/utils/self-check-evidence.ts'
 
 let failed = 0
 function check(name, actual, expected) {
@@ -169,7 +175,14 @@ check('unknown 计入未核', [unknownMerge.coverage.unknown, unknownMerge.cover
 const integrityMerged = mergeSelfCheckDecisions(
   {
     ...graph,
-    nodes: [{ ...graph.nodes[0], floating: true }, ...graph.nodes.slice(1)],
+    nodes: [
+      { ...graph.nodes[0], floating: true },
+      {
+        ...graph.nodes[1],
+        files: [...graph.nodes[1].files, { path: 'Article.java' }],
+      },
+      ...graph.nodes.slice(2),
+    ],
     edges: [{ ...graph.edges[0], filePairs: [{ from: 'Article.java', to: 'ArticleMapper.java', evidence: [] }] }],
     unownedFiles: ['Orphan.java'],
     duplicateFiles: [{ path: 'Article.java', nodes: ['entity', 'mapper'] }],
@@ -495,6 +508,7 @@ const priorityGraph = {
     { id: 'a', label: 'A', type: 'code', files: [{ path: 'a.java' }] },
     { id: 'b', label: 'B', type: 'code', files: [{ path: 'b.java' }] },
     { id: 'float', label: '浮', type: 'code', files: [{ path: 'f.java' }], floating: true },
+    { id: 'sql', label: 'SQL 建表脚本', type: 'tech' },
   ],
   edges: [
     { from: 'f:a.java', to: 'f:b.java', label: '反向' },
@@ -513,10 +527,36 @@ check('批次优先级单调', priorityPlan.batches.every((b, i, all) => i === 0
 check('第一条先跑关键边', [priorityPlan.batches[0]?.rank, priorityPlan.batches[0]?.category], [0, 'edge'])
 check('结构批次标记为 structural', priorityPlan.batches.filter((b) => b.category === 'structural').length > 0, true)
 check(
-  '未归属只送前 N 个',
+  '未归属不超过上限，够送就全送',
   priorityPlan.items.filter((item) => item.kind === 'unowned').length,
-  SELF_CHECK_MAX_UNOWNED,
+  Math.min(20, SELF_CHECK_MAX_UNOWNED),
 )
+check(
+  '未归属候选包含暂时没有文件的节点',
+  priorityPlan.items
+    .find((item) => item.kind === 'unowned')
+    ?.candidates?.some((candidate) => candidate.id === 'n:sql'),
+  true,
+)
+const movedToEmpty = mergeSelfCheckDecisions(
+  priorityGraph,
+  priorityPlan.items,
+  [{ id: 'U1', action: 'move-file', path: 'u0.java', toNode: 'n:sql' }],
+  0,
+)
+check(
+  'move-file 可以落到暂时没有文件的节点',
+  movedToEmpty.graph.nodes.find((node) => node.id === 'sql')?.files?.[0]?.path,
+  'u0.java',
+)
+const coveredAfterMove = mergeSelfCheckDecisions(
+  priorityGraph,
+  priorityPlan.items,
+  [{ id: 'U1', action: 'move-file', path: 'u0.java', toNode: 'n:sql' }],
+  0,
+  ['u0.java'],
+)
+check('搬走之后未归属不再计入摘要', coveredAfterMove.coverage.unowned, undefined)
 check('批次号连续', priorityPlan.batches.every((b, i) => b.index === i + 1), true)
 check(
   '收尾只含边',
@@ -531,6 +571,119 @@ const prefixA = prefixOf(formatBatchContent(priorityPlan.batches[0], '同一份�
 const prefixB = prefixOf(formatBatchContent(priorityPlan.batches[1], '同一份项目结论', priorityPlan.overview))
 check('批次静态前缀一致', prefixA, prefixB)
 check('工具额度不在静态前缀里', prefixA.includes('【本批工具额度】'), false)
+
+// ---- 缺边检测 ----
+const missingGraph = {
+  nodes: [
+    { id: 'front', label: '前端', files: [{ path: 'src/a.js' }, { path: 'src/b.js' }] },
+    { id: 'back', label: '后端', files: [{ path: 'server/c.js' }] },
+  ],
+  edges: [],
+}
+const missingScan = {
+  edges: [
+    { from: 'src/a.js', to: 'server/c.js', line: 3, evidence: "import c from '../server/c.js'" },
+    { from: 'src/b.js', to: 'server/c.js', line: 5, evidence: "import c from '../server/c.js'" },
+    { from: 'server/c.js', to: 'src/a.js', line: 1, evidence: "require('../src/a')" },
+  ],
+  unresolved: [],
+  filesParsed: 3,
+  filesWithImports: 3,
+  paths: ['src/a.js', 'src/b.js', 'server/c.js'],
+}
+const missing = findMissingEdges(missingGraph, missingScan)
+check('缺边按节点对去重', missing.length, 1)
+check('缺边保留 import 行号', missing[0]?.line, 3)
+check(
+  '已有连接的节点对不再报缺边',
+  findMissingEdges({ ...missingGraph, edges: [{ from: 'n:front', to: 'n:back' }] }, missingScan).length,
+  0,
+)
+
+const missingPlan = buildSelfCheckPlan(missingGraph, [], missing)
+const missingItem = missingPlan.items.find((item) => item.kind === 'missing-edge')
+check('缺边进结构项', Boolean(missingItem), true)
+check('缺边项给出两端节点', missingItem?.candidates?.length, 2)
+check(
+  '缺边 connect 能补进图',
+  mergeSelfCheckDecisions(
+    missingGraph,
+    missingPlan.items,
+    [{ id: 'M1', action: 'connect', to: 'f:server/c.js', reason: 'import 有依赖' }],
+    0,
+  ).graph.edges.length,
+  1,
+)
+
+// ---- 证据包 ----
+const evidenceTexts = new Map([
+  [
+    'src/a.js',
+    "import c from '../server/c.js'\nconst x = 1\nstore.dispatch('user/login')\n",
+  ],
+  ['server/c.js', "@RequestMapping('/user/login')\nexport function login() {}\n"],
+])
+const packs = buildEvidencePacks(
+  [
+    {
+      id: 'E1',
+      edgeIndex: 0,
+      from: 'f:src/a.js',
+      to: 'f:server/c.js',
+      kind: 'unsupported',
+      detail: '没有找到依据',
+      batch: 1,
+    },
+  ],
+  missingGraph,
+  (path) => evidenceTexts.get(path),
+)
+check('证据包覆盖两端文件', packs[0]?.files.length, 2)
+check('证据包带真实行号', packs[0]?.text.includes('3: store.dispatch'), true)
+check('证据包抓路由行', packs[0]?.text.includes("1: @RequestMapping('/user/login')"), true)
+check(
+  '引用证据包里的真实行通过',
+  checkEvidenceCitations(
+    { id: 'E1', action: 'reverse', evidence: ['src/a.js:1'] },
+    packs,
+    (path) => evidenceTexts.get(path),
+  ).ok,
+  true,
+)
+check(
+  '引用不存在的行不通过',
+  checkEvidenceCitations(
+    { id: 'E1', action: 'reverse', evidence: ['src/a.js:99'] },
+    packs,
+    (path) => evidenceTexts.get(path),
+  ).ok,
+  false,
+)
+check(
+  '引用证据包外的文件不通过',
+  checkEvidenceCitations(
+    { id: 'E1', action: 'keep', evidence: ['other.js:1'] },
+    packs,
+    (path) => evidenceTexts.get(path),
+  ).ok,
+  false,
+)
+
+const fakePacks = Array.from({ length: 7 }, (_, index) => ({
+  id: `E${index}`,
+  kind: 'unsupported',
+  from: '',
+  to: '',
+  files: [],
+  text: 'x'.repeat(100),
+}))
+check(
+  '证据包按 5 个一组',
+  chunkEvidencePacks(fakePacks)
+    .map((chunk) => chunk.length)
+    .join(','),
+  '5,2',
+)
 
 if (failed > 0) {
   console.error(`\n${failed} 项失败`)

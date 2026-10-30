@@ -16,6 +16,7 @@ import { scanCandidateEdges } from '~/utils/project-candidate-edges.ts'
 import {
   compareGraphToCandidates,
   filterVerifiedSuspicions,
+  findMissingEdges,
 } from '~/utils/project-graph-candidates.ts'
 
 definePageMeta({ layout: false })
@@ -48,6 +49,7 @@ const planGraph = ref<ProjectGraphData | null>(null)
 const plan = ref<SelfCheckPlan | null>(null)
 const entries = ref<ProjectFileEntry[]>([])
 const fileMap = new Map<string, File>()
+const contentMap = new Map<string, string>()
 const loadError = ref('')
 const result = ref<Awaited<ReturnType<ReturnType<typeof useProjectAgent>['runSelfCheckBatch']>>>(null)
 const merged = ref<ReturnType<typeof mergeSelfCheckDecisions> | null>(null)
@@ -72,6 +74,7 @@ onMounted(async () => {
     }))
     for (const file of data.files) {
       fileMap.set(file.path, new File([file.content], file.name, { type: 'text/plain' }))
+      contentMap.set(file.path, file.content)
     }
 
     if (route.query.fixture === '187-original') {
@@ -88,8 +91,9 @@ onMounted(async () => {
       const scan = scanCandidateEdges(sources)
       const report = compareGraphToCandidates(enriched, scan)
       const suspicions = filterVerifiedSuspicions(enriched, report.suspicions)
+      const missingEdges = findMissingEdges(enriched, scan)
       planGraph.value = enriched
-      plan.value = buildSelfCheckPlan(enriched, suspicions)
+      plan.value = buildSelfCheckPlan(enriched, suspicions, missingEdges)
     } else {
       planGraph.value = data.graph
       plan.value = buildSelfCheckPlan(data.graph, [])
@@ -107,6 +111,8 @@ async function run() {
     entries: entries.value,
     readablePaths: entries.value.map((entry) => entry.path),
     getFile: (path) => fileMap.get(path),
+    graph: planGraph.value ?? fixture.value.graph,
+    getText: (path) => contentMap.get(path),
   })
   if (result.value) {
     merged.value = mergeSelfCheckDecisions(
@@ -153,6 +159,7 @@ async function run() {
         usedTokens: result.usedTokens,
         modelCalls: result.modelCalls,
         toolCalls: result.toolCalls,
+        evidencePacks: result.evidencePacks ?? 0,
         stopped: result.stopped,
         decisions: result.decisions.length,
         actions: result.decisions.reduce((counts, decision) => {

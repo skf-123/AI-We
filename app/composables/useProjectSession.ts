@@ -25,6 +25,7 @@ import { scanCandidateEdges } from '~/utils/project-candidate-edges'
 import {
   compareGraphToCandidates,
   filterVerifiedSuspicions,
+  findMissingEdges,
 } from '~/utils/project-graph-candidates'
 import { buildSelfCheckPlan, selfCheckBatchEnabled } from '~/utils/self-check-plan'
 import { mergeSelfCheckDecisions } from '~/utils/self-check-merge'
@@ -1152,7 +1153,9 @@ export function useProjectSession() {
     const suspicions = filterVerifiedSuspicions(graph, candidateReport.suspicions)
 
     if (selfCheckBatchMode.value) {
-      const plan = buildSelfCheckPlan(graph, suspicions)
+      // 源码 import 有、图上没有的边；只找出候选，是否需要补由自检模型判断。
+      const missingEdges = findMissingEdges(graph, candidateScan)
+      const plan = buildSelfCheckPlan(graph, suspicions, missingEdges)
       if (plan.batches.length === 0) {
         selfCheckCoverage.value = {
           total: plan.total,
@@ -1173,6 +1176,8 @@ export function useProjectSession() {
         entries: files.value.filter((entry) => graphPaths.has(entry.path)),
         readablePaths: [...graphPaths],
         getFile: (path) => fileHandles.get(path),
+        graph,
+        getText: (path) => pool.textOf(path),
       })
 
       if (batchResult) {

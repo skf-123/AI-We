@@ -9,7 +9,7 @@
  * 不碰模型、不碰 DOM；模型只拿到这里生成的批次。
  */
 import type { ProjectGraphData, ProjectGraphEdge } from '~/types/project'
-import type { GraphSuspicion } from '~/utils/project-graph-candidates'
+import type { GraphSuspicion, MissingEdgeCandidate } from '~/utils/project-graph-candidates'
 import type {
   SelfCheckBatch,
   SelfCheckItem,
@@ -20,8 +20,13 @@ import type {
 
 export const SELF_CHECK_BATCH_SIZE = 8
 export const SELF_CHECK_MAX_TOOL_ALLOWANCE = 6
-/** 未归属文件一条一项太贵；最多送这么多，剩下的继续显示未归属 */
-export const SELF_CHECK_MAX_UNOWNED = 16
+/**
+ * 未归属文件一条一项太贵；最多送这么多，剩下的继续显示未归属。
+ * 2026-10-30 从 16 提到 48：187 图里未归属 42 个，16 会让另外 26 个永远拿不到归属判断。
+ */
+export const SELF_CHECK_MAX_UNOWNED = 48
+/** 源码有 import、图上没有边；最多送这么多，避免大项目一次塞爆结构批 */
+export const SELF_CHECK_MAX_MISSING_EDGES = 20
 /** 收尾调用不读文件，只允许这些边动作 */
 export const SELF_CHECK_FINAL_ACTIONS = [
   'keep',
@@ -91,7 +96,12 @@ function kindOf(suspicion: GraphSuspicion | undefined): SelfCheckItemKind | null
  */
 function rankOf(item: SelfCheckItem): number {
   if (item.edgeIndex < 0) {
-    if (item.kind === 'duplicate' || item.kind === 'floating' || item.kind === 'node') {
+    if (
+      item.kind === 'duplicate' ||
+      item.kind === 'floating' ||
+      item.kind === 'node' ||
+      item.kind === 'missing-edge'
+    ) {
       return 1
     }
     return 3
@@ -143,6 +153,7 @@ export interface SelfCheckPlan {
 export function buildSelfCheckPlan(
   graph: ProjectGraphData,
   suspicions: GraphSuspicion[],
+  missingEdges: MissingEdgeCandidate[] = [],
 ): SelfCheckPlan {
   const byKey = new Map<string, GraphSuspicion>()
   for (const suspicion of suspicions) {
@@ -182,6 +193,13 @@ export function buildSelfCheckPlan(
   const groupCandidates = graph.nodes
     .filter((node) => node.files && node.files.length > 0)
     .map((node) => ({ id: `n:${node.id}`, label: node.label, type: node.type }))
+  // 未归属 / 浮节点可以落到暂时没有文件的节点上（例如「SQL 建表脚本」这种技术节点），
+  // 候选里必须有它，否则模型只能 add-node 或写 unknown。
+  const candidateNodes = graph.nodes.map((node) => ({
+    id: `n:${node.id}`,
+    label: node.label,
+    type: node.type,
+  }))
   let structuralIndex = 0
   for (const node of graph.nodes) {
     if (!node.floating || !node.files?.length) continue
@@ -195,7 +213,7 @@ export function buildSelfCheckPlan(
       detail: '节点有文件，但没有任何外部连线',
       batch: 0,
       paths: node.files.map((file) => file.path),
-      candidates: groupCandidates.filter((candidate) => candidate.id !== `n:${node.id}`),
+      candidates: candidateNodes.filter((candidate) => candidate.id !== `n:${node.id}`),
     })
   }
   const unowned = (graph.unownedFiles ?? []).slice(0, SELF_CHECK_MAX_UNOWNED)
@@ -209,7 +227,26 @@ export function buildSelfCheckPlan(
       detail: '文件没有出现在任何节点的 files 列表里',
       batch: 0,
       paths: [path],
-      candidates: groupCandidates,
+      candidates: candidateNodes,
+    })
+  }
+  // 缺边：源码 import 有、图上没有。程序只负责找出来，是否需要补由模型判断。
+  let missingIndex = 0
+  for (const edge of missingEdges.slice(0, SELF_CHECK_MAX_MISSING_EDGES)) {
+    const fromNode = groupOf(`f:${edge.from}`, graph)
+    const toNode = groupOf(`f:${edge.to}`, graph)
+    items.push({
+      id: `M${++missingIndex}`,
+      edgeIndex: -1,
+      from: `f:${edge.from}`,
+      to: `f:${edge.to}`,
+      kind: 'missing-edge',
+      detail: `源码里有依赖，图上没有对应的边：${edge.from}:${edge.line} ${edge.evidence}`,
+      batch: 0,
+      paths: [edge.from, edge.to],
+      candidates: groupCandidates.filter(
+        (candidate) => candidate.id === `n:${fromNode}` || candidate.id === `n:${toNode}`,
+      ),
     })
   }
   for (const [index, row] of (graph.duplicateFiles ?? []).entries()) {
@@ -412,7 +449,9 @@ ${projectContext.slice(0, 20_000)}
 - 结构项可以回：keep / connect / split / move-file / add-node / remove-node / rename-node / update-node / unknown；
 - 结构项不是必须产生动作：先判断是否真的需要修，不需要就 keep，证据不足就 unknown；
 - connect 用 to 指向目标端点；split 用 pairs 指定保留的文件对；move-file 用 path + toNode 指定文件和新节点；add-node 用 node 指定新节点；
+- 未归属文件如果已有职责对得上的节点（例如 SQL 建表脚本 → 类型 tech 的「SQL 建表脚本」节点），用 move-file 直接归属过去；候选节点可以是暂时没有文件的节点；
 - split 只在分组边掩盖两个以上不同文件级关系、拆开能让对象更具体时使用；只有一对或语义一致时保留分组边；
+- 缺边项（missing-edge）表示源码 import 有、图上没有对应边：import 能说明依赖方向时用 connect，to 写目标文件或节点；只是同目录 / 同层、或这条依赖不值得单独画时 keep；证据不足就 unknown；
 - add-node 只在候选节点都不合适、且新节点职责清楚时使用；已有节点能容纳就 move-file 或 keep；
 - remove-node 用 nodeId 指定要删的节点；节点还有文件时用 moveFilesTo 先移到目标节点，不能直接丢文件；
 - rename-node 用 nodeId + label 只改节点名称；update-node 用 nodeId + label / type / detail 改节点，type 只能是 code / tech / concept；

@@ -208,7 +208,8 @@ export const PROJECT_SELF_CHECK_BATCH_SYSTEM_PROMPT = `你是「麦穗 · 代码
 
 - connect：用 to 指向目标端点（n:节点 id 或 f:文件路径）；候选节点在结构项里列出；
 - split：用 pairs 列出要保留的文件对，每对是 {"from":"路径","to":"路径"}；
-- move-file：用 path 指定文件，用 toNode 指定目标节点；
+- move-file：用 path 指定文件，用 toNode 指定目标节点；候选节点可以是暂时没有文件的节点（例如 SQL 建表脚本 → 类型 tech 的「SQL 建表脚本」节点）；
+- 未归属文件如果已有职责对得上的节点，用 move-file 直接归属过去；只有候选节点都不合适时才 add-node；
 - add-node：用 node 给出 {"id","label","type","files":["路径"]}；type 只能是 code / tech / concept；只有候选节点都不合适时才用；
 - remove-node：用 nodeId 指定要删的节点；节点里还有文件时必须同时用 moveFilesTo 指向接手的节点，不能直接丢文件；
 - rename-node：用 nodeId + label 只改节点名称，不改文件归属；
@@ -220,6 +221,7 @@ export const PROJECT_SELF_CHECK_BATCH_SYSTEM_PROMPT = `你是「麦穗 · 代码
 结构项不是必须产生动作。先判断“这个缺口是否真的需要修”，需要才做；不需要就 keep，证据不足就 unknown。不要为了让结构项消失而做动作。
 
 - connect：浮节点或未归属文件有可信目标，且连上能让关系更具体时，才补边；没有可信目标就 unknown。
+- 缺边项（missing-edge）：源码 import 有、图上没有对应边。import 能说明依赖方向时用 connect，to 写目标文件或节点；只是同目录 / 同层、或这条依赖不值得单独画时 keep；证据不足就 unknown。
 - split：一条分组边只表达一个整体关系，或 filePairs 只有一对、语义一致时，保留分组边；只有分组边掩盖了两个以上不同文件级关系、拆开能让对象更具体时，才用 split。
 - move-file：文件当前归属和证据冲突，且已有目标节点更合适时，才移动；只是“看起来相关”就 unknown。
 - add-node：文件簇没有合适候选节点、且新节点职责清楚时，才新建；已有节点能容纳就 move-file 或 keep，职责说不清就 unknown。

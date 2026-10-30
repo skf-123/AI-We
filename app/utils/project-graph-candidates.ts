@@ -170,6 +170,67 @@ export function compareGraphToCandidates(
   }
 }
 
+export interface MissingEdgeCandidate {
+  from: string
+  to: string
+  line: number
+  evidence: string
+}
+
+function endpointNodeId(
+  endpoint: string,
+  pathToNode: Map<string, string>,
+): string | null {
+  if (endpoint.startsWith('n:')) return endpoint.slice(2)
+  if (endpoint.startsWith('f:')) return pathToNode.get(endpoint.slice(2)) ?? null
+  return null
+}
+
+/**
+ * 源码 import 有、图上没有的边。
+ *
+ * 只回答“这两个文件分属两个节点、源码里有依赖、图上却没有连接”；
+ * 是否需要补边、方向对不对仍然交给模型判断。
+ * 同一对节点只留一条候选，避免一个分组里几十个 import 把清单撑爆。
+ */
+export function findMissingEdges(
+  graph: GraphLike,
+  scan: CandidateScan,
+  limit = 20,
+): MissingEdgeCandidate[] {
+  const pathToNode = new Map<string, string>()
+  for (const node of graph.nodes) {
+    for (const file of node.files ?? []) pathToNode.set(file.path, node.id)
+  }
+
+  const drawnPairs = new Set<string>()
+  for (const edge of graph.edges) {
+    const from = endpointNodeId(edge.from, pathToNode)
+    const to = endpointNodeId(edge.to, pathToNode)
+    if (!from || !to || from === to) continue
+    drawnPairs.add([from, to].sort().join('\u0000'))
+  }
+
+  const seen = new Set<string>()
+  const result: MissingEdgeCandidate[] = []
+  for (const edge of scan.edges) {
+    const from = pathToNode.get(edge.from)
+    const to = pathToNode.get(edge.to)
+    if (!from || !to || from === to) continue
+    const pair = [from, to].sort().join('\u0000')
+    if (drawnPairs.has(pair) || seen.has(pair)) continue
+    seen.add(pair)
+    result.push({
+      from: edge.from,
+      to: edge.to,
+      line: edge.line,
+      evidence: edge.evidence,
+    })
+    if (result.length >= limit) break
+  }
+  return result
+}
+
 /** 程序已经用事实核实过的边，不再交给旧路径重复审 */
 export function filterVerifiedSuspicions(
   graph: ProjectGraphData,

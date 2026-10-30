@@ -24,6 +24,12 @@ import {
   SELF_CHECK_STRUCTURAL_TOKENS,
   SELF_CHECK_TOTAL_TOKENS,
 } from '~/utils/self-check-budget'
+import {
+  buildEvidencePacks,
+  checkEvidenceCitations,
+  chunkEvidencePacks,
+  formatEvidencePrompt,
+} from '~/utils/self-check-evidence'
 
 /**
  * 项目 Agent 的循环。一个实例只跑一种任务：
@@ -90,6 +96,10 @@ export interface BatchSelfCheckInput {
   entries: ProjectFileEntry[]
   readablePaths: string[]
   getFile: (path: string) => File | undefined
+  /** 给还没决定的边补证据包；不传就跳过这一步 */
+  graph?: ProjectGraphData
+  /** 按路径取原文；证据包只用图里列出的文件 */
+  getText?: (path: string) => string | undefined
 }
 
 const MAX_ROUNDS_HARD = 100
@@ -573,6 +583,26 @@ export function useProjectAgent() {
         let noProgress = 0
         let batchDecisions: SelfCheckDecision[] = []
 
+        /**
+         * 额度快用完时强制收口：关掉工具，要它只给这一批的决定。
+         * 以前这里直接 break，整批就变成“模型没有给出决定”；
+         * 浮节点批次只要先读了一轮文件，就会整批丢掉（2026-10-30 187 复跑）。
+         */
+        const forceDecision = async (why: string): Promise<SelfCheckDecision[]> => {
+          if (batchDecisions.length > 0) return batchDecisions
+          if (stopped.value || budget.used >= SELF_CHECK_HARD_TOKENS) return []
+          messages.push({
+            role: 'user',
+            content: `本批${why}。不要再调用工具；只根据已经读到的内容和预检信息，对本批 ${batch.items.length} 项给出决定，拿不准就 unknown。只输出 decisions JSON。`,
+          })
+          const response = await ask('self-check-batch', messages, true)
+          const usage = Number(response.usage?.total ?? response.usage?.total_tokens) || 0
+          batchUsed += usage
+          modelCalls++
+          recordUsage(budget, usage)
+          return parseBatchDecisions(response.message.content, allowedIds) ?? []
+        }
+
         while (!stopped.value) {
           const response = await ask('self-check-batch', messages, false)
           const usage = Number(response.usage?.total ?? response.usage?.total_tokens) || 0
@@ -654,11 +684,18 @@ export function useProjectAgent() {
 
             if (executed === 0) {
               noProgress++
-              if (noProgress >= 2) break
+              if (noProgress >= 2) {
+                batchDecisions = await forceDecision('没有执行到工具')
+                break
+              }
             } else {
               noProgress = 0
             }
-            if (budget.used >= SELF_CHECK_HARD_TOKENS || batchUsed >= quota) break
+            if (budget.used >= SELF_CHECK_HARD_TOKENS) break
+            if (batchUsed >= quota) {
+              batchDecisions = await forceDecision('token 额度已用完')
+              break
+            }
             continue
           }
 
@@ -669,7 +706,10 @@ export function useProjectAgent() {
           }
 
           noProgress++
-          if (noProgress >= 2) break
+          if (noProgress >= 2) {
+            batchDecisions = await forceDecision('没有给出合法 JSON')
+            break
+          }
           messages.push({
             role: 'user',
             content:
@@ -682,7 +722,71 @@ export function useProjectAgent() {
         if (budget.used >= SELF_CHECK_HARD_TOKENS) break
       }
 
-      // 批池用完后，用预留额度做最后一次“只给决定”的收尾。
+      // 最后一道：剩下的边还能不能靠程序证据包救回来。
+      // 只处理边的 keep / remove / reverse / relabel / unknown，不再动结构项。
+      let evidencePacksUsed = 0
+      if (
+        !stopped.value &&
+        input.graph &&
+        input.getText &&
+        budget.used < SELF_CHECK_HARD_TOKENS
+      ) {
+        const latest = new Map(decisions.map((decision) => [decision.id, decision]))
+        const undecided = input.plan.items.filter((item) => {
+          if (item.edgeIndex < 0) return false
+          const decision = latest.get(item.id)
+          return !decision || decision.action === 'unknown'
+        })
+        const packs = buildEvidencePacks(undecided, input.graph, input.getText)
+        for (const chunk of chunkEvidencePacks(packs)) {
+          if (stopped.value || budget.used >= SELF_CHECK_HARD_TOKENS) break
+          const response = await ask(
+            'self-check-batch',
+            [{ role: 'user', content: formatEvidencePrompt(chunk) }],
+            true,
+          )
+          const usage = Number(response.usage?.total ?? response.usage?.total_tokens) || 0
+          recordUsage(budget, usage)
+          modelCalls++
+          evidencePacksUsed += chunk.length
+          for (const pack of chunk) {
+            evidence.push({
+              id: `EV-${pack.id}`,
+              tool: 'evidence-pack',
+              args: pack.files.join('、').slice(0, 500),
+              result: pack.text,
+            })
+          }
+          const parsed = parseBatchDecisions(
+            response.message.content,
+            new Set(chunk.map((pack) => pack.id)),
+          )
+          if (!parsed) continue
+          const allowed = new Set<string>(SELF_CHECK_FINAL_ACTIONS)
+          for (const decision of parsed) {
+            if (!allowed.has(decision.action)) continue
+            if (decision.action === 'unknown') {
+              decisions.push(decision)
+              continue
+            }
+            const check = checkEvidenceCitations(decision, chunk, input.getText)
+            if (!check.ok) {
+              decisions.push({
+                ...decision,
+                action: 'unknown',
+                reason: `${decision.reason ?? '证据不足'}（程序核引用：没有定位到证据包里的原文行）`.slice(
+                  0,
+                  500,
+                ),
+              })
+              continue
+            }
+            decisions.push({ ...decision, evidence: check.cited })
+          }
+        }
+      }
+
+      // 证据包之后，剩下的边用预留额度做最后一次“只给决定”的收尾。
       // 这时不再读文件，所以只处理边，不给结构项做 move-file / add-node 这类改动。
       const decidedIds = new Set(decisions.map((decision) => decision.id))
       const missingItems = selectFinalReserveItems(input.plan.items, decidedIds)
@@ -751,6 +855,7 @@ export function useProjectAgent() {
         usedTokens: budget.used,
         modelCalls,
         toolCalls,
+        evidencePacks: evidencePacksUsed,
         stopped: stopped.value,
         error: '',
       }

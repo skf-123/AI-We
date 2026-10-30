@@ -10,6 +10,7 @@ import type {
   SelfCheckDecision,
   SelfCheckItem,
 } from '~/types/self-check'
+import { normalizePath } from './project-files.ts'
 
 function edgeKey(edge: Pick<ProjectGraphEdge, 'from' | 'to' | 'label'>): string {
   return `${edge.from}\u0000${edge.to}\u0000${edge.label ?? ''}`
@@ -573,6 +574,23 @@ export function mergeSelfCheckDecisions(
     (edge) => Boolean(edge.filePairs?.length) || Boolean(edge.note?.includes('分组关系')),
   ).length
 
+  // 归属问题按合并后的结果算：move-file 已经搬走、add-node 已经接住的文件，
+  // 不应再在摘要里显示“未归属”。knownPaths 为空（旧调用 / 单测）时退回原图计数。
+  const ownedCounts = new Map<string, number>()
+  for (const node of nodes) {
+    for (const file of node.files ?? []) {
+      const path = normalizePath(file.path)
+      ownedCounts.set(path, (ownedCounts.get(path) ?? 0) + 1)
+    }
+  }
+  const known = [...new Set(knownPaths.map((path) => normalizePath(path)))]
+  const remainingUnowned = known.length
+    ? known.filter((path) => !ownedCounts.has(path)).length
+    : (graph.unownedFiles?.length ?? 0)
+  const remainingDuplicate = [...ownedCounts.values()].filter(
+    (count) => count > 1,
+  ).length
+
   return {
     graph: { ...graph, nodes, edges: resultEdges },
     coverage: {
@@ -583,8 +601,8 @@ export function mergeSelfCheckDecisions(
       supported,
       ...(floatingCount ? { floating: floatingCount } : {}),
       ...(groupOnlyCount ? { groupOnly: groupOnlyCount } : {}),
-      ...(graph.unownedFiles?.length ? { unowned: graph.unownedFiles.length } : {}),
-      ...(graph.duplicateFiles?.length ? { duplicate: graph.duplicateFiles.length } : {}),
+      ...(remainingUnowned ? { unowned: remainingUnowned } : {}),
+      ...(remainingDuplicate ? { duplicate: remainingDuplicate } : {}),
       ...(structuralItems.length
         ? { structural: structuralItems.length, structuralChecked }
         : {}),

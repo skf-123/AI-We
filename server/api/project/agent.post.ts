@@ -79,7 +79,8 @@ export default defineEventHandler(async (event) => {
     {
       messages: [{ role: 'system', content: systemPrompt }, ...parsed.data.messages],
       stream: false,
-      temperature: 0.2,
+      // 侦查要一点发散来找线索；图自检是逐条核对，温度取 0 让同一份证据给出同一个结论。
+      temperature: parsed.data.mode === 'map' ? 0.2 : 0,
       // 地图 Agent 的最终 JSON 要覆盖所有可读文件；4096 在 100 多个文件时
       // 就会截断（线上 187 个文件的实测）。官方 /models 对 deepseek-flash
       // 报的 max_output_tokens 是 393216，5 万是一个足够宽、又低于模型上限的值。

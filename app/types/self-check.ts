@@ -14,6 +14,8 @@ export type SelfCheckItemKind =
   | 'other'
   | 'floating'
   | 'group-only'
+  /** 源码里有 import，图上没有对应的边 */
+  | 'missing-edge'
   | 'unowned'
   | 'duplicate'
   /** 节点本身有问题：名称不清、类型不合法、代码分组没有文件 */
@@ -157,6 +159,8 @@ export interface SelfCheckBatchResult {
   modelCalls: number
   /** 实际工具调用次数 */
   toolCalls: number
+  /** 补证据包覆盖的边数；0 表示这一步没跑或没有可补的边 */
+  evidencePacks?: number
   stopped: boolean
   error: string
 }
