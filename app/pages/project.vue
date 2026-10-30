@@ -90,7 +90,7 @@ const {
   displayGraph,
   summaryHasResult,
   canGeneratePartial,
-  summaryScopeNote,
+  graphScopeNote,
   summaryScopeLabel,
   doneCount,
   selectedFolder,
@@ -779,7 +779,8 @@ onBeforeUnmount(() => {
               :selected-group="selectedGroup"
               :active-path="activePath"
               hint="只出这一张项目图；展开 / 收起不重新请求"
-              :scope-note="summaryScopeNote"
+              :scope-note="graphScopeNote"
+              :scope-warn="failedCount > 0"
               @select-file="onGraphSelectFile"
               @select-group="onGraphSelectGroup"
             />

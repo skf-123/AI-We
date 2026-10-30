@@ -41,6 +41,8 @@ const props = defineProps<{
   hint?: string
   /** 图的范围说明；由页面算，不依赖模型 */
   scopeNote?: string
+  /** 范围里有失败文件时，用警告色 */
+  scopeWarn?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -437,7 +439,12 @@ onBeforeUnmount(() => {
       class="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-100 bg-white px-3 pb-2 text-[11px] text-slate-500"
     >
       <span v-if="props.hint" class="text-slate-400">{{ props.hint }}</span>
-      <span v-if="props.scopeNote">{{ props.scopeNote }}</span>
+      <span
+        v-if="props.scopeNote"
+        :class="props.scopeWarn ? 'text-amber-700' : 'text-slate-500'"
+      >
+        {{ props.scopeNote }}
+      </span>
     </div>
 
     <div v-if="selectedEdge" class="border-b border-slate-100 bg-white px-3 py-2 text-[11px]">

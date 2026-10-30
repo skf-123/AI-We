@@ -335,16 +335,14 @@ export function useProjectSession() {
     return 'blocked'
   })
 
-  /** 当前勾选里已完成 / 待解析 / 失败的数量说明；全完成则不显示 */
-  const summaryScopeNote = computed(() => {
+  /** 图的输入范围：当前勾选里已完成 / 待解析 / 失败的数量；开始解析后一直显示 */
+  const graphScopeNote = computed(() => {
     if (!started.value) return ''
 
     const totalSelected = queueFiles.value.length
     if (totalSelected === 0) return ''
 
     const unparsed = Math.max(0, totalSelected - doneCount.value - failedCount.value)
-    if (unparsed === 0 && failedCount.value === 0) return ''
-
     return `当前选中 ${totalSelected} 个：已完成 ${doneCount.value} 个、待解析 ${unparsed} 个、失败 ${failedCount.value} 个。`
   })
 
@@ -1407,7 +1405,7 @@ export function useProjectSession() {
     summaryHasResult,
     canGenerateSummary,
     canGeneratePartial,
-    summaryScopeNote,
+    graphScopeNote,
     summaryScopeLabel,
     summaryAction,
     newSelectedCount,
