@@ -21,6 +21,7 @@ import {
   createSelfCheckBudget,
   recordUsage,
   SELF_CHECK_HARD_TOKENS,
+  SELF_CHECK_RESERVE_TOKENS,
   SELF_CHECK_STRUCTURAL_TOKENS,
   SELF_CHECK_TOTAL_TOKENS,
 } from '~/utils/self-check-budget'
@@ -106,6 +107,8 @@ const MAX_ROUNDS_HARD = 100
 const MAX_SELF_CHECK_ROUNDS = 20
 const MAX_SELF_CHECK_TOOL_CALLS = 12
 const MAX_CONTEXT_CHARS = 1_400_000
+/** 证据包只能用“总预算减预留”的部分，给最后的补决定留 25k */
+const EVIDENCE_TOKENS_LIMIT = SELF_CHECK_TOTAL_TOKENS - SELF_CHECK_RESERVE_TOKENS
 const MAX_TREE_CHARS = 150_000
 const MAX_CONTEXT_TEXT = 100_000
 const MAX_READABLE_LIST = 300
@@ -729,7 +732,7 @@ export function useProjectAgent() {
         !stopped.value &&
         input.graph &&
         input.getText &&
-        budget.used < SELF_CHECK_HARD_TOKENS
+        budget.used < EVIDENCE_TOKENS_LIMIT
       ) {
         const latest = new Map(decisions.map((decision) => [decision.id, decision]))
         const undecided = input.plan.items.filter((item) => {
@@ -739,7 +742,7 @@ export function useProjectAgent() {
         })
         const packs = buildEvidencePacks(undecided, input.graph, input.getText)
         for (const chunk of chunkEvidencePacks(packs)) {
-          if (stopped.value || budget.used >= SELF_CHECK_HARD_TOKENS) break
+          if (stopped.value || budget.used >= EVIDENCE_TOKENS_LIMIT) break
           const response = await ask(
             'self-check-batch',
             [{ role: 'user', content: formatEvidencePrompt(chunk) }],

@@ -22,11 +22,11 @@ export const SELF_CHECK_BATCH_SIZE = 8
 export const SELF_CHECK_MAX_TOOL_ALLOWANCE = 6
 /**
  * 未归属文件一条一项太贵；最多送这么多，剩下的继续显示未归属。
- * 2026-10-30 从 16 提到 48：187 图里未归属 42 个，16 会让另外 26 个永远拿不到归属判断。
+ * 2026-10-30 从 16 提到 48；2026-10-31 提到 64，给完整 187（42 个）和更大的项目留余量。
  */
-export const SELF_CHECK_MAX_UNOWNED = 48
+export const SELF_CHECK_MAX_UNOWNED = 64
 /** 源码有 import、图上没有边；最多送这么多，避免大项目一次塞爆结构批 */
-export const SELF_CHECK_MAX_MISSING_EDGES = 20
+export const SELF_CHECK_MAX_MISSING_EDGES = 40
 /** 收尾调用不读文件，只允许这些边动作 */
 export const SELF_CHECK_FINAL_ACTIONS = [
   'keep',

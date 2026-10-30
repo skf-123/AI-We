@@ -1,24 +1,27 @@
 /**
  * 分批图自检的 token 预算。
  *
- * 规则（2026-10-27 定稿；2026-10-30 只给总预算 300k，不再单独卡结构项）：
- *   · 总预算 300k；不再单独留预留，全部进批池；
- *   · 批池 300k；
- *   · 单批硬顶 15k；
+ * 规则（2026-10-30 晚调高；2026-10-31 起总预算 500k，留 25k 给收尾）：
+ *   · 总预算 500k；预留 25k 给“最后补决定”，其余 475k 进批池；
+ *   · 单批硬顶 20k；
  *   · 每批额度按需求权重分，用完的剩余回池；
  *   · 实际扣费按服务端 usage.total，不按字符数估。
+ *
+ * 为什么从 300k 提到 500k：187 固定夹具在 300k 下用了 297,556（99.2%），
+ * 完整上传的 42 个未归属还没跑；再加结构项或证据包就会被硬停挡住。
+ * 提到 500k 是给完整流程留余量，不代表能解决剩下的语义 unknown。
  *
  * 纯函数；不读网络、不碰 DOM。
  */
 import type { SelfCheckBatch } from '~/types/self-check'
 
-export const SELF_CHECK_TOTAL_TOKENS = 300_000
-export const SELF_CHECK_RESERVE_TOKENS = 0
-export const SELF_CHECK_BATCH_CAP_TOKENS = 15_000
-export const SELF_CHECK_HARD_TOKENS = 315_000
+export const SELF_CHECK_TOTAL_TOKENS = 500_000
+export const SELF_CHECK_RESERVE_TOKENS = 25_000
+export const SELF_CHECK_BATCH_CAP_TOKENS = 20_000
+export const SELF_CHECK_HARD_TOKENS = 525_000
 export const SELF_CHECK_MIN_BATCH_TOKENS = 1_500
-/** 结构项不再单独卡上限；这个值只作“不设上限”的占位 */
-export const SELF_CHECK_STRUCTURAL_TOKENS = 300_000
+/** 结构项不单独卡上限；这个值只作“不设上限”的占位，必须跟着总预算走 */
+export const SELF_CHECK_STRUCTURAL_TOKENS = 500_000
 
 export interface SelfCheckBudget {
   total: number
