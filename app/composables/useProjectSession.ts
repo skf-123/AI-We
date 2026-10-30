@@ -358,7 +358,7 @@ export function useProjectSession() {
     const sourceSelected = queueFiles.value.filter((entry) => entry.category === 'user').length
     const partialSelection = sourceSelected < sourceTotal
     if (sent >= selected && failed === 0 && !partialSelection) return ''
-    return `本次总览基于已解析的 ${sent} 个文件；当前选中 ${selected} 个，失败 ${failed} 个。`
+    return `本次总览基于已解析的 ${sent} 个文件。`
   })
 
   const activeTitle = computed(() => {

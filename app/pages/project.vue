@@ -682,9 +682,6 @@ onBeforeUnmount(() => {
             >
               已完成
             </span>
-            <span class="text-[11px] text-slate-400">
-              只出这一张项目图；展开 / 收起不重新请求
-            </span>
             <button
               v-if="canShowGraphOnly"
               type="button"
@@ -720,13 +717,10 @@ onBeforeUnmount(() => {
           </p>
           <p v-if="summaryScopeLabel" class="mb-3 text-[11px] text-slate-500">
             {{ summaryScopeLabel }}
-          </p>
-          <p v-if="summaryScopeNote" class="mb-3 text-[11px] text-amber-700">
-            {{ summaryScopeNote }}
             <button
               v-if="!summaryLoading && failedCount > 0 && doneCount === 0"
               type="button"
-              class="ml-2 underline underline-offset-2 hover:text-amber-900"
+              class="ml-2 underline underline-offset-2 hover:text-slate-700"
               @click="retryFailedSelected"
             >
               重试失败的 {{ failedCount }} 个
@@ -784,6 +778,8 @@ onBeforeUnmount(() => {
               :data="displayGraph"
               :selected-group="selectedGroup"
               :active-path="activePath"
+              hint="只出这一张项目图；展开 / 收起不重新请求"
+              :scope-note="summaryScopeNote"
               @select-file="onGraphSelectFile"
               @select-group="onGraphSelectGroup"
             />

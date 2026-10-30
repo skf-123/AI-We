@@ -37,6 +37,10 @@ const props = defineProps<{
   selectedGroup?: string | null
   /** 当前展示的文件 */
   activePath?: string | null
+  /** 图自己的说明，例如“只出这一张项目图；展开 / 收起不重新请求” */
+  hint?: string
+  /** 图的范围说明；由页面算，不依赖模型 */
+  scopeNote?: string
 }>()
 
 const emit = defineEmits<{
@@ -426,6 +430,14 @@ onBeforeUnmount(() => {
           {{ isFullscreen ? '退出全屏' : '全屏' }}
         </button>
       </div>
+    </div>
+
+    <div
+      v-if="props.hint || props.scopeNote"
+      class="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-100 bg-white px-3 pb-2 text-[11px] text-slate-500"
+    >
+      <span v-if="props.hint" class="text-slate-400">{{ props.hint }}</span>
+      <span v-if="props.scopeNote">{{ props.scopeNote }}</span>
     </div>
 
     <div v-if="selectedEdge" class="border-b border-slate-100 bg-white px-3 py-2 text-[11px]">
