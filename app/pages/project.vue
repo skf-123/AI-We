@@ -91,6 +91,7 @@ const {
   summaryHasResult,
   canGeneratePartial,
   summaryScopeNote,
+  summaryScopeLabel,
   doneCount,
   selectedFolder,
   selectedGroup,
@@ -716,6 +717,9 @@ onBeforeUnmount(() => {
 
           <p v-if="summarySkippedCount > 0" class="mb-3 text-[11px] text-amber-700">
             另有 {{ summarySkippedCount }} 个文件超出本次汇总的输入预算，未纳入。
+          </p>
+          <p v-if="summaryScopeLabel" class="mb-3 text-[11px] text-slate-500">
+            {{ summaryScopeLabel }}
           </p>
           <p v-if="summaryScopeNote" class="mb-3 text-[11px] text-amber-700">
             {{ summaryScopeNote }}

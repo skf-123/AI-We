@@ -348,6 +348,19 @@ export function useProjectSession() {
     return `当前选中 ${totalSelected} 个：已完成 ${doneCount.value} 个、待解析 ${unparsed} 个、失败 ${failedCount.value} 个。`
   })
 
+  /** 这次总览实际基于多少个已解析文件；全选且全部成功时不显示 */
+  const summaryScopeLabel = computed(() => {
+    const sent = lastSummaryInput.value?.files.length ?? 0
+    if (sent === 0) return ''
+    const selected = queueFiles.value.length
+    const failed = failedCount.value
+    const sourceTotal = files.value.filter((entry) => entry.category === 'user').length
+    const sourceSelected = queueFiles.value.filter((entry) => entry.category === 'user').length
+    const partialSelection = sourceSelected < sourceTotal
+    if (sent >= selected && failed === 0 && !partialSelection) return ''
+    return `本次总览基于已解析的 ${sent} 个文件；当前选中 ${selected} 个，失败 ${failed} 个。`
+  })
+
   const activeTitle = computed(() => {
     if (!activeEntry.value) {
       if (selectedFolder.value) return selectedFolder.value
@@ -956,8 +969,10 @@ export function useProjectSession() {
       return
     }
 
-    // 同一个按钮：先把当前勾选里新增的文件补解析，再用全部已完成文件生成
-    if (hasNew) {
+    // 只有“全部解析完再生成”才补解析新增文件。
+    // 部分生成（用当前已经完成的）点了就是要停掉剩余解析、直接用已完成文件生成，
+    // 不能再走一遍补解析，否则池子已经停了，这里会直接 return，按钮看起来像点不动。
+    if (hasNew && !partial) {
       await parseNewSelected()
       if (pool.stopped.value) return
       if (doneFiles.value.length === 0) return
@@ -1393,6 +1408,7 @@ export function useProjectSession() {
     canGenerateSummary,
     canGeneratePartial,
     summaryScopeNote,
+    summaryScopeLabel,
     summaryAction,
     newSelectedCount,
     failedCount,
