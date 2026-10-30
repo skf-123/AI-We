@@ -401,19 +401,8 @@ export function formatBatchContent(
 
   const groups = overview.groups.length > 0 ? overview.groups.join('、') : '（没有分组）'
 
+  // 每批都相同的内容放前面，本批内容放后面；同一份前缀才能命中提示词缓存。
   return `【全图摘要】节点 ${overview.nodes} 个，边 ${overview.edges} 条；程序已支持 ${overview.supported} 条；浮节点 ${overview.floating} 个，分组边 ${overview.groupOnly} 条，未归属文件 ${overview.unowned} 个，重复归属 ${overview.duplicate} 个，待改节点 ${overview.nodeIssues} 个；分组：${groups}
-
-【本批边】共 ${edgeItems.length} 条，只处理这些
-${edges || '（没有边）'}
-
-【本批结构项】共 ${structuralItems.length} 项
-${structures || '（没有结构项）'}
-
-【涉及的节点】
-${nodes}
-
-【可读文件】只列本批涉及的文件和文件对；工具仍按完整可读列表校验
-${batch.paths.map((path) => `- ${path}`).join('\n') || '（没有文件端点）'}
 
 【项目结构结论（只作背景，不要据此编造）】
 ${projectContext.slice(0, 20_000)}
@@ -430,9 +419,23 @@ ${projectContext.slice(0, 20_000)}
 - rename-node / update-node 不改文件归属；节点仍被边引用时不要删；
 - reverse 表示把 from/to 对调；relabel 只改标签；unknown 表示证据不足；
 - 没有证据就写 unknown，不要猜；不要输出完整图；不要编造文件路径或节点 id；
-- 需要读文件时，按工具格式申请，最多 ${batch.toolAllowance} 次；程序可能按预算拒绝。
+- 需要读文件时，按工具格式申请；本批可用次数见后面的「本批工具额度」，程序可能按预算拒绝。
 
 【输出】
 只输出一个 JSON 对象，不要 Markdown 代码围栏：
-{"decisions":[{"id":"E12","action":"reverse","label":"新的标签","reason":"依据","evidence":["path:line"]}]}`
+{"decisions":[{"id":"E12","action":"reverse","label":"新的标签","reason":"依据","evidence":["path:line"]}]}
+
+【本批边】共 ${edgeItems.length} 条，只处理这些
+${edges || '（没有边）'}
+
+【本批结构项】共 ${structuralItems.length} 项
+${structures || '（没有结构项）'}
+
+【涉及的节点】
+${nodes}
+
+【可读文件】只列本批涉及的文件和文件对；工具仍按完整可读列表校验
+${batch.paths.map((path) => `- ${path}`).join('\n') || '（没有文件端点）'}
+
+【本批工具额度】最多 ${batch.toolAllowance} 次；程序可能按预算拒绝。`
 }

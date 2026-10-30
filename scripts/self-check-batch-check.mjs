@@ -523,6 +523,12 @@ check(
 check('收尾动作不含结构动作', SELF_CHECK_FINAL_ACTIONS.includes('move-file'), false)
 check('结构项预算上限', SELF_CHECK_STRUCTURAL_TOKENS, 25_000)
 
+const prefixOf = (text) => text.slice(0, text.indexOf('【本批边】'))
+const prefixA = prefixOf(formatBatchContent(priorityPlan.batches[0], '同一份项目结论', priorityPlan.overview))
+const prefixB = prefixOf(formatBatchContent(priorityPlan.batches[1], '同一份项目结论', priorityPlan.overview))
+check('批次静态前缀一致', prefixA, prefixB)
+check('工具额度不在静态前缀里', prefixA.includes('【本批工具额度】'), false)
+
 if (failed > 0) {
   console.error(`\n${failed} 项失败`)
   process.exit(1)
