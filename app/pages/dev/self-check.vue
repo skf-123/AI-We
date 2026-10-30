@@ -10,6 +10,13 @@ import type { SelfCheckPlan } from '~/utils/self-check-plan'
 import { buildSelfCheckPlan } from '~/utils/self-check-plan'
 import { useProjectAgent } from '~/composables/useProjectAgent'
 import { mergeSelfCheckDecisions } from '~/utils/self-check-merge'
+import { analyzeProjectStructure } from '~/utils/structure'
+import { enrichProjectGraph } from '~/utils/project-graph-enrich.ts'
+import { scanCandidateEdges } from '~/utils/project-candidate-edges.ts'
+import {
+  compareGraphToCandidates,
+  filterVerifiedSuspicions,
+} from '~/utils/project-graph-candidates.ts'
 
 definePageMeta({ layout: false })
 
@@ -17,7 +24,9 @@ const route = useRoute()
 const fixtureUrl =
   route.query.fixture === '187'
     ? '/dev/self-check-fixture-187.json'
-    : route.query.fixture === 'structural'
+    : route.query.fixture === '187-original'
+      ? '/dev/self-check-fixture-187-original.json'
+      : route.query.fixture === 'structural'
       ? '/dev/self-check-fixture-structural.json'
       : route.query.fixture === 'addnode'
         ? '/dev/self-check-fixture-addnode.json'
@@ -34,6 +43,8 @@ interface Fixture {
 }
 
 const fixture = ref<Fixture | null>(null)
+/** 这次计划用的图；187-original 会在加载时先挂证据 */
+const planGraph = ref<ProjectGraphData | null>(null)
 const plan = ref<SelfCheckPlan | null>(null)
 const entries = ref<ProjectFileEntry[]>([])
 const fileMap = new Map<string, File>()
@@ -62,7 +73,27 @@ onMounted(async () => {
     for (const file of data.files) {
       fileMap.set(file.path, new File([file.content], file.name, { type: 'text/plain' }))
     }
-    plan.value = buildSelfCheckPlan(data.graph, [])
+
+    if (route.query.fixture === '187-original') {
+      // 只做程序部分：结构事实、图证据、import 候选；不调用模型
+      const sources = data.files.map((file) => ({ path: file.path, text: file.content }))
+      const structure = analyzeProjectStructure(sources)
+      const knownPaths = sources.map((file) => file.path)
+      const enriched = enrichProjectGraph(
+        data.graph,
+        structure?.allFacts ?? [],
+        structure?.symbols ?? {},
+        knownPaths,
+      )
+      const scan = scanCandidateEdges(sources)
+      const report = compareGraphToCandidates(enriched, scan)
+      const suspicions = filterVerifiedSuspicions(enriched, report.suspicions)
+      planGraph.value = enriched
+      plan.value = buildSelfCheckPlan(enriched, suspicions)
+    } else {
+      planGraph.value = data.graph
+      plan.value = buildSelfCheckPlan(data.graph, [])
+    }
   } catch (err) {
     loadError.value = err instanceof Error ? err.message : String(err)
   }
@@ -79,7 +110,7 @@ async function run() {
   })
   if (result.value) {
     merged.value = mergeSelfCheckDecisions(
-      fixture.value.graph,
+      planGraph.value ?? fixture.value.graph,
       plan.value.items,
       result.value.decisions,
       plan.value.supported,
