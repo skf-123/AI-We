@@ -524,7 +524,7 @@ check(
   true,
 )
 check('收尾动作不含结构动作', SELF_CHECK_FINAL_ACTIONS.includes('move-file'), false)
-check('结构项预算上限', SELF_CHECK_STRUCTURAL_TOKENS, 25_000)
+check('结构项不单独设上限', SELF_CHECK_STRUCTURAL_TOKENS, SELF_CHECK_TOTAL_TOKENS)
 
 const prefixOf = (text) => text.slice(0, text.indexOf('【本批边】'))
 const prefixA = prefixOf(formatBatchContent(priorityPlan.batches[0], '同一份项目结论', priorityPlan.overview))
