@@ -19,6 +19,9 @@ useHead({ title: '整个项目 · 麦穗 · 代码理解助手' })
 
 const STEPS = ['上传项目', '勾选要解析的文件', '逐文件解析', '项目总览 + 框架图']
 
+// 项目说明（mapSummary、后端判断、建议先读、结构识别）可以收起，默认展开
+const projectOpen = ref(true)
+
 const {
   projectName,
   files,
@@ -382,20 +385,44 @@ onBeforeUnmount(() => {
                 </h1>
                 <p class="mt-0.5 text-xs text-slate-400">
                   {{ files.length }} 个文件 · {{ formatSize(totalBytes) }}
-                  <span v-if="mapSummary"> · {{ mapSummary }}</span>
                 </p>
-                <p v-if="mapBackend" class="mt-0.5 text-[11px] text-slate-400">
+                <button
+                  v-if="mapSummary || mapBackend || mapReadingPlan.length || structure"
+                  type="button"
+                  class="mt-0.5 inline-flex items-center gap-1 rounded text-[11px] text-slate-400 hover:text-slate-600"
+                  :aria-expanded="projectOpen"
+                  @click="projectOpen = !projectOpen"
+                >
+                  <span class="text-[9px]">{{ projectOpen ? '▾' : '▸' }}</span>
+                  {{ projectOpen ? '收起项目说明' : '展开项目说明' }}
+                </button>
+                <p
+                  v-if="mapSummary"
+                  v-show="projectOpen"
+                  class="mt-1 text-[11px] leading-relaxed text-slate-400"
+                >
+                  {{ mapSummary }}
+                </p>
+                <p v-if="mapBackend" v-show="projectOpen" class="mt-0.5 text-[11px] text-slate-400">
                   {{ mapBackend.hasBackend ? '有后端' : '没有后端' }}
                   <template v-if="mapBackend.evidence"> · {{ mapBackend.evidence }}</template>
                 </p>
-                <p v-if="mapReadingPlan.length" class="mt-0.5 text-[11px] text-slate-400">
+                <p
+                  v-if="mapReadingPlan.length"
+                  v-show="projectOpen"
+                  class="mt-0.5 text-[11px] text-slate-400"
+                >
                   建议先读：{{ mapReadingPlan.slice(0, 3).join(' → ') }}
                 </p>
-                <p v-if="structure" class="mt-0.5 text-[11px] text-emerald-600">
+                <p
+                  v-if="structure"
+                  v-show="projectOpen"
+                  class="mt-0.5 text-[11px] text-emerald-600"
+                >
                   已识别：{{ structureProfileLabel(structure.profile) }}
                   · 包名、import、namespace、扫描包、注入类型由程序核实
                 </p>
-                <p v-else class="mt-0.5 text-[11px] text-slate-400">
+                <p v-else v-show="projectOpen" class="mt-0.5 text-[11px] text-slate-400">
                   这个项目类型暂未做结构核对；跨文件结论只作为解释。
                 </p>
               </div>

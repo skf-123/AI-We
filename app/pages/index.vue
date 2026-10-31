@@ -13,12 +13,12 @@ const ENTRIES = [
   {
     key: 'code',
     eyebrow: '贴代码',
-    title: '一段代码，几秒看懂',
-    fit: '适合：一段陌生代码、面试题、报错片段、课程示例',
+    title: '一段代码，讲透上下文',
+    fit: '适合场景：遇到卡壳的报错片段、看不懂的面试题、开源库里的一段核心逻辑。',
     points: [
-      '逐词逐句、局部关系、整段作用、技术溯源',
-      '正文里的术语可点，引用编号可点',
-      '选中一段，左栏对应代码行亮起',
+      '讲清每一行的作用、上下文的衔接与关联',
+      '术语可点开，技术出处可核对',
+      '选中正文，左侧代码行自动高亮',
     ],
     tone: 'emerald' as const,
     to: '/code',
@@ -26,12 +26,12 @@ const ENTRIES = [
   {
     key: 'project',
     eyebrow: '整个项目',
-    title: '一个项目，先看全局',
-    fit: '适合：接手别人的项目、课程设计、看不懂目录结构',
+    title: '一个项目，理清结构网',
+    fit: '适合场景：限时读懂陌生的课设/毕设/开源仓库、接手团队老项目。',
     points: [
-      '目录树先告诉你哪些文件值得读',
-      '每个文件四段，按文件并发解析',
-      '最后一张可展开的项目级知识框架图',
+      '浏览器里只读文件，解析片段只发给大模型，服务端不留存',
+      '逐个文件四段解释，按依赖关系串联',
+      '最后收拢成可展开的项目知识框架图',
     ],
     tone: 'indigo' as const,
     to: '/project',
@@ -40,27 +40,33 @@ const ENTRIES = [
 
 const FEATURES = [
   {
-    title: '不是总结，是逐行讲',
-    body: '每一行在干什么、前后怎么衔接、整体解决什么问题，都按固定四段讲清楚。',
+    title: '逐行拆解',
+    body: '普通 AI 只会给一段大概的总结。我们把每一行、局部上下文、整体作用、技术来由，按固定四段讲清楚，不敷衍。',
   },
   {
-    title: '技术溯源有出处',
-    body: '自建 58 条知识语料；关键结论标注来源，点开就能核对原文。',
+    title: '技术出处，有据可查',
+    body: '自建 58 张技术卡片。讲这项技术为什么被发明时，不仅给结论，还标出处；跨文件的引用和依赖关系，由程序严格核对，不瞎编。',
   },
   {
-    title: '知识框架图',
-    body: '代码、技术、概念三类节点，把一段代码或一个项目的关系摊开来看。',
+    title: '跨文件的全局视角',
+    body: '不孤立解释单行。它属于哪一层、被谁引用、又依赖了谁，一张知识框架图把代码、技术和文件关系全部串起来。',
   },
   {
-    title: '读不懂就地追问',
-    body: '选中正文里的一段就能问，同一个面板里可以接着往下聊。',
+    title: '不懂就追问',
+    body: '选中正文里看不懂的一段，直接在原地展开追问。历史不存服务器，对话关掉即焚，不给你留痕。',
   },
 ]
 
 const STEPS = [
-  { title: '贴代码，或拖进整个项目', body: '不需要写任何提示词。' },
-  { title: '自动解析', body: '逐词逐句、局部关系、整体作用、技术溯源。' },
-  { title: '带出处地看懂', body: '顺着引用与框架图，继续读下去。' },
+  { title: '丢进去', body: '贴一段代码，或者拖进整个项目。不需要想提示词，不需要配环境。' },
+  {
+    title: '自动拆解',
+    body: '自动跑出四段解释，生成知识框架图，把文件和依赖的结构关系摊开在你面前。',
+  },
+  {
+    title: '顺藤摸瓜',
+    body: '点术语、点出处、点跨文件关联，顺着线索把项目看穿；看不懂的地方，选中直接追问。',
+  },
 ]
 </script>
 
@@ -89,24 +95,23 @@ const STEPS = [
         <h1
           class="mt-6 text-4xl font-semibold leading-[1.15] tracking-tight text-slate-900 sm:text-6xl"
         >
-          贴一段代码，<br class="hidden sm:block" />
-          或者拖进<span
+          看懂代码，<br class="hidden sm:block" />
+          不能只看<span
             class="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent"
           >
-            整个项目</span
+            这一行</span
           >。
         </h1>
 
         <p class="mt-5 max-w-2xl text-base leading-relaxed text-slate-600 sm:text-lg">
-          不用写一句提示词。逐词逐句、局部关系、整段作用、技术溯源，一次讲完；
-          再配一张能展开的知识框架图。
+          贴代码，讲透上下文；拖项目，理清结构网。不用写一句提示词，把项目里的代码放回它原本的全局里。
         </p>
 
         <div class="mt-6 flex flex-wrap gap-2 text-xs text-slate-500">
           <span class="rounded-full bg-white px-3 py-1 shadow-sm">零提示词</span>
-          <span class="rounded-full bg-white px-3 py-1 shadow-sm">引用有出处</span>
-          <span class="rounded-full bg-white px-3 py-1 shadow-sm">术语可点</span>
-          <span class="rounded-full bg-white px-3 py-1 shadow-sm">选中即可追问</span>
+          <span class="rounded-full bg-white px-3 py-1 shadow-sm">技术说法有出处</span>
+          <span class="rounded-full bg-white px-3 py-1 shadow-sm">全局结构感</span>
+          <span class="rounded-full bg-white px-3 py-1 shadow-sm">就地追问</span>
         </div>
       </div>
     </section>
@@ -131,12 +136,14 @@ const STEPS = [
       </section>
 
       <p class="mt-3 px-1 text-center text-[11px] text-slate-400">
-        两个入口都不会把代码上传到任何存储；解析结果只留在当前页面。
+        隐私优先：浏览器里只读文件，解析片段只发给大模型，服务端不留存；解析结果只留在当前页面。
       </p>
 
       <!-- 它能帮你什么 -->
       <section class="py-14 sm:py-20">
-        <h2 class="text-center text-sm font-medium tracking-wide text-slate-400">它能帮你什么</h2>
+        <h2 class="text-center text-sm font-medium tracking-wide text-slate-400">
+          为什么它比“直接问大模型”管用？
+        </h2>
 
         <div class="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <article
