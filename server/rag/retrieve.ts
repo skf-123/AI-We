@@ -84,6 +84,12 @@ export function detectBucket(code: string): DetectedBucket {
     return 'python'
   }
 
+  // MyBatis / Spring 的 XML 配置：归到 Java 生态，别被下面的 SQL 或前端规则抢走
+  if (/^\s*<\?xml|<\s*(mapper|beans|configuration)\b/.test(code)) return 'java'
+
+  // 纯 DDL 没有 FROM / WHERE，也要算 SQL
+  if (/\bCREATE\s+(TABLE|INDEX|VIEW)\b|\bALTER\s+TABLE\b/i.test(code)) return 'sql'
+
   // SQL —— 只在看起来确实是 SQL 语句时才算，避免把普通字符串误判
   if (
     /\b(SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM|CREATE\s+TABLE)\b/i.test(code) &&

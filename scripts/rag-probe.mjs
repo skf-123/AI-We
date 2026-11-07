@@ -65,6 +65,11 @@ function detectBucket(code) {
   )
     return 'python'
 
+  if (/^\s*<\?xml|<\s*(mapper|beans|configuration)\b/.test(code)) return 'java'
+
+  // 纯 DDL 没有 FROM / WHERE，也要算 SQL
+  if (/\bCREATE\s+(TABLE|INDEX|VIEW)\b|\bALTER\s+TABLE\b/i.test(code)) return 'sql'
+
   if (
     /\b(SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM|CREATE\s+TABLE)\b/i.test(code) &&
     /\b(FROM|WHERE|VALUES|SET|INTO)\b/i.test(code)
