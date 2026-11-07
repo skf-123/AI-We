@@ -77,11 +77,11 @@ function stepSummary(step: AgentStep): string {
     <div class="flex flex-wrap items-center gap-2">
       <button
         type="button"
-        class="inline-flex items-center gap-1 rounded text-xs font-semibold text-slate-700 hover:text-slate-900"
+        class="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-100"
         :aria-expanded="open"
         @click="open = !open"
       >
-        <span class="text-[9px] text-slate-400">{{ open ? '▾' : '▸' }}</span>
+        <span class="text-[11px] text-slate-500">{{ open ? '▾' : '▸' }}</span>
         {{ props.title || 'Agent 侦查' }}
       </button>
 

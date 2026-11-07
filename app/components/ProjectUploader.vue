@@ -271,26 +271,34 @@ function emitFiles(raw: { path: string; file: File }[]) {
       1.9 MB（依赖 / 产物不计入）。zip 压缩包在后续版本支持。
     </p>
 
-    <div class="mt-6 border-t border-slate-100 pt-5">
-      <h3 class="text-sm font-semibold text-slate-800">麦穗将为你完成</h3>
-      <ul class="mt-3 grid gap-2 text-sm text-slate-500 sm:grid-cols-2">
-        <li class="flex items-center gap-2">
-          <AppIcon name="project" class="h-4 w-4 shrink-0 text-emerald-600" />
-          识别项目目录与配置线索
-        </li>
-        <li class="flex items-center gap-2">
-          <AppIcon name="code" class="h-4 w-4 shrink-0 text-emerald-600" />
-          筛选文件并逐个理解源码
-        </li>
-        <li class="flex items-center gap-2">
-          <AppIcon name="book" class="h-4 w-4 shrink-0 text-emerald-600" />
-          生成项目整体说明
-        </li>
-        <li class="flex items-center gap-2">
-          <AppIcon name="graph" class="h-4 w-4 shrink-0 text-emerald-600" />
-          构建可交互的项目关系图
-        </li>
-      </ul>
+    <div class="mt-7 pt-5">
+      <h3 class="pl-[2px] text-left text-[20px] font-semibold leading-7 text-slate-800">
+        麦穗将为你完成
+      </h3>
+      <div
+        class="mt-4 grid gap-x-12 gap-y-2.5 pl-[2px] text-sm leading-relaxed text-slate-500 sm:grid-cols-2 sm:text-base"
+      >
+        <ul class="flex flex-col gap-2.5">
+          <li class="flex items-center gap-2">
+            <AppIcon name="project" class="h-4 w-4 shrink-0 text-emerald-600" />
+            识别项目目录配置与层级关系
+          </li>
+          <li class="flex items-center gap-2">
+            <AppIcon name="code" class="h-4 w-4 shrink-0 text-emerald-600" />
+            筛选文件并逐个理解源码
+          </li>
+        </ul>
+        <ul class="flex flex-col gap-2.5">
+          <li class="flex items-center gap-2">
+            <AppIcon name="book" class="h-4 w-4 shrink-0 text-emerald-600" />
+            生成项目整体说明
+          </li>
+          <li class="flex items-center gap-2">
+            <AppIcon name="graph" class="h-4 w-4 shrink-0 text-emerald-600" />
+            构建可交互的项目关系图
+          </li>
+        </ul>
+      </div>
     </div>
   </section>
 </template>

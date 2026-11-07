@@ -402,11 +402,11 @@ onBeforeUnmount(() => {
                 <button
                   v-if="mapSummary || mapBackend || mapReadingPlan.length || structure"
                   type="button"
-                  class="mt-0.5 inline-flex items-center gap-1 rounded text-[11px] text-slate-400 hover:text-slate-600"
+                  class="mt-1 inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-800"
                   :aria-expanded="projectOpen"
                   @click="projectOpen = !projectOpen"
                 >
-                  <span class="text-[9px]">{{ projectOpen ? '▾' : '▸' }}</span>
+                  <span class="text-[11px] text-slate-500">{{ projectOpen ? '▾' : '▸' }}</span>
                   {{ projectOpen ? '收起项目说明' : '展开项目说明' }}
                 </button>
                 <p

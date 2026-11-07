@@ -63,9 +63,9 @@ const MAX_EXPANDED_FILES = 12
 
 const TYPE_STYLE: Record<GraphNodeType, { border: string; bg: string; text: string; tag: string }> =
   {
-    code: { border: '#10b981', bg: 'rgba(16,185,129,0.08)', text: '#047857', tag: '代码' },
-    tech: { border: '#3b82f6', bg: 'rgba(59,130,246,0.08)', text: '#1d4ed8', tag: '技术' },
-    concept: { border: '#f59e0b', bg: 'rgba(245,158,11,0.10)', text: '#b45309', tag: '概念' },
+    code: { border: '#6ee7b7', bg: '#ffffff', text: '#047857', tag: '代码' },
+    tech: { border: '#93c5fd', bg: '#ffffff', text: '#1d4ed8', tag: '技术' },
+    concept: { border: '#fcd34d', bg: '#ffffff', text: '#b45309', tag: '概念' },
   }
 
 /** 展开中的分组 id。默认：JSP / 页面类收起，其余展开 */
@@ -317,8 +317,10 @@ const layout = computed(() => {
     label: edge.label,
     animated: !edge.structural,
     markerEnd: MarkerType.ArrowClosed,
-    style: edge.structural ? { stroke: '#cbd5e1', strokeDasharray: '5 4' } : { stroke: '#cbd5e1' },
-    labelStyle: { fill: edge.structural ? '#94a3b8' : '#64748b', fontSize: 10 },
+    style: edge.structural
+      ? { stroke: '#cbd5e1', strokeWidth: 1.2, strokeDasharray: '5 4' }
+      : { stroke: '#cbd5e1', strokeWidth: 1.2 },
+    labelStyle: { fill: '#94a3b8', fontSize: 10.5 },
     labelBgStyle: { fill: '#ffffff', fillOpacity: 0.92 },
     data: { edge },
   }))
@@ -382,12 +384,14 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="containerRef"
-    class="overflow-hidden rounded-xl border border-slate-200 bg-[#fbfcfd]"
+    class="overflow-hidden rounded-2xl border border-slate-200 bg-[#fbfcfd]"
     :class="isFullscreen ? 'h-screen rounded-none border-0 bg-white' : ''"
   >
     <div
-      class="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-100 bg-white px-3 py-2 text-[11px] text-slate-500"
+      class="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-100 bg-white px-4 py-3 text-[11px] text-slate-500"
     >
+      <span class="text-base font-semibold text-slate-800">项目关系图</span>
+      <span class="hidden h-4 w-px bg-slate-200 sm:inline-block" />
       <span class="inline-flex items-center gap-1.5">
         <span class="h-2 w-2 rounded-sm bg-emerald-500" />代码
       </span>
@@ -398,7 +402,9 @@ onBeforeUnmount(() => {
         <span class="h-2 w-2 rounded-sm bg-amber-500" />概念
       </span>
       <span class="text-slate-400">只数分组节点 · 展开出的文件不另计</span>
-      <span class="hidden text-slate-400 sm:inline">虚线「归属」表示源码里没有外部调用</span>
+      <span class="hidden text-slate-400 sm:inline"
+        >虚线「归属」表示源码里没有外部调用；实线会流动，表示真实关系</span
+      >
 
       <span v-if="!hasEdges" class="text-amber-700">模型没有给出可用的关系线</span>
       <span v-if="unownedCount" class="text-amber-700">未归属文件 {{ unownedCount }}</span>
@@ -526,9 +532,9 @@ onBeforeUnmount(() => {
           <!-- 普通节点：独立节点 / 收起的分组 / 展开后的分组头 -->
           <template #node-wb="p">
             <div
-              class="rounded-lg border px-3 py-2 shadow-sm transition"
+              class="rounded-xl border-2 px-3 py-2 shadow-sm transition"
               :class="{
-                'ring-2 ring-emerald-400 ring-offset-1':
+                'shadow-[0_0_0_3px_rgba(16,185,129,0.18)]':
                   p.data.filesCount && (p.data.nodeId === selectedGroup || p.data.active),
                 'cursor-pointer': p.data.filesCount,
               }"
@@ -594,8 +600,8 @@ onBeforeUnmount(() => {
           <!-- 展开后的文件卡片 -->
           <template #node-file="p">
             <div
-              class="flex h-full cursor-pointer items-center gap-2 rounded-lg border border-emerald-200 border-l-[3px] border-l-emerald-500 bg-white px-2.5 shadow-sm transition"
-              :class="{ 'ring-2 ring-emerald-400 ring-offset-1': p.data.path === activePath }"
+              class="flex h-full cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 border-l-[3px] border-l-emerald-500 bg-white px-2.5 shadow-sm transition"
+              :class="{ 'shadow-[0_0_0_3px_rgba(16,185,129,0.18)]': p.data.path === activePath }"
               :style="{ width: `${FILE_W}px`, height: `${FILE_H}px` }"
               @click.stop="emit('select-file', p.data.path)"
             >
@@ -614,7 +620,7 @@ onBeforeUnmount(() => {
           <!-- 文件过多时的兜底卡片 -->
           <template #node-more="p">
             <div
-              class="flex h-full items-center justify-center rounded-lg border border-dashed border-emerald-300 bg-emerald-50/60 px-2 text-[10px] text-emerald-700"
+              class="flex h-full items-center justify-center rounded-xl border border-dashed border-emerald-300 bg-emerald-50/60 px-2 text-[10px] text-emerald-700"
               :style="{ width: `${FILE_W}px`, height: `${MORE_H}px` }"
             >
               {{ p.data.label }}
