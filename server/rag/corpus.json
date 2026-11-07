@@ -922,5 +922,170 @@
       "label": "Spring 参考文档 · DispatcherServlet",
       "url": "https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-servlet.html"
     }
+  },
+  {
+    "id": "py-asyncio",
+    "lang": "python",
+    "tags": ["python", "asyncio", "async", "await"],
+    "title": "asyncio 与 async / await",
+    "content": "async def 定义协程，await 等待另一个协程或可等待对象，asyncio.run 启动事件循环。并发执行多个协程用 asyncio.gather 或 create_task，它们在同一线程里协作式切换。协程里调用阻塞函数（time.sleep、同步请求）会卡住整个循环，要用 asyncio.sleep 或 asyncio.to_thread。",
+    "source": {
+      "label": "Python 文档 · asyncio 任务",
+      "url": "https://docs.python.org/3/library/asyncio-task.html"
+    }
+  },
+  {
+    "id": "py-mutable-default",
+    "lang": "python",
+    "tags": ["python", "default-argument", "mutable"],
+    "title": "可变默认参数",
+    "content": "函数的默认参数只在定义时求值一次，之后所有调用共用同一个对象。def add(item, items=[]) 连续调用会把元素累积到同一个列表里，看起来像“记住了上次的结果”。正确写法是用 None 当哨兵，进函数后 if items is None: items = []。字典、集合和自定义对象同理。",
+    "source": {
+      "label": "Python 教程 · 默认参数",
+      "url": "https://docs.python.org/3/tutorial/controlflow.html#default-argument-values"
+    }
+  },
+  {
+    "id": "py-dataclass",
+    "lang": "python",
+    "tags": ["python", "dataclass", "field"],
+    "title": "dataclass",
+    "content": "@dataclass 按字段声明自动生成 __init__、__repr__ 和 __eq__，适合承载数据的类。frozen=True 让它不可变；可变默认值要用 field(default_factory=list)，直接写 [] 会触发“可变默认值”的错误。它不生成校验逻辑，需要校验时在 __post_init__ 里做。",
+    "source": {
+      "label": "Python 文档 · dataclasses",
+      "url": "https://docs.python.org/3/library/dataclasses.html"
+    }
+  },
+  {
+    "id": "py-scope-legb",
+    "lang": "python",
+    "tags": ["python", "scope", "closure", "nonlocal"],
+    "title": "作用域与 LEGB",
+    "content": "Python 查找名字的顺序是 Local → Enclosing → Global → Built-in，也就是 LEGB。函数内部赋值会让名字变成局部变量，除非用 global 或 nonlocal 声明。闭包要修改外层函数的变量时必须写 nonlocal，否则会新建一个同名局部变量并报未赋值错误。",
+    "source": {
+      "label": "Python 教程 · 作用域",
+      "url": "https://docs.python.org/3/tutorial/classes.html#python-scopes-and-namespaces"
+    }
+  },
+  {
+    "id": "py-copy-deepcopy",
+    "lang": "python",
+    "tags": ["python", "copy", "deepcopy"],
+    "title": "浅拷贝与深拷贝",
+    "content": "赋值只是让两个名字指向同一个对象。copy.copy 复制最外层，内部嵌套对象仍然共享；copy.deepcopy 递归复制，适合嵌套列表、字典和自定义对象。不可变对象（数字、字符串、元组）通常不需要复制。深拷贝会处理循环引用，但成本更高。",
+    "source": {
+      "label": "Python 文档 · copy",
+      "url": "https://docs.python.org/3/library/copy.html"
+    }
+  },
+  {
+    "id": "py-sort-key",
+    "lang": "python",
+    "tags": ["python", "sorted", "sort", "key"],
+    "title": "排序与 key 函数",
+    "content": "list.sort() 原地排序并返回 None，sorted() 返回新列表。key 接收一个元素、返回用于比较的值，每个元素只调用一次，比 cmp 写法快。多字段排序返回元组，例如 key=lambda u: (u.age, u.name)；要降序就加 reverse=True，或者对数值取负。",
+    "source": {
+      "label": "Python 文档 · 排序指南",
+      "url": "https://docs.python.org/3/howto/sorting.html"
+    }
+  },
+  {
+    "id": "py-is-eq",
+    "lang": "python",
+    "tags": ["python", "identity", "equality", "none"],
+    "title": "is 与 == 的区别",
+    "content": "is 比较两个名字是不是同一个对象，== 比较值是否相等。小整数和短字符串可能因为驻留而指向同一个对象，但这是实现细节，不能拿 is 判断值相等。和 None、True、False 比较时用 is，这是唯一推荐的场景；其他情况一律用 ==。",
+    "source": {
+      "label": "Python 文档 · is 比较",
+      "url": "https://docs.python.org/3/reference/expressions.html#is-not"
+    }
+  },
+  {
+    "id": "py-context-manager",
+    "lang": "python",
+    "tags": ["python", "with", "context-manager"],
+    "title": "上下文管理器协议",
+    "content": "with 进入时调用 __enter__，离开时调用 __exit__，即使代码块里抛异常也会执行，所以适合管文件、锁和连接。用 contextlib.contextmanager 可以把带 yield 的生成器写成上下文管理器：yield 前是进入逻辑，yield 后是清理逻辑。__exit__ 返回 True 会吞掉异常，除非确实要吞，否则别这么写。",
+    "source": {
+      "label": "Python 文档 · with 协议",
+      "url": "https://docs.python.org/3/reference/datamodel.html#with-statement-context-managers"
+    }
+  },
+  {
+    "id": "java-optional",
+    "lang": "java",
+    "tags": ["java", "optional", "null"],
+    "title": "Optional 的用法",
+    "content": "Optional 用来表达“可能没有值”，逼调用方显式处理空的情况。常用 orElse、orElseGet、orElseThrow、map、flatMap；不要直接 get()，那和判空没区别。它适合返回值，不适合当字段、方法参数或集合元素，也不该用来替代所有 null。",
+    "source": {
+      "label": "Java 21 API · Optional",
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Optional.html"
+    }
+  },
+  {
+    "id": "java-concurrenthashmap",
+    "lang": "java",
+    "tags": ["java", "concurrenthashmap", "concurrency"],
+    "title": "ConcurrentHashMap",
+    "content": "ConcurrentHashMap 用 CAS 和桶级锁支持并发读写，get 基本不加锁，put 只锁当前桶。它不允许 null 键和 null 值；size 是估算值，不适合拿来做精确计数。复合操作要用 computeIfAbsent、merge、compute 保证原子，先 get 再 put 会在并发下丢更新。",
+    "source": {
+      "label": "Java 21 API · ConcurrentHashMap",
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html"
+    }
+  },
+  {
+    "id": "java-threadpool",
+    "lang": "java",
+    "tags": ["java", "threadpool", "executor"],
+    "title": "线程池参数",
+    "content": "ThreadPoolExecutor 的核心参数是核心线程数、最大线程数、任务队列和拒绝策略。任务先占核心线程，满了进队列，队列满了才扩到最大线程；所以无界队列会让最大线程数永远用不上，过载时只会无限堆积。用完要 shutdown，否则线程不退出。",
+    "source": {
+      "label": "Java 21 API · ThreadPoolExecutor",
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html"
+    }
+  },
+  {
+    "id": "java-stringbuilder",
+    "lang": "java",
+    "tags": ["java", "string", "stringbuilder"],
+    "title": "字符串拼接与 StringBuilder",
+    "content": "Java 的 String 不可变，循环里用 + 拼接会不断创建新对象和临时数组，数据量大时明显变慢。StringBuilder 是可变的字符序列，append 不会每次新建；它不是线程安全的，跨线程共享时用 StringBuffer 或自己加锁。能预估长度时先给容量，减少扩容。",
+    "source": {
+      "label": "Java 21 API · StringBuilder",
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/StringBuilder.html"
+    }
+  },
+  {
+    "id": "java-list-choice",
+    "lang": "java",
+    "tags": ["java", "arraylist", "linkedlist", "collection"],
+    "title": "ArrayList 与 LinkedList",
+    "content": "ArrayList 底层是数组，随机访问 O(1)，中间插入删除要搬元素；LinkedList 是双向链表，头尾插入删除 O(1)，随机访问要遍历，每个节点还多两个引用。绝大多数业务场景选 ArrayList；只有频繁在两端增删、且很少按下标访问时才考虑 LinkedList。",
+    "source": {
+      "label": "Java 21 API · List",
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html"
+    }
+  },
+  {
+    "id": "java-rest-params",
+    "lang": "java",
+    "tags": ["java", "spring-mvc", "requestbody", "pathvariable"],
+    "title": "Spring MVC 参数绑定",
+    "content": "@PathVariable 取 URL 路径里的占位符，@RequestParam 取查询参数或表单字段，@RequestBody 把请求体按 JSON 反序列化成对象，@RequestHeader 取请求头。一个方法只能有一个 @RequestBody。参数名依赖编译时保留信息，构建时没开 -parameters 就要在注解里显式写名字。",
+    "source": {
+      "label": "Spring 参考文档 · 处理方法",
+      "url": "https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods.html"
+    }
+  },
+  {
+    "id": "java-tx-propagation",
+    "lang": "java",
+    "tags": ["java", "spring", "transaction", "propagation"],
+    "title": "事务传播行为",
+    "content": "REQUIRED 是默认值：有事务就加入，没有就新建；REQUIRES_NEW 挂起当前事务、另开一个，内层回滚不影响外层；NESTED 用保存点，内层失败只回滚到保存点；SUPPORTS 有就加入、没有就非事务运行；MANDATORY 必须已有事务；NOT_SUPPORTED 挂起事务。选之前先想清楚失败要回滚到哪一层。",
+    "source": {
+      "label": "Spring 参考文档 · 事务传播",
+      "url": "https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html"
+    }
   }
 ]

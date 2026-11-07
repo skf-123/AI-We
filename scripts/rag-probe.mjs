@@ -443,6 +443,142 @@ public class UserController {
   public List<User> list() { return service.all(); }
 }`,
   },
+  {
+    label: 'Python asyncio',
+    expect: ['py-asyncio'],
+    code: `async def fetch(url):
+    await asyncio.sleep(1)
+    return url
+
+async def main():
+    return await asyncio.gather(fetch('a'), fetch('b'))`,
+  },
+  {
+    label: 'Python 可变默认参数',
+    expect: ['py-mutable-default'],
+    code: `def add(item, items=[]):
+    items.append(item)
+    return items`,
+  },
+  {
+    label: 'Python dataclass',
+    expect: ['py-dataclass'],
+    code: `from dataclasses import dataclass, field
+
+@dataclass
+class User:
+    name: str
+    tags: list = field(default_factory=list)`,
+  },
+  {
+    label: 'Python 作用域',
+    expect: ['py-scope-legb'],
+    code: `def outer():
+    count = 0
+    def inner():
+        nonlocal count
+        count += 1
+    return inner`,
+  },
+  {
+    label: 'Python 深拷贝',
+    expect: ['py-copy-deepcopy'],
+    code: `import copy
+
+original = {'items': [1, 2]}
+cloned = copy.deepcopy(original)`,
+  },
+  {
+    label: 'Python 排序 key',
+    expect: ['py-sort-key'],
+    code: `users.sort(key=lambda u: (u.age, u.name))
+top = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)`,
+  },
+  {
+    label: 'Python is 与 ==',
+    expect: ['py-is-eq'],
+    code: `if value is None:
+    return []
+if value == expected:
+    return value`,
+  },
+  {
+    label: 'Python 上下文管理器',
+    expect: ['py-context-manager'],
+    code: `from contextlib import contextmanager
+
+@contextmanager
+def tx():
+    yield
+    print('done')`,
+  },
+  {
+    label: 'Java Optional',
+    expect: ['java-optional'],
+    code: `String name = Optional.ofNullable(user)
+    .map(User::getName)
+    .orElse("unknown");`,
+  },
+  {
+    label: 'Java ConcurrentHashMap',
+    expect: ['java-concurrenthashmap'],
+    code: `public class Registry {
+  private final Map<String, List<String>> map = new ConcurrentHashMap<>();
+  public void add(String key, String value) {
+    map.computeIfAbsent(key, k -> new ArrayList<>()).add(value);
+  }
+}`,
+  },
+  {
+    label: 'Java 线程池',
+    expect: ['java-threadpool'],
+    code: `public class WorkerPool {
+  private final ExecutorService pool = new ThreadPoolExecutor(
+      4, 8, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(100));
+  public void run(Runnable task) { pool.submit(task); }
+  public void close() { pool.shutdown(); }
+}`,
+  },
+  {
+    label: 'Java StringBuilder',
+    expect: ['java-stringbuilder'],
+    code: `StringBuilder sb = new StringBuilder();
+for (String item : items) {
+  sb.append(item).append(',');
+}`,
+  },
+  {
+    label: 'Java 集合选择',
+    expect: ['java-list-choice'],
+    code: `public class Demo {
+  public String first(List<String> input) {
+    List<String> list = new ArrayList<>(input);
+    list.add("a");
+    return list.get(0);
+  }
+}`,
+  },
+  {
+    label: 'Spring MVC 参数绑定',
+    expect: ['java-rest-params'],
+    code: `import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+  @GetMapping("/users/{id}")
+  public User get(@PathVariable Long id, @RequestParam(required = false) String q) {
+    return service.find(id, q);
+  }
+}`,
+  },
+  {
+    label: 'Spring 事务传播',
+    expect: ['java-tx-propagation'],
+    code: `@Transactional(propagation = Propagation.REQUIRES_NEW)
+public void writeAudit(String action) {
+  repository.save(action);
+}`,
+  },
 ]
 
 const SHOULD_MISS = [
