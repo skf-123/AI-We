@@ -234,6 +234,215 @@ WHERE o.created_at >= '2026-01-01'
 GROUP BY c.name
 HAVING COUNT(o.id) > 3;`,
   },
+  {
+    label: 'TS 类型收窄',
+    expect: ['ts-narrowing'],
+    code: `function format(v: string | number) {
+  if (typeof v === 'number') return v.toFixed(2);
+  return v.trim();
+}`,
+  },
+  {
+    label: 'TS 泛型约束',
+    expect: ['ts-generics-constraint'],
+    code: `function longest<T extends { length: number }>(a: T, b: T) {
+  return a.length >= b.length ? a : b;
+}`,
+  },
+  {
+    label: 'TS interface 与 type',
+    expect: ['ts-interface-vs-type'],
+    code: `interface User { id: number; name: string }
+type Id = string | number;
+const u: User = { id: 1, name: 'a' };`,
+  },
+  {
+    label: 'TS unknown 与 never',
+    expect: ['ts-unknown-any-never'],
+    code: `function parse(input: unknown) {
+  if (typeof input !== 'string') throw new Error('bad');
+  return input.trim();
+}`,
+  },
+  {
+    label: 'TS 工具类型',
+    expect: ['ts-utility-types'],
+    code: `type Patch = Partial<Pick<User, 'name' | 'age'>>;
+type Counts = Record<string, number>;
+type Keys = keyof User;`,
+  },
+  {
+    label: 'TS satisfies',
+    expect: ['ts-satisfies'],
+    code: `const config = { theme: 'dark', size: 12 } satisfies { theme: 'dark' | 'light'; size: number };`,
+  },
+  {
+    label: 'TS 类型守卫',
+    expect: ['ts-type-guard'],
+    code: `function isString(v: unknown): v is string {
+  return typeof v === 'string';
+}`,
+  },
+  {
+    label: 'TS 可辨识联合',
+    expect: ['ts-discriminated-union'],
+    code: `type Result = { ok: true; data: string } | { ok: false; error: string };
+function read(r: Result) { if (r.ok) return r.data; return r.error; }`,
+  },
+  {
+    label: 'TS as const',
+    expect: ['ts-as-const'],
+    code: `const ROLES = ['admin', 'user'] as const;
+type Role = (typeof ROLES)[number];`,
+  },
+  {
+    label: 'TS strict 空值',
+    expect: ['ts-strict'],
+    code: `function label(value: string | null | undefined) {
+  return value ?? 'unknown';
+}`,
+  },
+  {
+    label: 'TS 模块解析',
+    expect: ['ts-module-resolution'],
+    code: `import { ref } from 'vue';
+import utils from '@/utils/format';
+const n = ref(0);`,
+  },
+  {
+    label: 'TS 声明文件',
+    expect: ['ts-dts'],
+    code: `declare module 'my-lib' {
+  export function run(input: string): void;
+}
+declare const APP_VERSION: string;`,
+  },
+  {
+    label: 'TS 类型推断',
+    expect: ['ts-inference'],
+    code: `const nums = [1, 2, 3];
+const doubled = nums.map((n) => n * 2);
+const first = nums[0];`,
+  },
+  {
+    label: 'TS 函数重载',
+    expect: ['ts-overload'],
+    code: `function create(tag: 'a'): HTMLAnchorElement;
+function create(tag: 'div'): HTMLDivElement;
+function create(tag: string) { return document.createElement(tag); }`,
+  },
+  {
+    label: 'Spring 事务自调用',
+    expect: ['java-transactional-self-invocation'],
+    code: `import org.springframework.transaction.annotation.Transactional;
+public class OrderService {
+  @Transactional
+  public void pay() { this.writeLog(); }
+  public void writeLog() { }
+}`,
+  },
+  {
+    label: 'Spring AOP 代理',
+    expect: ['java-aop-proxy'],
+    code: `import org.springframework.stereotype.Component;
+@Component
+public class LogAspect {
+  @Around("execution(* com.demo..*(..))")
+  public Object around(ProceedingJoinPoint p) throws Throwable { return p.proceed(); }
+}`,
+  },
+  {
+    label: 'Spring Bean 生命周期',
+    expect: ['java-bean-lifecycle'],
+    code: `import javax.annotation.PostConstruct;
+public class CacheHolder {
+  @PostConstruct
+  public void init() { }
+}`,
+  },
+  {
+    label: 'Spring Bean 作用域',
+    expect: ['java-bean-scope'],
+    code: `import org.springframework.context.annotation.Scope;
+@Scope("prototype")
+public class TaskRunner { }`,
+  },
+  {
+    label: 'Spring 循环依赖',
+    expect: ['java-circular-dependency'],
+    code: `public class OrderService {
+  private final UserService userService;
+  public OrderService(UserService userService) { this.userService = userService; }
+}
+public class UserService {
+  public UserService(OrderService orderService) { }
+}`,
+  },
+  {
+    label: 'Spring Boot 配置优先级',
+    expect: ['java-config-precedence'],
+    code: `import org.springframework.beans.factory.annotation.Value;
+public class AppProps {
+  @Value("\${app.mode}")
+  private String mode;
+}`,
+  },
+  {
+    label: 'MyBatis 参数占位',
+    expect: ['java-mybatis-param'],
+    code: `public interface UserMapper {
+  @Select("SELECT * FROM users WHERE name = #{name}")
+  User findByName(String name);
+}`,
+  },
+  {
+    label: 'MyBatis 二级缓存',
+    expect: ['java-mybatis-cache'],
+    code: `import org.apache.ibatis.annotations.CacheNamespace;
+@CacheNamespace
+public interface UserMapper {
+  User findById(long id);
+}`,
+  },
+  {
+    label: 'Spring 构造器注入',
+    expect: ['java-autowired'],
+    code: `public class OrderService {
+  private final OrderRepository repository;
+  public OrderService(OrderRepository repository) { this.repository = repository; }
+}`,
+  },
+  {
+    label: '统一异常处理',
+    expect: ['java-controller-advice'],
+    code: `import org.springframework.web.bind.annotation.RestControllerAdvice;
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+  @ExceptionHandler(Exception.class)
+  public ResponseEntity<String> handle(Exception e) { return ResponseEntity.badRequest().body(e.getMessage()); }
+}`,
+  },
+  {
+    label: '参数校验',
+    expect: ['java-validation'],
+    code: `public class UserForm {
+  @NotBlank
+  private String name;
+  @Email
+  private String email;
+}
+public void create(@Valid UserForm form) { }`,
+  },
+  {
+    label: 'Spring MVC 请求流程',
+    expect: ['java-mvc-flow'],
+    code: `import org.springframework.web.bind.annotation.RestController;
+@RestController
+public class UserController {
+  @GetMapping("/users")
+  public List<User> list() { return service.all(); }
+}`,
+  },
 ]
 
 const SHOULD_MISS = [
@@ -315,14 +524,15 @@ async function main() {
       .map((e) => ({ id: e.id, score: cosine(qv, byId.get(e.id).vector) }))
       .sort((a, b) => b.score - a.score)
 
-    const top = scored.slice(0, 4)
+    const TOP_K = Number(process.env.PROBE_TOPK || 4)
+    const top = scored.slice(0, TOP_K)
     console.log(`\n【${s.label}】  语言=${detected}  候选=${candidates.length}`)
     top.forEach((t, i) => {
       const mark = s.expect.includes(t.id) ? ' ✓' : ''
       console.log(`   ${i + 1}. ${t.id.padEnd(28)} ${t.score.toFixed(4)}${mark}`)
     })
     const missing = s.expect.filter((e) => !top.map((t) => t.id).includes(e))
-    if (missing.length) console.log(`   ⚠️ 未进前 4：${missing.join(', ')}`)
+    if (missing.length) console.log(`   ⚠️ 未进前 ${TOP_K}：${missing.join(', ')}`)
 
     // 记下「期望命中项」中最低的那个分数 —— 这就是阈值的安全下限
     const hitScores = scored.filter((x) => s.expect.includes(x.id)).map((x) => x.score)

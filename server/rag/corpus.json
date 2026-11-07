@@ -636,5 +636,291 @@
       "label": "PostgreSQL 文档 · 约束",
       "url": "https://www.postgresql.org/docs/current/ddl-constraints.html"
     }
+  },
+  {
+    "id": "ts-narrowing",
+    "lang": "typescript",
+    "tags": ["typescript", "narrowing", "typeof", "control-flow"],
+    "title": "类型收窄（Type Narrowing）",
+    "content": "联合类型在运行时只是其中一种可能，TypeScript 靠控制流分析把宽类型收窄成窄类型。常见手段有 typeof 判断原始类型、instanceof 判断类实例、in 判断属性是否存在、真值判断排除 null 和 undefined，以及自定义类型守卫 value is T。收窄只在当前分支有效，赋值、函数调用或异步回调之后可能失效，需要重新判断。",
+    "source": {
+      "label": "TypeScript 手册 · 类型收窄",
+      "url": "https://www.typescriptlang.org/docs/handbook/2/narrowing.html"
+    }
+  },
+  {
+    "id": "ts-generics-constraint",
+    "lang": "typescript",
+    "tags": ["typescript", "generics", "extends", "constraint"],
+    "title": "泛型约束（extends）",
+    "content": "泛型参数默认可以是任意类型，用 extends 加约束后，函数体才能安全访问约束里的属性。例如 function longest<T extends { length: number }>(a: T, b: T)，T 至少要有 length。约束不改变运行时，只是在编译期缩小允许的类型；多个约束用交叉类型写，keyof 约束常用来限制对象键。约束过宽等于没约束，过窄会拒绝合法调用。",
+    "source": {
+      "label": "TypeScript 手册 · 泛型",
+      "url": "https://www.typescriptlang.org/docs/handbook/2/generics.html"
+    }
+  },
+  {
+    "id": "ts-interface-vs-type",
+    "lang": "typescript",
+    "tags": ["typescript", "interface", "type-alias"],
+    "title": "interface 与 type 的区别",
+    "content": "两者都能描述对象形状，差别在扩展和合并。interface 用 extends 扩展，同名声明会自动合并，适合描述公开 API 或需要扩充的对象；type 用交叉类型组合，还能直接写联合、元组、映射类型和条件类型。interface 不能表示联合类型，type 不能重复声明合并。团队里选一种为主，混用会让同一个形状出现两套名字。",
+    "source": {
+      "label": "TypeScript 手册 · 日常类型",
+      "url": "https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#differences-between-type-aliases-and-interfaces"
+    }
+  },
+  {
+    "id": "ts-unknown-any-never",
+    "lang": "typescript",
+    "tags": ["typescript", "unknown", "any", "never"],
+    "title": "unknown、any 与 never",
+    "content": "any 关闭类型检查，什么都能赋值、什么都能调用，错误被推迟到运行时。unknown 表示值存在但类型未知，必须先收窄才能使用，适合接外部输入。never 表示不可能出现的值：总是抛错的函数返回类型、穷尽检查后剩下的分支。never 可以赋给任何类型，除 any 外没有类型能赋给 never。实际项目里优先 unknown，慎用 any。",
+    "source": {
+      "label": "TypeScript 手册 · any 类型",
+      "url": "https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#any"
+    }
+  },
+  {
+    "id": "ts-utility-types",
+    "lang": "typescript",
+    "tags": ["typescript", "utility-types", "partial", "pick", "omit", "record"],
+    "title": "工具类型 Partial / Pick / Omit / Record",
+    "content": "工具类型是从已有类型派生的映射类型：Partial<T> 把属性全变可选，Required<T> 全变必填，Readonly<T> 全变只读，Pick<T, K> 只保留指定键，Omit<T, K> 去掉指定键，Record<K, V> 造键值对象，Exclude 和 Extract 过滤联合类型，ReturnType 取函数返回类型。它们只在类型层生效，不生成运行时代码，常用来避免重复声明 DTO。",
+    "source": {
+      "label": "TypeScript 手册 · 工具类型",
+      "url": "https://www.typescriptlang.org/docs/handbook/utility-types.html"
+    }
+  },
+  {
+    "id": "ts-satisfies",
+    "lang": "typescript",
+    "tags": ["typescript", "satisfies", "literal-type"],
+    "title": "satisfies 运算符",
+    "content": "satisfies 检查一个值是否符合某个类型，同时保留值本身的更具体类型。用类型注解会把字面量拓宽成 string，用 as 会跳过检查，satisfies 两者都不牺牲：配置对象既被检查键名和值类型，又保留 dark 这样的字面量类型供后续推导。它不改变运行时，只在编译期校验，适合配置表和常量映射。",
+    "source": {
+      "label": "TypeScript 4.9 发布说明 · satisfies",
+      "url": "https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-9.html"
+    }
+  },
+  {
+    "id": "ts-type-guard",
+    "lang": "typescript",
+    "tags": ["typescript", "type-guard", "predicate"],
+    "title": "类型守卫（value is T）",
+    "content": "类型守卫是返回 boolean 的函数，返回类型写成 parameter is Type，调用后 TypeScript 会在真分支里把参数收窄成 Type。它适合判断外部数据、联合类型和类实例。守卫函数内部仍要真的检查，不能直接 return true 骗过编译器；异步函数不能当守卫，因为收窄不会跨 await 保留。",
+    "source": {
+      "label": "TypeScript 手册 · 类型谓词",
+      "url": "https://www.typescriptlang.org/docs/handbook/2/narrowing.html#using-type-predicates"
+    }
+  },
+  {
+    "id": "ts-discriminated-union",
+    "lang": "typescript",
+    "tags": ["typescript", "union", "discriminated-union", "exhaustive"],
+    "title": "可辨识联合",
+    "content": "可辨识联合由若干对象类型组成，每个成员有一个共同字段，值是不同字面量，例如 type 字段为 success 或 error。用 switch 判断这个字段后，每个分支只保留对应成员，访问其他成员独有的字段会报错。在 default 分支把值赋给 never，可以检查是否漏了情况。它是描述请求状态、事件和表单结果的常用写法。",
+    "source": {
+      "label": "TypeScript 手册 · 可辨识联合",
+      "url": "https://www.typescriptlang.org/docs/handbook/2/narrowing.html#discriminated-unions"
+    }
+  },
+  {
+    "id": "ts-as-const",
+    "lang": "typescript",
+    "tags": ["typescript", "as-const", "literal-type", "readonly"],
+    "title": "as const 常量断言",
+    "content": "as const 让字面量保留最窄的类型，并把对象属性和数组元素变成 readonly：const arr = [1, 2] as const 得到 readonly [1, 2]，不是 number[]；对象的字符串属性变成字面量联合。它不改变运行时值，只影响类型。常见用途是从配置数组推导联合类型，例如 typeof ROLES[number]；代价是不能再修改数组内容。",
+    "source": {
+      "label": "TypeScript 3.4 发布说明 · 常量断言",
+      "url": "https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-4.html#const-assertions"
+    }
+  },
+  {
+    "id": "ts-strict",
+    "lang": "typescript",
+    "tags": ["typescript", "tsconfig", "strict", "strictNullChecks"],
+    "title": "strict 严格模式",
+    "content": "tsconfig 的 strict 是一组开关的总闸，打开后包含 strictNullChecks、strictFunctionTypes、strictBindCallApply、noImplicitAny、noImplicitThis 等。最直接的影响是 null 和 undefined 不再能赋给其他类型，可选属性必须显式处理。新项目应当一开始就开；老项目可以逐项打开，先开 noImplicitAny 和 strictNullChecks，再处理剩余报错。",
+    "source": {
+      "label": "TypeScript 文档 · strict",
+      "url": "https://www.typescriptlang.org/tsconfig#strict"
+    }
+  },
+  {
+    "id": "ts-module-resolution",
+    "lang": "typescript",
+    "tags": ["typescript", "moduleResolution", "bundler", "paths"],
+    "title": "模块解析（moduleResolution）",
+    "content": "moduleResolution 决定 import 的路径怎么找到文件。node 旧算法按 node_modules 和扩展名逐级查找；bundler 面向 Vite、webpack 这类打包器，支持 package.json 的 exports 和 imports 字段；nodenext 对应 Node 原生 ESM，相对导入要写扩展名。路径别名要在 tsconfig 的 paths 和打包器里各配一次，只配一边会出现编译通过、运行找不到模块。",
+    "source": {
+      "label": "TypeScript 手册 · 模块解析",
+      "url": "https://www.typescriptlang.org/docs/handbook/modules/reference.html"
+    }
+  },
+  {
+    "id": "ts-dts",
+    "lang": "typescript",
+    "tags": ["typescript", "declaration", "d.ts", "types"],
+    "title": "声明文件（.d.ts）",
+    "content": ".d.ts 只写类型、不写实现，用于给没有类型的 JavaScript 库补类型，或声明全局变量、模块和环境类型。常见写法有 declare module 包名、declare global、declare const。声明文件只参与编译检查，不会被打包；发布库时在 package.json 的 types 字段指向入口声明。手写声明要和真实实现同步，否则类型通过、运行时照样出错。",
+    "source": {
+      "label": "TypeScript 手册 · 声明文件",
+      "url": "https://www.typescriptlang.org/docs/handbook/declaration-files/introduction.html"
+    }
+  },
+  {
+    "id": "ts-inference",
+    "lang": "typescript",
+    "tags": ["typescript", "inference", "contextual-typing"],
+    "title": "类型推断与上下文类型",
+    "content": "TypeScript 会从初始值推断变量类型，从 return 推断函数返回类型，从参数默认值推断参数类型。上下文类型是反向的：回调参数的类型由调用方签名决定，例如数组 map 的回调参数自动是元素类型。推断通常比自己写注解更精确，但公开 API 的返回类型建议显式标注，避免实现改动导致类型悄悄变化。",
+    "source": {
+      "label": "TypeScript 手册 · 类型推断",
+      "url": "https://www.typescriptlang.org/docs/handbook/type-inference.html"
+    }
+  },
+  {
+    "id": "ts-overload",
+    "lang": "typescript",
+    "tags": ["typescript", "overload", "function"],
+    "title": "函数重载",
+    "content": "函数重载先写多个只含签名的重载声明，再写一个实现签名。调用时只能匹配前面的重载，实现签名对外不可见；实现内部要自己判断参数并分派。重载适合参数个数或类型组合有限的函数，例如 createElement 按标签名返回不同元素类型。参数组合太多时，用联合类型加泛型条件类型往往比重载更好维护。",
+    "source": {
+      "label": "TypeScript 手册 · 函数重载",
+      "url": "https://www.typescriptlang.org/docs/handbook/2/functions.html#function-overloads"
+    }
+  },
+  {
+    "id": "java-transactional-self-invocation",
+    "lang": "java",
+    "tags": ["java", "spring", "transactional", "proxy"],
+    "title": "@Transactional 自调用失效",
+    "content": "Spring 的 @Transactional 默认基于代理：外部调用先经过代理，代理在方法前后开启和提交事务。同一个类里 A 方法直接调用 B 方法，走的是 this，不经过代理，B 上的 @Transactional 不生效，异常也不会回滚。解决办法是把 B 放到另一个 Bean、用 AopContext.currentProxy()，或注入自身代理；不要靠把方法改成 public 来赌它生效。",
+    "source": {
+      "label": "Spring 参考文档 · 声明式事务",
+      "url": "https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html"
+    }
+  },
+  {
+    "id": "java-aop-proxy",
+    "lang": "java",
+    "tags": ["java", "spring", "aop", "proxy", "cglib"],
+    "title": "Spring AOP 代理",
+    "content": "Spring AOP 在运行时给 Bean 套一层代理，把切面逻辑织入方法调用。目标类实现了接口时默认用 JDK 动态代理，只能代理接口方法；没有接口或设置 proxyTargetClass=true 时用 CGLIB 生成子类，不能代理 final 类和 final 方法。代理只拦截从外部进来的调用，自调用、private 方法和同类内部调用都不会经过切面。",
+    "source": {
+      "label": "Spring 参考文档 · AOP 代理",
+      "url": "https://docs.spring.io/spring-framework/reference/core/aop/proxying.html"
+    }
+  },
+  {
+    "id": "java-bean-lifecycle",
+    "lang": "java",
+    "tags": ["java", "spring", "bean", "lifecycle", "postconstruct"],
+    "title": "Bean 生命周期",
+    "content": "单例 Bean 的大致顺序是：实例化、填充属性、调用 Aware 接口、BeanPostProcessor 前置处理、@PostConstruct 和 InitializingBean.afterPropertiesSet、自定义 init-method、BeanPostProcessor 后置处理（AOP 代理常在这一步生成），之后才可以使用；容器关闭时执行 @PreDestroy 和 destroy-method。依赖注入完成前不要访问其他 Bean 的业务方法。",
+    "source": {
+      "label": "Spring 参考文档 · Bean 生命周期",
+      "url": "https://docs.spring.io/spring-framework/reference/core/beans/factory-nature.html"
+    }
+  },
+  {
+    "id": "java-bean-scope",
+    "lang": "java",
+    "tags": ["java", "spring", "bean", "scope", "prototype"],
+    "title": "Bean 作用域",
+    "content": "常用作用域有 singleton（默认，每个容器一个实例）、prototype（每次获取新建）、request、session、application。singleton Bean 注入 prototype Bean 时，只会拿到第一次创建的那个实例；要让每次调用都新建，需要 ObjectProvider、@Lookup 或作用域代理。单例里不要保存请求级状态，否则并发下会互相覆盖。",
+    "source": {
+      "label": "Spring 参考文档 · Bean 作用域",
+      "url": "https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html"
+    }
+  },
+  {
+    "id": "java-circular-dependency",
+    "lang": "java",
+    "tags": ["java", "spring", "circular-dependency", "constructor"],
+    "title": "循环依赖",
+    "content": "两个 Bean 通过构造器互相注入时，Spring 无法先完整创建任何一个，会抛 BeanCurrentlyInCreationException；字段或 setter 注入可以靠提前暴露引用绕过，但这是掩盖设计问题，不是解决办法。正确做法是抽出第三个 Bean、改成事件或接口回调。较新的 Spring Boot 默认禁止循环引用，打开开关只是把问题藏起来。",
+    "source": {
+      "label": "Spring 参考文档 · 循环依赖",
+      "url": "https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html#beans-circular-dependencies"
+    }
+  },
+  {
+    "id": "java-config-precedence",
+    "lang": "java",
+    "tags": ["java", "spring-boot", "configuration", "environment"],
+    "title": "Spring Boot 配置优先级",
+    "content": "同一项配置可能出现在多处，优先级从高到低大致是：命令行参数、Java 系统属性、操作系统环境变量、profile 专属配置文件、application.yml、@PropertySource、默认值。profile 文件覆盖同名基础配置；环境变量用大写加下划线映射。排查配置没生效时，先打印 Environment 或打开调试日志，确认最终是哪一层赢了。",
+    "source": {
+      "label": "Spring Boot 参考文档 · 外部配置",
+      "url": "https://docs.spring.io/spring-boot/reference/features/external-config.html"
+    }
+  },
+  {
+    "id": "java-mybatis-param",
+    "lang": "java",
+    "tags": ["java", "mybatis", "sql-injection", "prepared-statement"],
+    "title": "MyBatis #{} 与 ${}",
+    "content": "#{} 生成 PreparedStatement 的占位符，参数作为值传入，驱动会转义，能防 SQL 注入，也能复用执行计划；${} 是字符串拼接，原样拼进 SQL，只适合表名、列名、排序字段这类不能参数化的位置，而且必须来自白名单。用户输入一律用 #{}；需要动态表名时在服务端校验枚举，不要直接把请求参数塞进 ${}。",
+    "source": {
+      "label": "MyBatis 文档 · XML 映射",
+      "url": "https://mybatis.org/mybatis-3/sqlmap-xml.html"
+    }
+  },
+  {
+    "id": "java-mybatis-cache",
+    "lang": "java",
+    "tags": ["java", "mybatis", "cache", "sqlsession"],
+    "title": "MyBatis 一级与二级缓存",
+    "content": "一级缓存是 SqlSession 级别，默认开启，同一个会话里相同语句和参数只查一次；会话关闭或执行增删改后清空。二级缓存是 namespace 级别，默认关闭，需要在 mapper 里加 cache 标签，缓存对象最好可序列化；它跨会话共享，但更新语句只会清空本 namespace，关联查询容易读到旧数据。一致性要求高的查询建议不用二级缓存。",
+    "source": {
+      "label": "MyBatis 文档 · 缓存",
+      "url": "https://mybatis.org/mybatis-3/sqlmap-xml.html#cache"
+    }
+  },
+  {
+    "id": "java-autowired",
+    "lang": "java",
+    "tags": ["java", "spring", "autowired", "dependency-injection"],
+    "title": "@Autowired 注入方式",
+    "content": "@Autowired 默认按类型注入，找到多个候选时再按字段名匹配，可以用 @Qualifier 指定。字段注入写法短，但隐藏依赖、难做单元测试；构造器注入能保证依赖不为空、字段可以声明 final，Spring 4.3 起单构造器可以省略注解。循环依赖在构造器注入下会直接暴露，这也是推荐它的原因之一。",
+    "source": {
+      "label": "Spring 参考文档 · @Autowired",
+      "url": "https://docs.spring.io/spring-framework/reference/core/beans/annotation-config/autowired.html"
+    }
+  },
+  {
+    "id": "java-controller-advice",
+    "lang": "java",
+    "tags": ["java", "spring-mvc", "exception", "controlleradvice"],
+    "title": "@ControllerAdvice 统一异常处理",
+    "content": "@ControllerAdvice 配合 @ExceptionHandler 把异常处理从各个 Controller 里抽出来，统一返回错误结构；可以按包或注解限定生效范围。@RestControllerAdvice 相当于加了 @ResponseBody。要注意异常是否已经被更具体的处理器接住，以及返回的 HTTP 状态码：参数校验失败通常是 400，未登录 401，没权限 403，别一律返回 500。",
+    "source": {
+      "label": "Spring 参考文档 · 异常处理",
+      "url": "https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-exceptionhandler.html"
+    }
+  },
+  {
+    "id": "java-validation",
+    "lang": "java",
+    "tags": ["java", "spring", "validation", "bean-validation"],
+    "title": "参数校验（Bean Validation）",
+    "content": "在 DTO 字段上加 @NotNull、@Size、@Email 等约束，Controller 参数加 @Valid 或 @Validated 触发校验；失败时抛 MethodArgumentNotValidException，可用 @ExceptionHandler 转成 400 和字段级错误列表。分组校验用 groups 区分新增和修改场景。嵌套对象要在字段上再加 @Valid，否则内层约束不会执行。",
+    "source": {
+      "label": "Spring 参考文档 · Bean Validation",
+      "url": "https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html"
+    }
+  },
+  {
+    "id": "java-mvc-flow",
+    "lang": "java",
+    "tags": ["java", "spring-mvc", "dispatcherservlet", "request"],
+    "title": "Spring MVC 请求流程",
+    "content": "请求先到 DispatcherServlet，它查 HandlerMapping 找到能处理该 URL 的方法，再交给 HandlerAdapter 调用 Controller；返回值是 @ResponseBody 时由消息转换器直接写 JSON，否则交给 ViewResolver 找视图。拦截器在 handler 前后执行，异常交给 HandlerExceptionResolver。理解这条链能定位 404、405、415 和返回值不生效分别卡在哪一环。",
+    "source": {
+      "label": "Spring 参考文档 · DispatcherServlet",
+      "url": "https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-servlet.html"
+    }
   }
 ]
