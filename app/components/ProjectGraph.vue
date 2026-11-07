@@ -13,7 +13,7 @@ import type { ProjectGraphData, ProjectGraphEdge } from '~/types/project'
 import { defaultCollapsed, resolveGraphEdges } from '~/utils/project-graph'
 
 /**
- * 项目级知识框架图 —— 分组可展开 / 收起。
+ * 项目关系图 —— 分组可展开 / 收起。
  *
  * 关键规则（快照第十一节第 30 条第 3 小节）：
  *   · 图数据只存文件级关系；展开 / 收起是渲染变换，不请求接口

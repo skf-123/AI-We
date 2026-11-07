@@ -126,13 +126,13 @@ await evaluate(
   `[...document.querySelectorAll('button')].find(b => b.textContent.trim() === '开始解析').click()`,
 )
 
-// 等流式结束：右栏那条「知识框架图已生成」出现 = 图 JSON 也解析成功了
+// 等流式结束：右栏那条「代码关系图已生成」出现 = 图 JSON 也解析成功了
 let waited = 0
 while (waited < 150000) {
   await sleep(2000)
   waited += 2000
   const finished = await evaluate(
-    `!![...document.querySelectorAll('button')].find(b => b.textContent.includes('知识框架图已生成'))`,
+    `!![...document.querySelectorAll('button')].find(b => b.textContent.includes('代码关系图已生成'))`,
   )
   if (finished) break
 }
@@ -190,7 +190,7 @@ function normalize(s) {
 let check = { skipped: true }
 if (analyzeBody) {
   // 只取正文四段 —— 第五段是图 JSON，它不渲染成 article
-  const cut = analyzeBody.indexOf('## 五、知识框架图')
+  const cut = analyzeBody.indexOf('## 五、代码关系图')
   const rawBody = cut === -1 ? analyzeBody : analyzeBody.slice(0, cut)
   // article.innerText 里已经含 <h2> 标题，不要再手动拼一次
   const renderedText = dom.articles.map((a) => a.text).join('\n')

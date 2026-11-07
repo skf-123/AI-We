@@ -21,7 +21,7 @@ export interface RagSource {
   score: number
 }
 
-/** 知识框架图的节点类型（代码 / 技术 / 概念），与提示词里的 "type" 取值一一对应 */
+/** 代码关系图的节点类型（代码 / 技术 / 概念），与提示词里的 "type" 取值一一对应 */
 export type GraphNodeType = 'code' | 'tech' | 'concept'
 
 export interface GraphNode {

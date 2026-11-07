@@ -1,8 +1,8 @@
 /**
- * 把模型输出的流式文本切分成四段，并从中抠出项目关系图的 JSON。
+ * 把模型输出的流式文本切分成四段，并从中抠出代码关系图的 JSON。
  *
  * 这两个函数原先写在 app/pages/index.vue 的 computed 里。抽出来是因为
- * 「解析结果」面板要用切分、「项目关系图」面板要用图 JSON，两边都需要
+ * 「解析结果」面板要用切分、「代码关系图」面板要用图 JSON，两边都需要
  * 同一份标题约定 —— 让它们各自去 import 一个纯函数，比让其中一个去
  * 依赖另一个要干净。
  *
@@ -20,7 +20,7 @@ export const SECTION_TITLES = [
 ] as const
 
 /** 第五部分是给图用的 JSON，不当作正文渲染 */
-export const GRAPH_TITLE = '五、项目关系图'
+export const GRAPH_TITLE = '五、代码关系图'
 
 export interface AnalysisSection {
   title: string

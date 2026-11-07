@@ -50,7 +50,7 @@ interface FeatureInfo {
 const FEATURES: Record<string, FeatureInfo> = {
   'code/analyze': {
     label: '贴代码主链路',
-    detail: '五段讲解：逐词逐句 → 局部关系 → 整段作用 → 技术溯源 → 项目关系图；带知识库引用',
+    detail: '五段讲解：逐词逐句 → 局部关系 → 整段作用 → 技术溯源 → 代码关系图；带知识库引用',
     limit: '输入 ≤20,000 字符；输出 ≤100,000 token；检索 topK 4、阈值 0.38',
     outputLimit: 100_000,
   },
