@@ -544,6 +544,15 @@ onBeforeUnmount(() => {
                 borderColor: styleOf(p.data.type).border,
                 background: styleOf(p.data.type).bg,
               }"
+              :title="
+                [
+                  p.data.label,
+                  p.data.detail,
+                  p.data.floating ? '浮节点 · 无外部连线' : p.data.ownershipNote,
+                ]
+                  .filter(Boolean)
+                  .join('\n')
+              "
               @click.stop="p.data.filesCount && emit('select-group', p.data.nodeId)"
             >
               <div class="flex items-center gap-1.5">
@@ -603,6 +612,7 @@ onBeforeUnmount(() => {
               class="flex h-full cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 border-l-[3px] border-l-emerald-500 bg-white px-2.5 shadow-sm transition"
               :class="{ 'shadow-[0_0_0_3px_rgba(16,185,129,0.18)]': p.data.path === activePath }"
               :style="{ width: `${FILE_W}px`, height: `${FILE_H}px` }"
+              :title="[p.data.label, p.data.role].filter(Boolean).join('\n')"
               @click.stop="emit('select-file', p.data.path)"
             >
               <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
@@ -622,6 +632,7 @@ onBeforeUnmount(() => {
             <div
               class="flex h-full items-center justify-center rounded-xl border border-dashed border-emerald-300 bg-emerald-50/60 px-2 text-[10px] text-emerald-700"
               :style="{ width: `${FILE_W}px`, height: `${MORE_H}px` }"
+              :title="p.data.label"
             >
               {{ p.data.label }}
             </div>
