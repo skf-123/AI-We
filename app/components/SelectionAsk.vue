@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { stripOutputTruncation } from '#shared/stream-meta'
+
 /**
  * 追问气泡：在解析结果里选中一段代码，就地接着问。
  *
@@ -15,6 +17,8 @@
 interface Turn {
   role: 'user' | 'assistant'
   content: string
+  /** 回答是不是撞到输出上限被截断了 */
+  truncated?: boolean
 }
 
 const props = defineProps<{
@@ -296,8 +300,15 @@ function appendToLast(chunk: string) {
 async function ask(text: string) {
   if (loading.value || !text.trim()) return
 
-  // 先取历史（这时还没把本轮塞进去），历史里只会有已完成的问答
-  const history = turns.value.map((t) => ({ role: t.role, content: t.content }))
+  // 先取历史（这时还没把本轮塞进去），历史里只会有已完成的问答。
+  // 被截断的回答在历史里补一句说明，让模型知道上一条没说完；界面上不显示这句。
+  const history = turns.value.map((t) => ({
+    role: t.role,
+    content:
+      t.role === 'assistant' && t.truncated
+        ? `${t.content}\n\n（上一条回答因长度上限被截断）`
+        : t.content,
+  }))
 
   turns.value.push({ role: 'user', content: text })
   turns.value.push({ role: 'assistant', content: '' })
@@ -355,6 +366,15 @@ async function ask(text: string) {
       if (done) break
       appendToLast(decoder.decode(value, { stream: true }))
       void scrollToBottom()
+    }
+
+    // 流末尾可能带着截断标记（不可见字符）。这里剥掉，并记下这一轮被截断，
+    // 后面再追问时只在发给模型的历史里说明，界面上单独给一句提示。
+    const last = turns.value[turns.value.length - 1]
+    if (last) {
+      const stripped = stripOutputTruncation(last.content)
+      last.content = stripped.text
+      last.truncated = stripped.truncated
     }
   } catch (err) {
     if ((err as Error)?.name !== 'AbortError') {
@@ -592,6 +612,9 @@ watch(
             </div>
             <div v-else class="rounded-lg bg-slate-50 px-2.5 py-2">
               <MarkdownBlock v-if="t.content" :text="t.content" />
+              <p v-if="t.truncated" class="mt-1.5 text-[11px] leading-4 text-amber-700">
+                回答写到长度上限，被截断了；可以继续追问
+              </p>
               <span v-else class="inline-flex items-center gap-1.5 text-[12px] text-slate-400">
                 <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
                 正在想…

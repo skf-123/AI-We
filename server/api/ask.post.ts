@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { OUTPUT_TRUNCATED_MARKER } from '#shared/stream-meta'
 import { toLoggedTextStream } from '../utils/stream'
 import { HISTORY_ITEM_GUARD, charBudgetOf, trimHistory } from '../utils/history'
 
@@ -188,7 +189,7 @@ export default defineEventHandler(async (event) => {
   return new Response(
     toLoggedTextStream(
       upstream.body,
-      {},
+      { truncatedMarker: OUTPUT_TRUNCATED_MARKER },
       { feature: 'code/ask', model: config.llmModel, startedAt },
     ) as unknown as ReadableStream,
     { headers },
