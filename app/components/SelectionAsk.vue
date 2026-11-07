@@ -614,7 +614,7 @@ watch(
           ref="inputRef"
           v-model="question"
           rows="1"
-          :maxlength="500"
+          :maxlength="800"
           placeholder="继续问…（回车发送，Shift+回车换行）"
           class="max-h-24 w-full resize-none rounded-md border border-slate-200 px-2 py-1.5 text-[12.5px] leading-5 text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-emerald-500"
           @keydown="onKeydown"
