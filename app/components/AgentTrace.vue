@@ -73,11 +73,11 @@ function stepSummary(step: AgentStep): string {
 </script>
 
 <template>
-  <section class="shrink-0 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
+  <section class="shrink-0 border-b border-slate-100 bg-[#fbfcfd] px-5 py-3">
     <div class="flex flex-wrap items-center gap-2">
       <button
         type="button"
-        class="inline-flex items-center gap-1 rounded text-[11px] font-medium text-slate-600 hover:text-slate-800"
+        class="inline-flex items-center gap-1 rounded text-xs font-semibold text-slate-700 hover:text-slate-900"
         :aria-expanded="open"
         @click="open = !open"
       >
@@ -105,7 +105,8 @@ function stepSummary(step: AgentStep): string {
 
       <div class="ml-auto flex items-center gap-2">
         <span class="text-[10px] text-slate-400">
-          {{ props.round }} / {{ props.maxRounds }} {{ props.roundUnit || '轮' }} · {{ totalCalls }} 次工具调用
+          {{ props.round }} / {{ props.maxRounds }} {{ props.roundUnit || '轮' }} ·
+          {{ totalCalls }} 次工具调用
         </span>
 
         <div
@@ -162,18 +163,26 @@ function stepSummary(step: AgentStep): string {
       {{ props.error }}
     </p>
 
-    <p v-if="props.statusText" v-show="open" class="mt-1.5 text-[11px] leading-relaxed text-slate-600">
+    <p
+      v-if="props.statusText"
+      v-show="open"
+      class="mt-1.5 text-[11px] leading-relaxed text-slate-600"
+    >
       {{ props.statusText }}
     </p>
 
     <details v-if="props.ledgerText" v-show="open" class="mt-1.5 text-[11px] text-slate-600">
       <summary class="cursor-pointer select-none text-slate-500">结构动作账本</summary>
-      <pre class="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-[10px] leading-relaxed text-slate-600">{{ props.ledgerText }}</pre>
+      <pre
+        class="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-[10px] leading-relaxed text-slate-600"
+        >{{ props.ledgerText }}</pre>
     </details>
 
     <details v-if="props.uncheckedText" v-show="open" class="mt-1.5 text-[11px] text-slate-600">
       <summary class="cursor-pointer select-none text-slate-500">未核项</summary>
-      <pre class="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-[10px] leading-relaxed text-slate-600">{{ props.uncheckedText }}</pre>
+      <pre
+        class="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-[10px] leading-relaxed text-slate-600"
+        >{{ props.uncheckedText }}</pre>
     </details>
 
     <!-- 阅读版：同一批工具调用的人话翻译，按轮分组 -->
@@ -184,7 +193,9 @@ function stepSummary(step: AgentStep): string {
     >
       <div v-for="group in rounds" :key="group.round">
         <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] text-slate-400">
-          <span class="rounded bg-white px-1.5 text-[10px]">第 {{ group.round }} {{ props.roundUnit || '轮' }}</span>
+          <span class="rounded bg-white px-1.5 text-[10px]"
+            >第 {{ group.round }} {{ props.roundUnit || '轮' }}</span
+          >
           <span>{{ group.steps.length }} 次调用</span>
           <span class="min-w-0 truncate font-mono text-[10px] text-slate-400">
             {{ summarizeToolCalls(group.steps) }}
@@ -247,6 +258,8 @@ function stepSummary(step: AgentStep): string {
       正在看目录和配置，决定先读哪个文件…
     </p>
 
-    <p v-if="props.outcome" v-show="open" class="mt-2 text-[10.5px] text-slate-500">产出：{{ props.outcome }}</p>
+    <p v-if="props.outcome" v-show="open" class="mt-2 text-[10.5px] text-slate-500">
+      产出：{{ props.outcome }}
+    </p>
   </section>
 </template>

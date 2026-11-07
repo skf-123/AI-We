@@ -382,7 +382,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="containerRef"
-    class="overflow-hidden rounded-lg border border-slate-200 bg-slate-50"
+    class="overflow-hidden rounded-xl border border-slate-200 bg-[#fbfcfd]"
     :class="isFullscreen ? 'h-screen rounded-none border-0 bg-white' : ''"
   >
     <div
@@ -439,17 +439,16 @@ onBeforeUnmount(() => {
       class="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-100 bg-white px-3 pb-2 text-[11px] text-slate-500"
     >
       <span v-if="props.hint" class="text-slate-400">{{ props.hint }}</span>
-      <span
-        v-if="props.scopeNote"
-        :class="props.scopeWarn ? 'text-amber-700' : 'text-slate-500'"
-      >
+      <span v-if="props.scopeNote" :class="props.scopeWarn ? 'text-amber-700' : 'text-slate-500'">
         {{ props.scopeNote }}
       </span>
     </div>
 
     <div v-if="selectedEdge" class="border-b border-slate-100 bg-white px-3 py-2 text-[11px]">
       <div class="flex flex-wrap items-center gap-2">
-        <span class="font-mono text-slate-700">{{ selectedEdge.from }} → {{ selectedEdge.to }}</span>
+        <span class="font-mono text-slate-700"
+          >{{ selectedEdge.from }} → {{ selectedEdge.to }}</span
+        >
         <span v-if="selectedEdge.label" class="text-slate-400">{{ selectedEdge.label }}</span>
         <span
           class="rounded px-1.5 py-0.5"
@@ -478,10 +477,7 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div v-if="selectedEdge.note" class="mt-1 text-amber-700">{{ selectedEdge.note }}</div>
-      <div
-        v-if="selectedEdge.evidence?.length"
-        class="mt-1 text-[10px] text-slate-400"
-      >
+      <div v-if="selectedEdge.evidence?.length" class="mt-1 text-[10px] text-slate-400">
         程序依据核对的是文件关系；边上的文字仍是模型解释。
       </div>
       <div v-if="selectedEdge.evidence?.length" class="mt-1 space-y-0.5">
@@ -506,10 +502,7 @@ onBeforeUnmount(() => {
           还有 {{ selectedEdge.filePairs.length - 4 }} 对
         </div>
       </div>
-      <div
-        v-else-if="selectedEdge.confidence === 'inferred'"
-        class="mt-1 text-slate-400"
-      >
+      <div v-else-if="selectedEdge.confidence === 'inferred'" class="mt-1 text-slate-400">
         程序没有找到这条边的文件级依据；结论来自模型推断。
       </div>
     </div>

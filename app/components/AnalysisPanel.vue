@@ -280,11 +280,11 @@ defineExpose({ scrollIntoView })
 <template>
   <section
     ref="panelRef"
-    class="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:overflow-hidden"
+    class="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:overflow-hidden"
     :class="fillHeight ? 'lg:min-h-0' : 'lg:h-[calc(100vh-200px)] lg:min-h-[420px]'"
   >
     <div class="mb-3 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-      <span class="shrink-0 text-sm text-slate-500">{{ title || '解析结果' }}</span>
+      <span class="shrink-0 text-base font-semibold text-slate-800">{{ title || '解析结果' }}</span>
       <span
         v-if="subtitle"
         class="min-w-0 truncate font-mono text-[11.5px] text-slate-400"
@@ -340,15 +340,56 @@ defineExpose({ scrollIntoView })
         这段等待是整个流程里唯一「真的在等、又没东西可看」的时段 ——
         正文一开始流，文字本身就在持续告诉你进度了。
       -->
-      <div v-else-if="isEmpty" class="flex h-full items-center justify-center px-6 text-center">
+      <div
+        v-else-if="isEmpty"
+        class="flex h-full flex-col items-center justify-center px-6 text-center"
+      >
         <BookLoader v-if="loading" />
-        <p v-else class="text-sm leading-relaxed text-slate-400">
-          <template v-if="emptyHint">{{ emptyHint }}</template>
-          <template v-else>
-            左边粘贴代码，点「开始解析」。<br />
-            这里会依次出现：逐词逐句 → 局部关系 → 整段作用 → 技术溯源。
-          </template>
-        </p>
+        <template v-else-if="emptyHint">
+          <p class="text-sm leading-relaxed text-slate-400">{{ emptyHint }}</p>
+        </template>
+        <template v-else>
+          <span
+            class="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-600"
+            aria-hidden="true"
+          >
+            <AppIcon name="book" class="h-6 w-6" />
+          </span>
+          <p class="mt-4 text-base font-semibold text-slate-700">解析结果会出现在这里</p>
+          <p class="mt-2 max-w-sm text-sm leading-relaxed text-slate-400">
+            左边粘贴代码，点“开始解析”。这里会依次出现四段解释，再按需画出知识框架图。
+          </p>
+          <div class="mt-6 grid w-full max-w-md grid-cols-2 gap-x-6 gap-y-5 text-left">
+            <div>
+              <div class="flex items-center gap-2">
+                <AppIcon name="list" class="h-5 w-5 shrink-0 text-emerald-600" />
+                <p class="text-base font-semibold text-slate-800">逐词逐句</p>
+              </div>
+              <p class="mt-1.5 text-xs leading-relaxed text-slate-400">理解代码写了什么</p>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <AppIcon name="graph" class="h-5 w-5 shrink-0 text-emerald-600" />
+                <p class="text-base font-semibold text-slate-800">局部关系</p>
+              </div>
+              <p class="mt-1.5 text-xs leading-relaxed text-slate-400">看看代码之间的联系</p>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <AppIcon name="layers" class="h-5 w-5 shrink-0 text-emerald-600" />
+                <p class="text-base font-semibold text-slate-800">整段作用</p>
+              </div>
+              <p class="mt-1.5 text-xs leading-relaxed text-slate-400">了解整段代码的用途</p>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <AppIcon name="book" class="h-5 w-5 shrink-0 text-emerald-600" />
+                <p class="text-base font-semibold text-slate-800">技术溯源</p>
+              </div>
+              <p class="mt-1.5 text-xs leading-relaxed text-slate-400">了解背后的技术知识</p>
+            </div>
+          </div>
+        </template>
       </div>
 
       <!-- 流式渲染的四段 -->
@@ -356,9 +397,12 @@ defineExpose({ scrollIntoView })
         <article
           v-for="s in sections"
           :key="s.title"
-          class="rounded-lg border border-slate-100 bg-slate-50 p-3.5"
+          class="rounded-xl border border-slate-200 bg-[#fbfcfd] p-4"
         >
-          <h2 class="mb-2 text-sm font-semibold text-emerald-700">{{ s.title }}</h2>
+          <div class="mb-3 flex items-center gap-2">
+            <span class="h-4 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
+            <h2 class="text-base font-semibold text-slate-800">{{ s.title }}</h2>
+          </div>
           <MarkdownBlock :text="s.body" :terms="terms" @term="onTerm" @cite="onCite" />
         </article>
 
@@ -462,7 +506,9 @@ defineExpose({ scrollIntoView })
           "
         >
           <p v-if="facts">
-            跨文件事实引文核对：{{ facts.verified }} 条能在原文找到<template v-if="facts.unverified">
+            跨文件事实引文核对：{{ facts.verified }} 条能在原文找到<template
+              v-if="facts.unverified"
+            >
               ，{{ facts.unverified }} 条没对上</template
             ><template v-if="facts.contradictions">
               ，{{ facts.contradictions }} 条与事实矛盾</template
@@ -525,7 +571,7 @@ defineExpose({ scrollIntoView })
         <button
           v-if="!loading && graphReady"
           type="button"
-          class="flex w-full items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm font-medium text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
+          class="flex w-full items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm font-medium text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
           @click="emit('request-graph')"
         >
           <span>知识框架图已生成</span>

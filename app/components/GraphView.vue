@@ -27,9 +27,9 @@ const NODE_H = 62
 /** 三种节点类型的配色 */
 const TYPE_STYLE: Record<GraphNodeType, { border: string; bg: string; text: string; tag: string }> =
   {
-    code: { border: '#10b981', bg: 'rgba(16,185,129,0.08)', text: '#047857', tag: '代码' },
-    tech: { border: '#3b82f6', bg: 'rgba(59,130,246,0.08)', text: '#1d4ed8', tag: '技术' },
-    concept: { border: '#f59e0b', bg: 'rgba(245,158,11,0.10)', text: '#b45309', tag: '概念' },
+    code: { border: '#6ee7b7', bg: '#ffffff', text: '#047857', tag: '代码' },
+    tech: { border: '#93c5fd', bg: '#ffffff', text: '#1d4ed8', tag: '技术' },
+    concept: { border: '#fcd34d', bg: '#ffffff', text: '#b45309', tag: '概念' },
   }
 
 const layout = computed(() => {
@@ -68,9 +68,9 @@ const layout = computed(() => {
     label: e.label,
     animated: true,
     markerEnd: MarkerType.ArrowClosed,
-    style: { stroke: '#cbd5e1' },
-    labelStyle: { fill: '#64748b', fontSize: 11 },
-    labelBgStyle: { fill: '#ffffff', fillOpacity: 0.9 },
+    style: { stroke: '#cbd5e1', strokeWidth: 1.2 },
+    labelStyle: { fill: '#94a3b8', fontSize: 10.5 },
+    labelBgStyle: { fill: '#ffffff', fillOpacity: 0.92 },
   }))
 
   return { nodes, edges }
@@ -82,7 +82,7 @@ function styleOf(type: GraphNodeType) {
 </script>
 
 <template>
-  <div class="h-full w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+  <div class="h-full w-full overflow-hidden rounded-xl border border-slate-200 bg-[#fbfcfd]">
     <!-- Vue Flow 依赖浏览器 API，必须只在客户端渲染 -->
     <ClientOnly>
       <VueFlow
@@ -99,7 +99,7 @@ function styleOf(type: GraphNodeType) {
 
         <template #node-wb="p">
           <div
-            class="rounded-lg border px-3 py-2 shadow-sm"
+            class="rounded-xl border-2 px-3 py-2 shadow-sm"
             :style="{
               width: `${NODE_W}px`,
               minHeight: `${NODE_H}px`,

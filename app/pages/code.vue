@@ -105,7 +105,7 @@ function clearAll() {
 </script>
 
 <template>
-  <div class="min-h-dvh bg-[#f5f6f8] text-slate-800">
+  <div class="min-h-dvh bg-white text-slate-800">
     <!--
       布局说明（桌面端 lg 以上）：
         整页可以正常滚动（右侧有整页滚动条），从上到下依次是：
@@ -125,6 +125,20 @@ function clearAll() {
     <main
       class="mx-auto grid w-full max-w-[1400px] gap-4 px-4 py-4 sm:gap-5 sm:px-6 sm:py-6 lg:grid-cols-2"
     >
+      <div class="lg:col-span-2">
+        <span
+          class="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-700"
+        >
+          单段代码理解
+        </span>
+        <h1 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+          贴代码，开始理解
+        </h1>
+        <p class="mt-3 max-w-3xl text-sm leading-relaxed text-slate-500 sm:text-base">
+          粘贴你想理解的代码，麦穗将为你拆解语法、分析关系，并梳理代码背后的技术知识。
+        </p>
+      </div>
+
       <!-- 左：输入 -->
       <CodePane
         ref="codePaneRef"
@@ -166,8 +180,19 @@ function clearAll() {
       @close="closeAsk"
     />
 
-    <footer class="shrink-0 px-4 pb-4 text-center text-xs text-slate-400 sm:px-6 sm:pb-6">
-      麦穗团队 · 传智杯 AI Web 开发挑战赛
+    <footer class="shrink-0 border-t border-slate-200/70 bg-white px-4 py-2.5 text-center sm:py-3">
+      <p class="text-sm text-slate-500">让代码好理解，让项目更清晰。</p>
+      <p class="mt-1 text-xs text-slate-400">
+        麦穗团队 · 传智杯 AI Web 开发挑战赛 ·
+        <a
+          href="https://github.com/skf-123/AI-We"
+          target="_blank"
+          rel="noreferrer"
+          class="transition hover:text-slate-600"
+          >GitHub</a
+        >
+        · © 2026 麦穗团队
+      </p>
     </footer>
   </div>
 </template>

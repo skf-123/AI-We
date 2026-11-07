@@ -86,7 +86,7 @@ function setAllOpen(value: boolean) {
 <template>
   <div class="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
     <div
-      class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5 text-[11px] text-slate-500"
+      class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-100 bg-[#fbfcfd] px-5 py-3 text-[11px] text-slate-500"
     >
       <span class="inline-flex items-center gap-1.5">
         <span class="h-2 w-2 rounded-sm bg-emerald-500" />用户代码 · 读内容

@@ -25,9 +25,9 @@ defineExpose({ scrollIntoView })
 
 <template>
   <section ref="panelRef" class="mx-auto w-full max-w-[1400px] px-4 pb-4 sm:px-6 sm:pb-6">
-    <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span class="text-sm text-slate-500">知识框架图</span>
+        <span class="text-base font-semibold text-slate-800">知识框架图</span>
         <div class="flex items-center gap-3 text-[11px] text-slate-500">
           <span class="inline-flex items-center gap-1.5">
             <span class="h-2.5 w-2.5 rounded-sm bg-emerald-500" />代码
@@ -42,7 +42,7 @@ defineExpose({ scrollIntoView })
         <span class="text-[11px] text-slate-400">可拖拽节点 · 滚轮 / 双指缩放</span>
       </div>
 
-      <div class="h-[300px] sm:h-[400px]">
+      <div :class="data ? 'h-[420px] sm:h-[520px]' : 'h-[240px] sm:h-[300px]'">
         <GraphView v-if="data" :data="data" />
 
         <!--
@@ -53,7 +53,7 @@ defineExpose({ scrollIntoView })
         -->
         <div
           v-else-if="loading"
-          class="flex h-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-6"
+          class="flex h-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-slate-200 bg-[#fbfcfd] px-6"
         >
           <CodeToGraphHint />
           <p class="text-xs text-slate-400">缓冲中…</p>
@@ -62,16 +62,27 @@ defineExpose({ scrollIntoView })
         <!-- 还没开始解析：说明这块地方将来会出现什么 -->
         <div
           v-else
-          class="flex h-full items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 px-6 text-center"
+          class="flex h-full flex-col items-center justify-center rounded-xl border border-transparent bg-white px-6 text-center"
         >
-          <p class="text-sm leading-relaxed text-slate-400">
-            解析完成后，这里会画出这段代码的知识框架图<br />
-            <span class="text-[13px]">
-              节点分三类：
-              <span class="text-emerald-600">代码</span>、 <span class="text-blue-600">技术</span>、
-              <span class="text-amber-600">概念</span>
-            </span>
+          <span
+            class="grid h-16 w-16 place-items-center rounded-2xl bg-emerald-50 text-emerald-600"
+            aria-hidden="true"
+          >
+            <AppIcon name="graph" class="h-7 w-7" />
+          </span>
+          <p class="mt-4 text-lg font-semibold text-slate-800">知识框架图会显示在这里</p>
+          <p class="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
+            解析完成后，麦穗会根据代码内容整理相关知识点，并展示它们之间的联系。
           </p>
+          <div class="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs">
+            <span class="rounded-full bg-emerald-50 px-3 py-1 font-medium text-emerald-700"
+              >代码</span
+            >
+            <span class="text-slate-300">↔</span>
+            <span class="rounded-full bg-blue-50 px-3 py-1 font-medium text-blue-700">技术</span>
+            <span class="text-slate-300">↔</span>
+            <span class="rounded-full bg-amber-50 px-3 py-1 font-medium text-amber-700">概念</span>
+          </div>
         </div>
       </div>
     </div>

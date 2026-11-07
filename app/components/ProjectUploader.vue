@@ -205,9 +205,12 @@ function emitFiles(raw: { path: string; file: File }[]) {
 </script>
 
 <template>
-  <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10" :aria-busy="isBusy">
+  <section
+    class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
+    :aria-busy="isBusy"
+  >
     <div
-      class="flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-12 text-center transition"
+      class="flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition sm:py-12"
       :class="dragging ? 'border-emerald-400 bg-emerald-50/60' : 'border-slate-200 bg-slate-50/60'"
       @dragover.prevent="dragging = true"
       @dragleave.prevent="dragging = false"
@@ -221,50 +224,37 @@ function emitFiles(raw: { path: string; file: File }[]) {
           class="h-6 w-6 animate-spin rounded-full border-[3px] border-emerald-500 border-t-transparent"
           aria-hidden="true"
         />
-        <svg
-          v-else
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.6"
-          class="h-6 w-6"
-        >
-          <path
-            d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2h9A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-10Z"
-          />
-          <path d="M12 11v5M9.5 13.5 12 11l2.5 2.5" />
-        </svg>
+        <AppIcon v-else name="upload" class="h-6 w-6" />
       </div>
 
       <p class="text-base font-semibold text-slate-800" role="status" aria-live="polite">
-        {{ isBusy ? '正在读取文件夹…' : '把整个项目文件夹拖到这里' }}
+        {{ isBusy ? '正在读取文件夹…' : '将项目文件夹拖到这里' }}
       </p>
 
-      <p v-if="isBusy" class="mt-1.5 text-sm text-slate-500">
-        <template v-if="picked">
-          {{ picked.count }} 个文件 · 约 {{ formatSize(picked.size) }}
-        </template>
-        <template v-else>文件多的时候会慢一点，请稍等</template>
-        <span class="mt-1 block text-xs text-slate-400">文件不会离开你的电脑</span>
-      </p>
+      <template v-if="isBusy">
+        <p class="mt-1.5 text-sm text-slate-500">
+          <template v-if="picked">
+            {{ picked.count }} 个文件 · 约 {{ formatSize(picked.size) }}
+          </template>
+          <template v-else>文件多的时候会慢一点，请稍等</template>
+        </p>
+        <p class="mt-1 text-xs text-slate-400">文件只在浏览器里读取</p>
+      </template>
 
-      <p v-else class="mt-1.5 text-sm text-slate-500">
-        或者
+      <template v-else>
+        <p class="mt-1.5 text-sm text-slate-500">也可以点击下方按钮选择本地文件夹</p>
         <button
           type="button"
-          class="font-medium text-emerald-600 underline-offset-2 hover:underline"
+          class="mt-4 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-500"
           @click="pick"
         >
-          选择一个文件夹
+          选择文件夹
         </button>
-      </p>
-
-      <p class="mt-5 max-w-md text-xs leading-relaxed text-slate-400">
-        依赖（node_modules / target / .idea 等）只登记位置，不会上传给模型。<br />
-        用户相关文件选中总量上限 1.9 MB（依赖 / 产物不计入），整个文件夹上限
-        {{ formatSize(PROJECT_LIMITS.maxTotal) }}。<br />
-        zip 压缩包在后续版本支持。
-      </p>
+        <p class="mt-3 text-xs text-slate-400">
+          支持的项目目录原始大小不超过 {{ formatSize(PROJECT_LIMITS.maxTotal) }}，文件数不超过
+          {{ PROJECT_LIMITS.maxFiles.toLocaleString() }}
+        </p>
+      </template>
 
       <input
         ref="inputRef"
@@ -274,6 +264,33 @@ function emitFiles(raw: { path: string; file: File }[]) {
         class="hidden"
         @change="onInputChange"
       />
+    </div>
+
+    <p class="mt-4 text-xs leading-relaxed text-slate-400">
+      依赖（node_modules / target / .idea 等）只登记位置，不会上传给模型。用户相关文件选中总量上限
+      1.9 MB（依赖 / 产物不计入）。zip 压缩包在后续版本支持。
+    </p>
+
+    <div class="mt-6 border-t border-slate-100 pt-5">
+      <h3 class="text-sm font-semibold text-slate-800">麦穗将为你完成</h3>
+      <ul class="mt-3 grid gap-2 text-sm text-slate-500 sm:grid-cols-2">
+        <li class="flex items-center gap-2">
+          <AppIcon name="project" class="h-4 w-4 shrink-0 text-emerald-600" />
+          识别项目目录与配置线索
+        </li>
+        <li class="flex items-center gap-2">
+          <AppIcon name="code" class="h-4 w-4 shrink-0 text-emerald-600" />
+          筛选文件并逐个理解源码
+        </li>
+        <li class="flex items-center gap-2">
+          <AppIcon name="book" class="h-4 w-4 shrink-0 text-emerald-600" />
+          生成项目整体说明
+        </li>
+        <li class="flex items-center gap-2">
+          <AppIcon name="graph" class="h-4 w-4 shrink-0 text-emerald-600" />
+          构建可交互的项目关系图
+        </li>
+      </ul>
     </div>
   </section>
 </template>
