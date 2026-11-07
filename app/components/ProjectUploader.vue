@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { formatSize, normalizePath, PROJECT_LIMITS, stripCommonRoot } from '~/utils/project-files'
+import { isZipFile, unzipFile, ZipError, ZIP_LIMITS } from '~/utils/zip'
 
 /**
  * 项目入口的上传区（第一里程碑只做文件夹，zip 在第二里程碑）。
@@ -27,8 +28,12 @@ const emit = defineEmits<{
 }>()
 
 const inputRef = ref<HTMLInputElement | null>(null)
+const zipInputRef = ref<HTMLInputElement | null>(null)
 const dragging = ref(false)
 const reading = ref(false)
+
+/** 正在解压 zip 时的进度；null 表示不是解压阶段 */
+const unzipProgress = ref<{ done: number; total: number } | null>(null)
 
 /** 已经拿到的文件数与总大小；拿不到时显示一句“请稍等” */
 const picked = ref<{ count: number; size: number } | null>(null)
@@ -51,6 +56,10 @@ function nextPaint(): Promise<void> {
 
 function pick() {
   inputRef.value?.click()
+}
+
+function pickZip() {
+  zipInputRef.value?.click()
 }
 
 function readEntry(entry: FileSystemEntry): Promise<{ path: string; file: File }[]> {
@@ -90,6 +99,13 @@ function readEntry(entry: FileSystemEntry): Promise<{ path: string; file: File }
 async function onDrop(e: DragEvent) {
   dragging.value = false
   if (isBusy.value) return
+
+  // 拖进来的如果是一个 zip，走解压；否则按文件夹读取
+  const dropped = e.dataTransfer?.files
+  if (dropped && dropped.length === 1 && isZipFile(dropped[0]!.name, dropped[0]!.type)) {
+    await readZip(dropped[0]!)
+    return
+  }
 
   reading.value = true
   picked.value = null
@@ -142,6 +158,49 @@ async function onDrop(e: DragEvent) {
   }
 }
 
+/** 解压并走和文件夹相同的出口；解压失败时错误文案由 zip.ts 给 */
+async function readZip(file: File) {
+  reading.value = true
+  picked.value = null
+  unzipProgress.value = { done: 0, total: 0 }
+
+  try {
+    const files = await unzipFile(file, {
+      onProgress: (done, total) => {
+        unzipProgress.value = { done, total }
+      },
+    })
+
+    picked.value = {
+      count: files.length,
+      size: files.reduce((sum, item) => sum + item.file.size, 0),
+    }
+    // 先让「解压了 N 个文件」这一帧画出来，再做同步建树
+    await nextTick()
+    await nextPaint()
+    emitFiles(files, file.name.replace(/\.zip$/i, ''))
+  } catch (err) {
+    emit(
+      'error',
+      err instanceof ZipError
+        ? err.message
+        : `解压失败：${err instanceof Error ? err.message : String(err)}`,
+    )
+  } finally {
+    reading.value = false
+    unzipProgress.value = null
+  }
+}
+
+async function onZipChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+
+  await readZip(file)
+  // 允许再次选择同一个压缩包
+  ;(e.target as HTMLInputElement).value = ''
+}
+
 async function onInputChange(e: Event) {
   const list = (e.target as HTMLInputElement).files
   if (!list || list.length === 0) return
@@ -169,7 +228,7 @@ async function onInputChange(e: Event) {
   ;(e.target as HTMLInputElement).value = ''
 }
 
-function emitFiles(raw: { path: string; file: File }[]) {
+function emitFiles(raw: { path: string; file: File }[], preferredRoot = '') {
   const normalized = raw.map((item) => ({ path: normalizePath(item.path), file: item.file }))
 
   if (normalized.length === 0) {
@@ -177,10 +236,11 @@ function emitFiles(raw: { path: string; file: File }[]) {
     return
   }
 
-  // 第一版只做文件夹；拖进来一个压缩包时明确说清楚，别让它变成「未命名项目」
+  // 走到这里说明拿到的是文件夹内容。文件夹里只放了一个压缩包时不解开，
+  // 明确说清楚要单独选它，别让它变成一个「未命名项目」。
   const archive = /\.(zip|rar|7z|tar|tgz|gz)$/i
   if (normalized.length === 1 && archive.test(normalized[0]!.path)) {
-    emit('error', '第一版只支持拖入文件夹；zip 压缩包在后续版本支持。')
+    emit('error', '文件夹里的压缩包不会自动解开。请单独拖入这个 zip，或点「选择压缩包」。')
     return
   }
   if (normalized.length > PROJECT_LIMITS.maxFiles) {
@@ -200,7 +260,8 @@ function emitFiles(raw: { path: string; file: File }[]) {
   const stripped = stripCommonRoot(normalized.map((item) => item.path))
   const files = normalized.map((item, i) => ({ path: stripped.paths[i]!, file: item.file }))
 
-  emit('select', { root: stripped.root, files })
+  // 文件夹有共同根目录时用它当项目名；zip 如果直接把文件放根上，用压缩包名兜底
+  emit('select', { root: stripped.root || preferredRoot, files })
 }
 </script>
 
@@ -228,12 +289,21 @@ function emitFiles(raw: { path: string; file: File }[]) {
       </div>
 
       <p class="text-base font-semibold text-slate-800" role="status" aria-live="polite">
-        {{ isBusy ? '正在读取文件夹…' : '将项目文件夹拖到这里' }}
+        {{
+          isBusy
+            ? unzipProgress
+              ? '正在解压压缩包…'
+              : '正在读取文件夹…'
+            : '将项目文件夹或 zip 拖到这里'
+        }}
       </p>
 
       <template v-if="isBusy">
         <p class="mt-1.5 text-sm text-slate-500">
-          <template v-if="picked">
+          <template v-if="unzipProgress && unzipProgress.total > 0">
+            已解压 {{ unzipProgress.done }} / {{ unzipProgress.total }} 个文件
+          </template>
+          <template v-else-if="picked">
             {{ picked.count }} 个文件 · 约 {{ formatSize(picked.size) }}
           </template>
           <template v-else>文件多的时候会慢一点，请稍等</template>
@@ -242,16 +312,27 @@ function emitFiles(raw: { path: string; file: File }[]) {
       </template>
 
       <template v-else>
-        <p class="mt-1.5 text-sm text-slate-500">也可以点击下方按钮选择本地文件夹</p>
-        <button
-          type="button"
-          class="mt-4 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-500"
-          @click="pick"
-        >
-          选择文件夹
-        </button>
+        <p class="mt-1.5 text-sm text-slate-500">也可以选择本地文件夹，或一个 zip 压缩包</p>
+        <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            class="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-500"
+            @click="pick"
+          >
+            选择文件夹
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-emerald-200 bg-white px-5 py-2.5 text-sm font-medium text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-50"
+            @click="pickZip"
+          >
+            选择压缩包
+          </button>
+        </div>
         <p class="mt-3 text-xs text-slate-400">
-          支持的项目目录原始大小不超过 {{ formatSize(PROJECT_LIMITS.maxTotal) }}，文件数不超过
+          文件夹原始大小不超过 {{ formatSize(PROJECT_LIMITS.maxTotal) }}；zip 不超过
+          {{ formatSize(ZIP_LIMITS.maxCompressed) }}、解压后不超过
+          {{ formatSize(ZIP_LIMITS.maxUncompressed) }}；文件数不超过
           {{ PROJECT_LIMITS.maxFiles.toLocaleString() }}
         </p>
       </template>
@@ -264,11 +345,18 @@ function emitFiles(raw: { path: string; file: File }[]) {
         class="hidden"
         @change="onInputChange"
       />
+      <input
+        ref="zipInputRef"
+        type="file"
+        accept=".zip,application/zip,application/x-zip-compressed"
+        class="hidden"
+        @change="onZipChange"
+      />
     </div>
 
     <p class="mt-4 text-xs leading-relaxed text-slate-400">
       依赖（node_modules / target / .idea 等）只登记位置，不会上传给模型。用户相关文件选中总量上限
-      1.9 MB（依赖 / 产物不计入）。zip 压缩包在后续版本支持。
+      1.9 MB（依赖 / 产物不计入）。zip 在浏览器里解压，同样不上传；加密压缩包和 ZIP64 暂不支持。
     </p>
 
     <div class="mt-7 pt-5">

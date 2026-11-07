@@ -92,6 +92,44 @@ const SAMPLES: { label: string; code: string }[] = [
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const mirrorRef = ref<HTMLElement | null>(null)
 
+/**
+ * 代码截图上传（M9）。
+ *
+ * 识别结果只放进输入框，不自动开始解析：用户要先看一眼识别得对不对。
+ * 输入框里已经有代码时直接拒绝，避免把用户手写的内容悄悄覆盖掉。
+ */
+const { reading: imageReading, error: imageError, extract } = useImageCode()
+const imageInputRef = ref<HTMLInputElement | null>(null)
+const imageHint = ref('')
+
+function pickImage() {
+  if (props.loading || imageReading.value) return
+
+  if (props.modelValue.trim()) {
+    imageHint.value = ''
+    imageError.value = '输入框里已经有代码了。先清空，再上传截图，避免覆盖。'
+    return
+  }
+
+  imageInputRef.value?.click()
+}
+
+async function onImageChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  imageHint.value = ''
+  const code = await extract(file)
+  if (code) {
+    emit('update:modelValue', code)
+    imageHint.value = `已从截图识别 ${code.split('\n').length} 行，检查无误后再点开始解析`
+  }
+
+  // 允许再次选择同一张图
+  input.value = ''
+}
+
 /** 外部传进来的值是只读 prop，要改必须显式往上抛事件 */
 const text = computed({
   get: () => props.modelValue,
@@ -155,6 +193,17 @@ onBeforeUnmount(() => {
 watch(
   () => props.modelValue,
   () => nextTick(measureScrollbar),
+)
+
+// 清空输入后，上一次的截图提示也该跟着消失
+watch(
+  () => props.modelValue,
+  (value) => {
+    if (!value.trim() && !imageReading.value) {
+      imageError.value = ''
+      imageHint.value = ''
+    }
+  },
 )
 </script>
 
@@ -221,6 +270,34 @@ watch(
         {{ s.label }}
       </button>
     </div>
+
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+        :disabled="loading || imageReading"
+        @click="pickImage"
+      >
+        <AppIcon v-if="!imageReading" name="upload" class="h-3.5 w-3.5" />
+        <span
+          v-else
+          class="h-3 w-3 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent"
+          aria-hidden="true"
+        />
+        {{ imageReading ? '正在识别截图…' : '上传代码截图' }}
+      </button>
+      <span class="text-[11px] text-slate-400">PNG / JPG / WebP，5 MB 以内</span>
+    </div>
+    <p v-if="imageError" class="mt-1.5 text-xs text-rose-600" role="alert">{{ imageError }}</p>
+    <p v-else-if="imageHint" class="mt-1.5 text-xs text-emerald-700">{{ imageHint }}</p>
+
+    <input
+      ref="imageInputRef"
+      type="file"
+      accept="image/png,image/jpeg,image/webp"
+      class="hidden"
+      @change="onImageChange"
+    />
 
     <div class="mt-3 flex items-center justify-between gap-2">
       <span

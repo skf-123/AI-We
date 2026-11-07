@@ -48,6 +48,12 @@ export default defineNuxtConfig({
     llmBaseUrl: 'https://api.deepseek.com',
     llmModel: 'deepseek-chat',
 
+    // ---------- 截图识别：只给 /api/ocr 用 ----------
+    // 环境变量：NUXT_LLM_VISION_MODEL
+    // 官方功能表里 deepseek-flash 支持图像理解；2026-11-07 实测两种模型名都能读图，
+    // 这里单独留一个开关，将来换视觉模型不用动主链路。key 和 baseURL 与生成共用。
+    llmVisionModel: 'deepseek-flash',
+
     // ---------- Embedding：负责把文字变成向量，供知识库检索 ----------
     // 环境变量：NUXT_EMBEDDING_API_KEY / _BASE_URL / _MODEL / _DIMENSIONS
     //
