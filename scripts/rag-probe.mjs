@@ -658,6 +658,240 @@ public void writeAudit(String action) {
   repository.save(action);
 }`,
   },
+  {
+    label: 'React Hooks 规则',
+    expect: ['react-hooks-rules'],
+    code: `function useCounter() {
+  const [count, setCount] = useState(0);
+  const doubled = useMemo(() => count * 2, [count]);
+  return { count, setCount, doubled };
+}`,
+  },
+  {
+    label: 'React memo 与 callback',
+    expect: ['react-usememo-usecallback'],
+    code: `const sorted = useMemo(() => items.slice().sort(), [items]);
+const onSave = useCallback(() => save(id), [id]);`,
+  },
+  {
+    label: 'React Context',
+    expect: ['react-usecontext'],
+    code: `const theme = useContext(ThemeContext);
+return <div className={theme}>{children}</div>;`,
+  },
+  {
+    label: 'React useReducer',
+    expect: ['react-usereducer'],
+    code: `const [state, dispatch] = useReducer(reducer, initialState);
+dispatch({ type: 'add', payload: 1 });`,
+  },
+  {
+    label: 'React 状态批处理',
+    expect: ['react-state-batching'],
+    code: `setCount((c) => c + 1);
+setCount((c) => c + 1);
+setTimeout(() => setCount(0), 0);`,
+  },
+  {
+    label: 'React 错误边界',
+    expect: ['react-error-boundary'],
+    code: `class Boundary extends React.Component {
+  componentDidCatch(error, info) { this.setState({ error }); }
+  render() { return this.state.error ? <p>出错了</p> : this.props.children; }
+}`,
+  },
+  {
+    label: 'React ref 与 forwardRef',
+    expect: ['react-ref-forwardref'],
+    code: `const inputRef = useRef(null);
+useEffect(() => { inputRef.current?.focus(); }, []);
+return <input ref={inputRef} />;`,
+  },
+  {
+    label: 'React StrictMode',
+    expect: ['react-strictmode'],
+    code: `createRoot(el).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+);`,
+  },
+  {
+    label: 'Vue 生命周期',
+    expect: ['vue-lifecycle'],
+    code: `onMounted(() => { window.addEventListener('resize', onResize); });
+onUnmounted(() => { window.removeEventListener('resize', onResize); });`,
+  },
+  {
+    label: 'Vue props 与 emits',
+    expect: ['vue-props-emits'],
+    code: `const props = defineProps({ title: String });
+const emit = defineEmits(['update']);
+const save = () => emit('update', props.title);`,
+  },
+  {
+    label: 'Vue provide 与 inject',
+    expect: ['vue-provide-inject'],
+    code: `provide('theme', ref('dark'));
+const theme = inject('theme', ref('light'));`,
+  },
+  {
+    label: 'Vue 插槽',
+    expect: ['vue-slots'],
+    code: `<slot name="header" :item="item" />
+<template #header="{ item }"><h3>{{ item.title }}</h3></template>`,
+  },
+  {
+    label: 'Vue keep-alive',
+    expect: ['vue-dynamic-keepalive'],
+    code: `<KeepAlive include="HomeView">
+  <component :is="currentView" />
+</KeepAlive>`,
+  },
+  {
+    label: 'Vue nextTick',
+    expect: ['vue-nexttick'],
+    code: `await nextTick();
+inputRef.value?.focus();`,
+  },
+  {
+    label: 'Vue 模板编译',
+    expect: ['vue-template-compile'],
+    code: `import { h } from 'vue';
+return h('div', { class: 'card' }, props.title);`,
+  },
+  {
+    label: 'Vue Pinia',
+    expect: ['vue-pinia'],
+    code: `const store = useUserStore();
+const { name } = storeToRefs(store);
+store.login();`,
+  },
+  {
+    label: 'JS 事件循环',
+    expect: ['js-event-loop'],
+    code: `console.log('a');
+setTimeout(() => console.log('b'));
+Promise.resolve().then(() => console.log('c'));`,
+  },
+  {
+    label: 'JS this 指向',
+    expect: ['js-this'],
+    code: `const obj = { name: 'a', hi() { return this.name; } };
+const fn = obj.hi;
+console.log(fn.call(obj));`,
+  },
+  {
+    label: 'JS 原型链',
+    expect: ['js-prototype-chain'],
+    code: `function User(name) { this.name = name; }
+User.prototype.hi = function () { return this.name; };
+const u = new User('a');
+console.log(u instanceof User);`,
+  },
+  {
+    label: 'JS Promise 组合器',
+    expect: ['js-promise-combinators'],
+    code: `const results = await Promise.allSettled([loadA(), loadB()]);
+const first = await Promise.race([loadA(), loadB()]);`,
+  },
+  {
+    label: 'JS ESM 与 CJS',
+    expect: ['js-esm-cjs'],
+    code: `import { readFile } from 'node:fs/promises';
+const config = require('./config.json');`,
+  },
+  {
+    label: 'JS structuredClone',
+    expect: ['js-structuredclone'],
+    code: `const copy = structuredClone(state);
+copy.items.push({ id: 1 });`,
+  },
+  {
+    label: 'CSS 层叠上下文',
+    expect: ['css-stacking-context'],
+    code: `.modal { position: fixed; z-index: 999; }
+.parent { transform: translateZ(0); }`,
+  },
+  {
+    label: 'CSS BFC',
+    expect: ['css-bfc'],
+    code: `.wrap { display: flow-root; }
+.float { float: left; width: 120px; }`,
+  },
+  {
+    label: 'CSS 外边距合并',
+    expect: ['css-margin-collapse'],
+    code: `.a { margin-bottom: 20px; }
+.b { margin-top: 10px; }`,
+  },
+  {
+    label: 'CSS 响应式单位',
+    expect: ['css-responsive-units'],
+    code: `.card { font-size: 1rem; padding: 1.5rem; width: min(90vw, 60ch); }`,
+  },
+  {
+    label: 'CSS 变量',
+    expect: ['css-variables'],
+    code: `:root { --brand: #10b981; }
+.btn { color: var(--brand); }`,
+  },
+  {
+    label: 'CSS 过渡与动画',
+    expect: ['css-transition-animation'],
+    code: `.btn { transition: transform 0.2s ease; }
+@keyframes fade { from { opacity: 0; } }`,
+  },
+  {
+    label: 'SQL 最左前缀',
+    expect: ['sql-leftmost-prefix'],
+    code: `SELECT id, status FROM orders WHERE shop_id = 1 AND created_at > '2026-01-01';`,
+  },
+  {
+    label: 'SQL 覆盖索引',
+    expect: ['sql-covering-index'],
+    code: `SELECT id, status FROM orders WHERE user_id = 7;`,
+  },
+  {
+    label: 'SQL EXPLAIN',
+    expect: ['sql-explain'],
+    code: `EXPLAIN SELECT * FROM orders WHERE status = 'paid';`,
+  },
+  {
+    label: 'SQL COUNT',
+    expect: ['sql-count'],
+    code: `SELECT count(*) FROM orders WHERE status = 'paid';`,
+  },
+  {
+    label: 'SQL 隔离级别',
+    expect: ['sql-isolation'],
+    code: `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+SELECT * FROM orders WHERE id = 1;`,
+  },
+  {
+    label: 'SQL 行锁',
+    expect: ['sql-locks'],
+    code: `SELECT * FROM accounts WHERE id = 1 FOR UPDATE;`,
+  },
+  {
+    label: 'SQL JOIN 顺序',
+    expect: ['sql-join-order'],
+    code: `SELECT * FROM orders o JOIN users u ON u.id = o.user_id WHERE u.city = 'beijing';`,
+  },
+  {
+    label: 'SQL 深分页',
+    expect: ['sql-deep-pagination'],
+    code: `SELECT * FROM orders ORDER BY id LIMIT 100000, 20;`,
+  },
+  {
+    label: 'Java record',
+    expect: ['java-record'],
+    code: `public record User(long id, String name) {
+  public User {
+    if (id <= 0) throw new IllegalArgumentException("id");
+  }
+}`,
+  },
 ]
 
 const SHOULD_MISS = [

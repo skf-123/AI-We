@@ -814,6 +814,7 @@
     "lang": "typescript",
     "tags": ["typescript", "overload", "function"],
     "title": "函数重载",
+    "snippet": "function create(tag: 'a'): HTMLAnchorElement;\nfunction create(tag: 'div'): HTMLDivElement;\nfunction create(tag: string) {\n  return document.createElement(tag);\n}",
     "content": "函数重载先写多个只含签名的重载声明，再写一个实现签名。调用时只能匹配前面的重载，实现签名对外不可见；实现内部要自己判断参数并分派。重载适合参数个数或类型组合有限的函数，例如 createElement 按标签名返回不同元素类型。参数组合太多时，用联合类型加泛型条件类型往往比重载更好维护。",
     "source": {
       "label": "TypeScript 手册 · 函数重载",
@@ -913,6 +914,7 @@
     "lang": "java",
     "tags": ["java", "spring", "autowired", "dependency-injection"],
     "title": "@Autowired 注入方式",
+    "snippet": "public class OrderService {\n  private final OrderRepository repository;\n  public OrderService(OrderRepository repository) {\n    this.repository = repository;\n  }\n}",
     "content": "@Autowired 默认按类型注入，找到多个候选时再按字段名匹配，可以用 @Qualifier 指定。字段注入写法短，但隐藏依赖、难做单元测试；构造器注入能保证依赖不为空、字段可以声明 final，Spring 4.3 起单构造器可以省略注解。循环依赖在构造器注入下会直接暴露，这也是推荐它的原因之一。",
     "source": {
       "label": "Spring 参考文档 · @Autowired",
@@ -1116,6 +1118,416 @@
     "source": {
       "label": "Spring 参考文档 · 事务传播",
       "url": "https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html"
+    }
+  },
+  {
+    "id": "react-hooks-rules",
+    "lang": "react",
+    "tags": ["react", "hooks", "rules"],
+    "title": "Hooks 的调用规则",
+        "content": "Hooks 只能在组件或自定义 Hook 的顶层调用，不能放进条件、循环、嵌套函数或事件回调；每次渲染的调用顺序必须完全一致，React 靠这个顺序把状态和 Hook 对上。自定义 Hook 要以 use 开头，内部才能调用其他 Hook。eslint-plugin-react-hooks 能在开发时抓出大部分违规，别等运行时状态串位。",
+    "source": {
+      "label": "React 文档 · Hooks 规则",
+      "url": "https://react.dev/reference/rules/rules-of-hooks"
+    }
+  },
+  {
+    "id": "react-usememo-usecallback",
+    "lang": "react",
+    "tags": ["react", "usememo", "usecallback", "performance"],
+    "title": "useMemo 与 useCallback",
+    "content": "useMemo 缓存计算结果，useCallback 缓存函数引用，二者都靠依赖数组决定何时重算。它们解决的是「引用变化导致子组件重渲染」或「计算确实昂贵」，不是所有值都该包一层。依赖数组漏项会读到旧值，多了又失去缓存意义。先测量再优化，不要把 memo 当默认写法。",
+    "source": {
+      "label": "React 文档 · useMemo",
+      "url": "https://react.dev/reference/react/useMemo"
+    }
+  },
+  {
+    "id": "react-usecontext",
+    "lang": "react",
+    "tags": ["react", "context", "usecontext"],
+    "title": "useContext 跨层传值",
+    "content": "Context 让祖先直接向任意深度的后代传值，省掉逐层 props。用 createContext 建上下文，Provider 的 value 变化会让所有消费者重渲染，所以别把整个对象每次新建；可以拆成多个 Context 或配合 memo。没有 Provider 时消费者拿到的是 createContext 的默认值，不是 undefined。",
+    "source": {
+      "label": "React 文档 · useContext",
+      "url": "https://react.dev/reference/react/useContext"
+    }
+  },
+  {
+    "id": "react-usereducer",
+    "lang": "react",
+    "tags": ["react", "usereducer", "state"],
+    "title": "useReducer 管理复杂状态",
+    "content": "状态字段多、更新逻辑互相牵制时，用 useReducer 把更新收进一个纯函数 reducer：组件只 dispatch action，reducer 根据旧状态和 action 返回新状态。它适合「下一个状态依赖前一个」和多种动作共享逻辑的场景。reducer 必须保持纯，不能在里面发请求或改外部变量。",
+    "source": {
+      "label": "React 文档 · useReducer",
+      "url": "https://react.dev/reference/react/useReducer"
+    }
+  },
+  {
+    "id": "react-state-batching",
+    "lang": "react",
+    "tags": ["react", "state", "batching", "setstate"],
+    "title": "状态更新批处理",
+    "content": "React 18 起自动批处理：事件处理、Promise 回调、setTimeout 里连续多次 setState 会合并成一次渲染，不是每次都重画。连续更新依赖旧值时要用函数式写法 setCount((c) => c + 1)，否则同一轮里的几次更新会互相覆盖。需要等 DOM 更新完再做副作用时，用 useEffect 而不是在 setState 后面直接读 DOM。",
+    "source": {
+      "label": "React 文档 · 状态更新队列",
+      "url": "https://react.dev/learn/queueing-a-series-of-state-updates"
+    }
+  },
+  {
+    "id": "react-error-boundary",
+    "lang": "react",
+    "tags": ["react", "error-boundary", "exception"],
+    "title": "错误边界",
+    "content": "错误边界是 class 组件，实现 getDerivedStateFromError 或 componentDidCatch，用来捕获子树渲染、生命周期和构造函数里的错误，渲染降级 UI。它不捕获事件处理、异步回调、服务端渲染和它自身的错误。函数组件没有等价的 Hook，只能自己写 class 或引入现成组件。",
+    "source": {
+      "label": "React 文档 · 错误边界",
+      "url": "https://react.dev/reference/react/Component"
+    }
+  },
+  {
+    "id": "react-ref-forwardref",
+    "lang": "react",
+    "tags": ["react", "ref", "useref", "forwardref"],
+    "title": "ref 与 forwardRef",
+    "content": "ref 有两个用途：拿到 DOM 节点，或保存一个不触发渲染的值。useRef 返回同一个对象，改 current 不会重渲染，适合存定时器 id、上一次的值。React 19 起 ref 可以直接作为 prop 传给函数组件，forwardRef 仍然可用但不再是必需写法；拿 DOM 时仍要在 Effect 或事件里访问。",
+    "source": {
+      "label": "React 文档 · forwardRef",
+      "url": "https://react.dev/reference/react/forwardRef"
+    }
+  },
+  {
+    "id": "react-strictmode",
+    "lang": "react",
+    "tags": ["react", "strictmode", "effect"],
+    "title": "StrictMode 的双调用",
+    "content": "开发环境里 StrictMode 会故意把渲染调用两次，并把 Effect 挂载、卸载、再挂载一次，用来暴露没清理干净的副作用；生产构建不会这样。看到请求发两次、定时器叠加，先检查 Effect 的清理函数，而不是用 ref 标记绕过。这个机制就是为了让问题在开发时出现。",
+    "source": {
+      "label": "React 文档 · StrictMode",
+      "url": "https://react.dev/reference/react/StrictMode"
+    }
+  },
+  {
+    "id": "vue-lifecycle",
+    "lang": "vue",
+    "tags": ["vue", "lifecycle", "onmounted"],
+    "title": "Vue 生命周期",
+    "content": "组合式 API 的顺序是 setup、onBeforeMount、onMounted、onBeforeUpdate、onUpdated、onBeforeUnmount、onUnmounted。访问 DOM 要放在 onMounted 之后；定时器、事件监听和订阅要在 onUnmounted 里清理。服务端渲染时没有 onMounted，依赖 DOM 的逻辑要判断运行环境。",
+    "source": {
+      "label": "Vue 文档 · 生命周期",
+      "url": "https://vuejs.org/guide/essentials/lifecycle.html"
+    }
+  },
+  {
+    "id": "vue-props-emits",
+    "lang": "vue",
+    "tags": ["vue", "props", "emits"],
+    "title": "props 与 emits",
+    "content": "props 单向向下传值，子组件不能直接改，否则父组件的数据来源就乱了。子组件要改数据时用 emit 发事件，父组件在监听里更新自己的状态。props 是只读的响应式对象，可以读取和计算，但不要解构后当普通变量用，也不要在子组件里改 props 的属性。",
+    "source": {
+      "label": "Vue 文档 · Props",
+      "url": "https://vuejs.org/guide/components/props.html"
+    }
+  },
+  {
+    "id": "vue-provide-inject",
+    "lang": "vue",
+    "tags": ["vue", "provide", "inject"],
+    "title": "provide 与 inject",
+    "content": "provide / inject 用于跨多层传依赖，祖先在 setup 里 provide，任意后代 inject，不用逐层写 props。注入普通值不会自动响应，要传 ref 或 reactive 才跟着变；可以给注入项一个默认值，也可以用 readonly 包一层，避免后代直接改祖先状态。",
+    "source": {
+      "label": "Vue 文档 · 依赖注入",
+      "url": "https://vuejs.org/guide/components/provide-inject.html"
+    }
+  },
+  {
+    "id": "vue-slots",
+    "lang": "vue",
+    "tags": ["vue", "slot", "component"],
+    "title": "插槽（slot）",
+    "content": "插槽让父组件把内容交给子组件决定放在哪。默认插槽写 slot，具名插槽用 name，作用域插槽把子组件的数据通过 slot props 传给父组件，父组件用 v-slot:name 或简写 #name 接收。插槽内容在父组件作用域里编译，不是子组件的数据。",
+    "source": {
+      "label": "Vue 文档 · 插槽",
+      "url": "https://vuejs.org/guide/components/slots.html"
+    }
+  },
+  {
+    "id": "vue-dynamic-keepalive",
+    "lang": "vue",
+    "tags": ["vue", "keep-alive", "component"],
+    "title": "动态组件与 keep-alive",
+    "content": "component 的 is 可以按变量切换组件。外层套 keep-alive 会缓存实例，切回来时保留状态、不重新创建，还会触发 activated 和 deactivated；不缓存时每次切换都重新挂载。include 和 exclude 按组件名控制缓存范围，缓存太多会占内存，列表页要设上限。",
+    "source": {
+      "label": "Vue 文档 · keep-alive",
+      "url": "https://vuejs.org/guide/built-ins/keep-alive.html"
+    }
+  },
+  {
+    "id": "vue-nexttick",
+    "lang": "vue",
+    "tags": ["vue", "nexttick", "dom"],
+    "title": "nextTick 与 DOM 更新时机",
+    "content": "修改响应式数据后，DOM 不会立刻更新，Vue 会把更新排进队列，等本轮同步代码结束后再统一渲染。要在更新后读 DOM，就 await nextTick()；想在数据变化后做副作用，优先用 watch 或 watchEffect。不要用 nextTick 代替计算属性，也不要在循环里反复等它。",
+    "source": {
+      "label": "Vue 文档 · nextTick",
+      "url": "https://vuejs.org/api/general.html#nexttick"
+    }
+  },
+  {
+    "id": "vue-template-compile",
+    "lang": "vue",
+    "tags": ["vue", "template", "compiler", "render"],
+    "title": "模板编译与渲染函数",
+    "content": "Vue 的模板先被编译成渲染函数，运行时再用虚拟 DOM 做 diff。编译阶段会做静态提升和补丁标记，把不会变的部分跳过，所以模板通常比手写渲染函数更容易优化。需要完全动态的结构时才用 h() 或 JSX；两者不要混着写，否则可读性和编译优化都会打折。",
+    "source": {
+      "label": "Vue 文档 · 渲染机制",
+      "url": "https://vuejs.org/guide/extras/rendering-mechanism.html"
+    }
+  },
+  {
+    "id": "vue-pinia",
+    "lang": "vue",
+    "tags": ["vue", "pinia", "state"],
+    "title": "Pinia 状态管理",
+    "content": "Pinia 是 Vue 官方推荐的状态管理库，用 defineStore 定义 store：state 存数据，getters 像计算属性，actions 放同步或异步逻辑。store 本身是响应式的，从 store 解构 state 会丢响应性，要用 storeToRefs；改状态直接赋值或调 action，不要在外面替换整个 store。",
+    "source": {
+      "label": "Pinia 文档 · 核心概念",
+      "url": "https://pinia.vuejs.org/core-concepts/"
+    }
+  },
+  {
+    "id": "js-event-loop",
+    "lang": "javascript",
+    "tags": ["javascript", "event-loop", "microtask", "promise"],
+    "title": "事件循环与微任务",
+    "content": "调用栈清空后，引擎先执行完所有微任务（Promise.then、queueMicrotask、MutationObserver），再取一个宏任务（setTimeout、I/O、事件回调）。所以 Promise 回调总排在同样的 setTimeout 之前，即使延时写成 0。requestAnimationFrame 在渲染前执行，适合动画，不适合放重计算。",
+    "source": {
+      "label": "MDN · 事件循环",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Event_loop"
+    }
+  },
+  {
+    "id": "js-this",
+    "lang": "javascript",
+    "tags": ["javascript", "this", "bind", "arrow-function"],
+    "title": "this 的指向",
+    "content": "this 由调用方式决定，不看定义位置：普通函数调用在严格模式下是 undefined，非严格是全局对象；作为对象方法调用指向该对象；call、apply、bind 可以显式指定；箭头函数没有自己的 this，永远取外层作用域。回调里丢 this 时，先看是不是把方法单独传了出去。",
+    "source": {
+      "label": "MDN · this",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/this"
+    }
+  },
+  {
+    "id": "js-prototype-chain",
+    "lang": "javascript",
+    "tags": ["javascript", "prototype", "inheritance"],
+    "title": "原型链",
+    "content": "每个对象有一个内部原型，读取属性时先找自身，再沿原型链向上找，直到 null。构造函数的 prototype 会成为实例的原型，class 只是这套机制的语法糖。instanceof 沿原型链判断，Object.create(null) 创建的对象没有原型，不适合直接当普通对象用。",
+    "source": {
+      "label": "MDN · 原型链",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Inheritance_and_the_prototype_chain"
+    }
+  },
+  {
+    "id": "js-promise-combinators",
+    "lang": "javascript",
+    "tags": ["javascript", "promise", "all", "allsettled"],
+    "title": "Promise 组合器",
+    "content": "Promise.all 等全部成功，任一失败就整体失败；Promise.allSettled 等全部结束，返回每条的成功或失败；Promise.race 取最先结束的那一个，不管成败；Promise.any 取第一个成功的，全部失败才拒绝。并发请求要按失败策略选：首页数据用 all 快速失败，批量任务用 allSettled 收全结果。",
+    "source": {
+      "label": "MDN · Promise.all",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all"
+    }
+  },
+  {
+    "id": "js-esm-cjs",
+    "lang": "javascript",
+    "tags": ["javascript", "esm", "commonjs", "module"],
+    "title": "ESM 与 CommonJS",
+    "content": "ESM 用 import / export，静态解析、支持顶层 await，导出的是活引用；CommonJS 用 require / module.exports，运行时加载，导出的是值拷贝。Node 里 package.json 的 type 决定 .js 按哪种解析；ESM 可以 import CommonJS，CommonJS 不能直接 require ESM，只能用动态 import。混用前先看清包的入口。",
+    "source": {
+      "label": "Node.js 文档 · ESM",
+      "url": "https://nodejs.org/api/esm.html"
+    }
+  },
+  {
+    "id": "js-structuredclone",
+    "lang": "javascript",
+    "tags": ["javascript", "deep-clone", "structuredclone"],
+    "title": "structuredClone 深拷贝",
+    "content": "structuredClone 能深拷贝普通对象、数组、Map、Set、Date、ArrayBuffer 等，并正确处理循环引用；不能克隆函数、DOM 节点和 Promise，自定义类的原型会丢失，结果只是普通对象。JSON.parse(JSON.stringify()) 的老办法会丢 Date、undefined、NaN 和循环引用，新代码优先用 structuredClone。",
+    "source": {
+      "label": "MDN · structuredClone",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/Window/structuredClone"
+    }
+  },
+  {
+    "id": "css-stacking-context",
+    "lang": "css",
+    "tags": ["css", "z-index", "stacking-context"],
+    "title": "层叠上下文与 z-index",
+    "content": "z-index 只在同一个层叠上下文里比较。position 非 static 且设了 z-index、opacity 小于 1、transform、filter、isolation: isolate 等都会新建上下文；子元素 z-index 再大，也出不了父上下文，只能和兄弟层比。弹窗被盖住时，先找祖先有没有新建上下文，而不是一直加 z-index。",
+    "source": {
+      "label": "MDN · 层叠上下文",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_positioned_layout/Understanding_z-index/Stacking_context"
+    }
+  },
+  {
+    "id": "css-bfc",
+    "lang": "css",
+    "tags": ["css", "bfc", "layout", "float"],
+    "title": "块级格式化上下文（BFC）",
+    "content": "BFC 是一块独立布局区域，内部的浮动不会影响外部，外部浮动也不会挤进来。overflow 非 visible、display: flow-root、float、绝对定位、flex 或 grid 的子项都会创建 BFC。常用 flow-root 包住浮动子元素、阻止外边距穿透；用 overflow: hidden 也能做到，但会顺带裁掉溢出内容。",
+    "source": {
+      "label": "MDN · 块级格式化上下文",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_display/Block_formatting_context"
+    }
+  },
+  {
+    "id": "css-margin-collapse",
+    "lang": "css",
+    "tags": ["css", "margin", "layout"],
+    "title": "外边距合并",
+    "content": "相邻块级元素的上下 margin 会合并成较大的那个；父元素和第一个子元素之间没有边框、内边距或内容时，两者的 margin 也会合并，看起来像父元素被推下去。浮动、绝对定位、flex 或 grid 子项、overflow 非 visible 不会合并。要隔开就用 padding、border 或 display: flow-root。",
+    "source": {
+      "label": "MDN · 外边距合并",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_box_model/Mastering_margin_collapsing"
+    }
+  },
+  {
+    "id": "css-responsive-units",
+    "lang": "css",
+    "tags": ["css", "units", "responsive", "rem"],
+    "title": "响应式单位",
+    "content": "px 是固定值；em 相对当前元素字号，嵌套时会层层放大；rem 相对根元素字号，改根字号就能整体缩放；vw 和 vh 相对视口，移动端地址栏收起展开会让 vh 跳动，可以用 dvh；百分比相对父元素；ch 适合限制行宽。字号用 rem，布局优先 flex 或 grid，少用写死的 px 宽度。",
+    "source": {
+      "label": "MDN · 值与单位",
+      "url": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Styling_basics/Values_and_units"
+    }
+  },
+  {
+    "id": "css-variables",
+    "lang": "css",
+    "tags": ["css", "custom-properties", "var", "theme"],
+    "title": "CSS 变量",
+    "content": "自定义属性用 --name 声明，用 var(--name, fallback) 取值；它会继承，可以在局部覆盖，适合做主题和尺寸表。变量在运行时可变，改一个值就能带动一片样式。它不能用在媒体查询条件里，声明时也不做类型检查，写错要到使用处才暴露；var 里可以再套 var，但别叠太深。",
+    "source": {
+      "label": "MDN · CSS 自定义属性",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/CSS/Using_CSS_custom_properties"
+    }
+  },
+  {
+    "id": "css-transition-animation",
+    "lang": "css",
+    "tags": ["css", "transition", "animation", "performance"],
+    "title": "transition 与 animation",
+    "content": "transition 负责两个状态之间的过渡，必须有属性变化才触发，适合悬停、展开这类交互；animation 配合 keyframes 自动播放，可以循环、反向、暂停，适合加载和入场。优先动 transform 和 opacity，它们不触发布局；动 width、height、top 会反复重排。还要尊重 prefers-reduced-motion。",
+    "source": {
+      "label": "MDN · CSS 过渡",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_transitions/Using_CSS_transitions"
+    }
+  },
+  {
+    "id": "sql-leftmost-prefix",
+    "lang": "sql",
+    "tags": ["sql", "mysql", "index", "composite-index", "leftmost-prefix"],
+    "title": "联合索引最左前缀",
+    "snippet": "-- 联合索引 (shop_id, created_at) 从最左列开始匹配\nSELECT id FROM orders WHERE shop_id = 1 AND created_at > '2026-01-01';",
+    "content": "联合索引 (a, b, c) 按 a、b、c 的顺序排序，查询条件必须从最左列开始连续使用才能走索引：a、a+b、a+b+c 可以，b 或 b+c 不行。范围查询会截断后面的列，例如 a = 1 AND b > 2 AND c = 3，c 用不上索引。order by 也遵循同样的顺序，把等值条件放前面、范围条件放后面。",
+    "source": {
+      "label": "MySQL 8.4 手册 · 多列索引",
+      "url": "https://dev.mysql.com/doc/refman/8.4/en/multiple-column-indexes.html"
+    }
+  },
+  {
+    "id": "sql-covering-index",
+    "lang": "sql",
+    "tags": ["sql", "mysql", "covering-index", "explain"],
+    "title": "覆盖索引",
+    "snippet": "-- 只取索引里已有的列，不用回表\nSELECT id, status FROM orders WHERE user_id = 7;",
+    "content": "查询需要的列全部包含在索引里时，存储引擎只读索引就能返回结果，不用回表查主键对应的行，EXPLAIN 的 Extra 会显示 Using index。它适合列表页只取少数几列的场景，能明显减少随机 IO。代价是索引变大、写入变慢；把大字段加进索引反而得不偿失。",
+    "source": {
+      "label": "MySQL 8.4 手册 · EXPLAIN Extra",
+      "url": "https://dev.mysql.com/doc/refman/8.4/en/explain-output.html#explain-extra-information"
+    }
+  },
+  {
+    "id": "sql-explain",
+    "lang": "sql",
+    "tags": ["sql", "mysql", "explain", "query-plan"],
+    "title": "EXPLAIN 执行计划",
+    "content": "EXPLAIN 展示优化器打算怎么执行查询，重点看 type（ALL 全表、index 全索引、range 范围、ref 等值、const 常量）、key（实际使用的索引）、rows（估算扫描行数）和 Extra。Using filesort 表示额外排序，Using temporary 表示用了临时表，Using index 表示覆盖索引。type 出现 ALL 且 rows 很大时，优先检查索引和条件写法。",
+    "source": {
+      "label": "MySQL 8.4 手册 · EXPLAIN",
+      "url": "https://dev.mysql.com/doc/refman/8.4/en/explain.html"
+    }
+  },
+  {
+    "id": "sql-count",
+    "lang": "sql",
+    "tags": ["sql", "mysql", "count", "null"],
+    "title": "count(*) / count(1) / count(列)",
+    "content": "count(*) 和 count(1) 统计行数，不判断列值，InnoDB 会选择较小的二级索引扫描；count(列) 只统计该列非 NULL 的行，列上有 NULL 时结果比总行数少。count(distinct 列) 还要去重，成本更高。业务上要区分总行数和有值的行数，别把 count(列) 当成 count(*) 用。",
+    "source": {
+      "label": "MySQL 8.4 手册 · 聚合函数",
+      "url": "https://dev.mysql.com/doc/refman/8.4/en/aggregate-functions.html"
+    }
+  },
+  {
+    "id": "sql-isolation",
+    "lang": "sql",
+    "tags": ["sql", "mysql", "innodb", "isolation", "mvcc"],
+    "title": "事务隔离级别",
+    "content": "SQL 标准有四个隔离级别：读未提交、读已提交、可重复读、串行化。InnoDB 默认可重复读，同一事务内多次快照读结果一致，靠 MVCC 实现；读已提交每次查询都取最新快照，常见于 Oracle 和部分互联网业务。级别越高一致性越强、并发越低。设置前先确认业务能接受脏读、不可重复读还是幻读。",
+    "source": {
+      "label": "MySQL 8.4 手册 · 事务隔离级别",
+      "url": "https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html"
+    }
+  },
+  {
+    "id": "sql-locks",
+    "lang": "sql",
+    "tags": ["sql", "mysql", "innodb", "lock", "gap-lock"],
+    "title": "InnoDB 行锁、间隙锁与临键锁",
+    "snippet": "-- 行锁：按主键更新\nSELECT * FROM accounts WHERE id = 1 FOR UPDATE;",
+    "content": "InnoDB 按索引加锁：命中唯一索引的等值查询加记录锁；范围查询在可重复读下加临键锁，也就是记录锁加间隙锁，锁住区间防止其他事务插入；没有索引的条件会退化成扫描并锁住更多记录。间隙锁主要在可重复读下使用，读已提交会关掉大部分间隙锁。更新和删除尽量走索引，缩小锁范围，减少死锁概率。",
+    "source": {
+      "label": "MySQL 8.4 手册 · InnoDB 锁",
+      "url": "https://dev.mysql.com/doc/refman/8.4/en/innodb-locking.html"
+    }
+  },
+  {
+    "id": "sql-join-order",
+    "lang": "sql",
+    "tags": ["sql", "mysql", "join", "optimizer"],
+    "title": "JOIN 执行顺序",
+    "content": "SQL 的书写顺序不等于执行顺序：先确定驱动表，再按连接条件逐行到被驱动表找匹配。MySQL 主要用嵌套循环连接，优化器根据统计信息选择驱动表和连接顺序，小结果集驱动大表通常更快。EXPLAIN 里第一行往往是驱动表；多表连接时 rows 的乘积决定成本，别凭 FROM 的先后判断谁先执行。",
+    "source": {
+      "label": "MySQL 8.4 手册 · 连接优化",
+      "url": "https://dev.mysql.com/doc/refman/8.4/en/nested-join-optimization.html"
+    }
+  },
+  {
+    "id": "sql-deep-pagination",
+    "lang": "sql",
+    "tags": ["sql", "mysql", "pagination", "limit"],
+    "title": "深分页优化",
+    "content": "LIMIT 100000, 20 会先扫描并丢弃前 10 万行，页码越大越慢。常用优化是延迟关联：先用覆盖索引查出主键，再回表取需要的列；或者记住上一页最后一条的 id，用 WHERE id > 上次最大 id ORDER BY id LIMIT 20 做游标分页。后者要求排序字段稳定且唯一，适合按时间线翻页，不适合随机跳页。",
+    "source": {
+      "label": "MySQL 8.4 手册 · LIMIT 优化",
+      "url": "https://dev.mysql.com/doc/refman/8.4/en/limit-optimization.html"
+    }
+  },
+  {
+    "id": "java-record",
+    "lang": "java",
+    "tags": ["java", "record", "immutable"],
+    "title": "record 记录类",
+    "content": "record 用来声明不可变的数据载体，编译时自动生成构造器、访问器、equals、hashCode 和 toString，适合 DTO 和值对象。它不能继承其他类，字段默认 final。需要校验时写紧凑构造器，在里面对参数检查后抛出异常；要额外字段就只能用普通类。",
+    "source": {
+      "label": "Java 21 · record 指南",
+      "url": "https://docs.oracle.com/en/java/javase/21/language/records.html"
     }
   }
 ]

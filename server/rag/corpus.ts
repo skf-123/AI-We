@@ -80,7 +80,7 @@ export function loadCorpus(dimensions: number): LoadedEntry[] {
     }
 
     // 语料内容变了但没重新生成向量 → 这条向量已经对不上当前内容，丢掉
-    const expectedHash = hashText(`${entry.title}\n${entry.content}`)
+    const expectedHash = hashText(embedTextOf(entry))
     if (item.hash !== expectedHash) {
       stale++
       continue
