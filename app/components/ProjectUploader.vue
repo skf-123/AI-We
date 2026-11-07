@@ -41,6 +41,26 @@ const picked = ref<{ count: number; size: number } | null>(null)
 const isBusy = computed(() => Boolean(props.busy) || reading.value)
 
 /**
+ * 手机浏览器不支持 webkitdirectory：点“选择文件夹”只会弹普通文件选择，
+ * 目录层级会丢。触屏且窄屏时禁用这个入口，改提示用电脑或传 zip。
+ */
+const isMobile = ref(false)
+
+function updateMobile() {
+  if (typeof window === 'undefined') return
+  isMobile.value = window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 768
+}
+
+onMounted(() => {
+  updateMobile()
+  window.addEventListener('resize', updateMobile)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateMobile)
+})
+
+/**
  * 让浏览器先画一帧，再交给父组件做同步建树。
  *
  * 只 await nextTick 不够：它只保证 DOM 更新，不保证浏览器真的画出来；
@@ -312,11 +332,17 @@ function emitFiles(raw: { path: string; file: File }[], preferredRoot = '') {
       </template>
 
       <template v-else>
-        <p class="mt-1.5 text-sm text-slate-500">也可以选择本地文件夹，或一个 zip 压缩包</p>
+        <p v-if="isMobile" class="mt-1.5 px-2 text-sm leading-relaxed text-amber-700">
+          手机上不能选择整个文件夹：浏览器不支持带目录结构的文件夹选择。请用电脑打开，或传一个 zip
+          压缩包。
+        </p>
+        <p v-else class="mt-1.5 text-sm text-slate-500">也可以选择本地文件夹，或一个 zip 压缩包</p>
         <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
           <button
             type="button"
-            class="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-500"
+            class="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-emerald-600"
+            :disabled="isMobile"
+            :title="isMobile ? '手机浏览器不支持选择整个文件夹' : ''"
             @click="pick"
           >
             选择文件夹
