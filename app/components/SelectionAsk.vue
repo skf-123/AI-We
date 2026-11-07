@@ -82,6 +82,9 @@ function updatePointer() {
 /** 预设问题。产品卖点是"零提示词"，所以不能让用户到这里卡在"我该问什么" */
 const PRESETS = ['这几行在干什么？', '为什么这么写？', '有什么风险？']
 
+/** 手指设备用右下角固定的“追问选中内容”，桌面用贴着选区的小浮标 */
+const { touchLike } = useTouchInput()
+
 const turns = ref<Turn[]>([])
 const question = ref('')
 const loading = ref(false)
@@ -503,7 +506,7 @@ watch(
   <Teleport to="body">
     <!-- 第一步：只是个小按钮。用户不理它，就当没出现过 -->
     <button
-      v-if="!open && selection && anchorRect"
+      v-if="!open && selection && anchorRect && !touchLike"
       type="button"
       class="ask-trigger"
       :style="triggerStyle"
@@ -518,9 +521,9 @@ watch(
       小屏只显示它（浮标由 CSS 隐藏），桌面仍用上面那个浮标。
     -->
     <button
-      v-if="!open && selection"
+      v-if="!open && selection && touchLike"
       type="button"
-      class="fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-50 rounded-full bg-emerald-600 px-4 py-3 text-[13.5px] font-medium whitespace-nowrap text-white shadow-lg transition active:bg-emerald-700 lg:hidden"
+      class="fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-50 rounded-full bg-emerald-600 px-4 py-3 text-[13.5px] font-medium whitespace-nowrap text-white shadow-lg transition active:bg-emerald-700"
       @click="emit('update:open', true)"
     >
       追问选中内容
@@ -724,15 +727,10 @@ watch(
 }
 
 /*
- * 手机上由页面右下角那个固定的「追问选中内容」接管。
- * 小浮标贴着选区，正好落在原生选中菜单附近：既容易被菜单压住，手指也难点准。
- * ≥1024 的触屏（平板、触屏笔记本）没有那个固定按钮，浮标继续用，并保持上面放大的尺寸。
+ * 手指设备上，小浮标由模板里的 touchLike 判断隐藏，
+ * 改由右下角固定的「追问选中内容」接管：浮标贴着选区，
+ * 正好落在原生选中菜单附近，既容易被菜单压住，手指也难点准。
  */
-@media (pointer: coarse) and (max-width: 1023px) {
-  .ask-trigger {
-    display: none;
-  }
-}
 
 .ask-bubble {
   position: fixed;

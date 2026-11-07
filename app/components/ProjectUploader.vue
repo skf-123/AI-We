@@ -42,32 +42,9 @@ const isBusy = computed(() => Boolean(props.busy) || reading.value)
 
 /**
  * 手机浏览器不支持 webkitdirectory：点“选择文件夹”只会弹普通文件选择，
- * 目录层级会丢。
- *
- * 判断的是“能不能用”，不是“是不是手机”：
- *   · 没有悬停、主输入是手指 → 手机和平板，横竖屏都算；
- *   · iPad 桌面模式会把 UA 报成 Macintosh，靠多点触控特征补一条。
- * 触屏笔记本只要有鼠标或触控板，hover 仍成立，不会被禁用。
+ * 目录层级会丢。用手指、没有悬停的设备禁用这个入口，判断逻辑在 useTouchInput。
  */
-const isMobile = ref(false)
-let coarseQuery: MediaQueryList | null = null
-
-function updateMobile() {
-  if (typeof window === 'undefined') return
-  const coarse = window.matchMedia('(hover: none) and (pointer: coarse)').matches
-  const iPadDesktop = navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)
-  isMobile.value = coarse || iPadDesktop
-}
-
-onMounted(() => {
-  updateMobile()
-  coarseQuery = window.matchMedia('(hover: none) and (pointer: coarse)')
-  coarseQuery.addEventListener('change', updateMobile)
-})
-
-onBeforeUnmount(() => {
-  coarseQuery?.removeEventListener('change', updateMobile)
-})
+const { touchLike: isMobile } = useTouchInput()
 
 /**
  * 让浏览器先画一帧，再交给父组件做同步建树。
