@@ -22,6 +22,17 @@ export function hashText(str: string): string {
   return (h >>> 0).toString(16)
 }
 
+/**
+ * 送进 embedding 的文本：标题 + 标签 + 典型代码 + 正文。
+ * ⚠️ 必须与 scripts/build-embeddings.mjs 里的同名逻辑逐字一致。
+ */
+export function embedTextOf(entry: CorpusEntry): string {
+  return `${entry.title}
+${entry.tags.join(' ')}
+${entry.snippet ?? ''}
+${entry.content}`
+}
+
 export interface LoadedEntry {
   entry: CorpusEntry
   vector: number[]

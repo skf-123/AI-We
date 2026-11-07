@@ -13,7 +13,7 @@
  *    对策是加一层【语言过滤】：先判断代码是什么语言，只在该语言的资料里检索。
  *    碰到没收录的语言（C++、Go 等），直接不检索 —— 干净降级，不硬凑。
  */
-import type { CorpusLang, EmbedConfig, RagConfig, RetrievedDoc } from './types'
+import type { CorpusEntry, CorpusLang, EmbedConfig, RagConfig, RetrievedDoc } from './types'
 import { loadCorpus } from './corpus'
 import { embedQuery } from './embed'
 
@@ -180,6 +180,90 @@ export async function searchKnowledge(
     .slice(0, ragCfg.topK)
 }
 
+/** 代码里太常见、对区分主题没有帮助的词 */
+const CODE_STOPWORDS = new Set([
+  'const',
+  'let',
+  'var',
+  'function',
+  'return',
+  'import',
+  'from',
+  'export',
+  'default',
+  'class',
+  'public',
+  'private',
+  'protected',
+  'static',
+  'final',
+  'void',
+  'new',
+  'this',
+  'if',
+  'else',
+  'for',
+  'while',
+  'switch',
+  'case',
+  'break',
+  'continue',
+  'try',
+  'catch',
+  'finally',
+  'throw',
+  'true',
+  'false',
+  'null',
+  'undefined',
+  'async',
+  'await',
+  'yield',
+  'def',
+  'self',
+  'print',
+  'int',
+  'string',
+  'boolean',
+  'long',
+  'double',
+  'float',
+  'char',
+  'list',
+  'dict',
+  'str',
+  'len',
+  'type',
+  'interface',
+  'enum',
+  'extends',
+  'implements',
+])
+
+/**
+ * 从代码里抽标识符，用于和卡片的 tags 做词面匹配。
+ * 只做小写化和去重，不猜语义 —— 猜错比不猜更糟。
+ */
+function codeIdentifiers(code: string): Set<string> {
+  const tokens = new Set<string>()
+  for (const raw of code.match(/[A-Za-z_$][\w$]{2,}/g) ?? []) {
+    const token = raw.toLowerCase()
+    if (CODE_STOPWORDS.has(token)) continue
+    tokens.add(token)
+    if (tokens.size >= 200) break
+  }
+  return tokens
+}
+
+/** 每个命中的 tag 加一点分；最多加三条，避免标签多的卡片占便宜 */
+function tagBoost(entry: CorpusEntry, tokens: Set<string>): number {
+  let hits = 0
+  for (const tag of entry.tags) {
+    if (tokens.has(tag.toLowerCase())) hits++
+  }
+  return Math.min(hits, 3) * 0.04
+}
+
 export async function retrieveDocs(
   code: string,
   ragCfg: RagConfig,
@@ -210,9 +294,10 @@ export async function retrieveDocs(
   const queryVector = await embedQuery(buildQuery(code), embedCfg)
   if (!queryVector) return []
 
+  const tokens = codeIdentifiers(code)
   const scored: RetrievedDoc[] = candidates.map(({ entry, vector }) => ({
     ...entry,
-    score: cosine(queryVector, vector),
+    score: cosine(queryVector, vector) + tagBoost(entry, tokens),
   }))
 
   const hits = scored

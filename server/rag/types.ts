@@ -20,6 +20,11 @@ export interface CorpusEntry {
   lang: CorpusLang
   tags: string[]
   title: string
+  /**
+   * 可选的典型代码片段，只参与向量计算，不进提示词。
+   * 代码查询对代码样例的相似度，比对中文解释高得多。
+   */
+  snippet?: string
   /** 约 150-250 字的技术说明，是真正会喂给大模型的内容 */
   content: string
   source: {

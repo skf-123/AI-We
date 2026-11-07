@@ -78,6 +78,16 @@ async function embedBatch(texts, offset) {
   return vectors
 }
 
+/**
+ * 送进 embedding 的文本；必须与 server/rag/corpus.ts 的 embedTextOf 逐字一致。
+ */
+function embedTextOf(entry) {
+  return `${entry.title}
+${entry.tags.join(' ')}
+${entry.snippet ?? ''}
+${entry.content}`
+}
+
 async function main() {
   console.log('=== 开始预计算语料向量 ===')
   console.log(`服务地址：${BASE_URL}`)
@@ -105,7 +115,7 @@ async function main() {
   // 送进 embedding 的文本 = 标题 + 正文。
   // 带标题是因为标题往往是技术名（如 "Array.prototype.reduce"），
   // 对检索的区分度贡献很大。
-  const texts = corpus.map((e) => `${e.title}\n${e.content}`)
+  const texts = corpus.map(embedTextOf)
 
   const allVectors = []
   for (let i = 0; i < texts.length; i += BATCH_SIZE) {
@@ -125,7 +135,7 @@ async function main() {
     }
     return {
       id: entry.id,
-      hash: hashText(`${entry.title}\n${entry.content}`),
+      hash: hashText(embedTextOf(entry)),
       vector,
     }
   })

@@ -83,6 +83,85 @@ function detectBucket(code) {
   return 'unknown'
 }
 
+const CODE_STOPWORDS = new Set([
+  'const',
+  'let',
+  'var',
+  'function',
+  'return',
+  'import',
+  'from',
+  'export',
+  'default',
+  'class',
+  'public',
+  'private',
+  'protected',
+  'static',
+  'final',
+  'void',
+  'new',
+  'this',
+  'if',
+  'else',
+  'for',
+  'while',
+  'switch',
+  'case',
+  'break',
+  'continue',
+  'try',
+  'catch',
+  'finally',
+  'throw',
+  'true',
+  'false',
+  'null',
+  'undefined',
+  'async',
+  'await',
+  'yield',
+  'def',
+  'self',
+  'print',
+  'int',
+  'string',
+  'boolean',
+  'long',
+  'double',
+  'float',
+  'char',
+  'list',
+  'dict',
+  'str',
+  'len',
+  'type',
+  'interface',
+  'enum',
+  'extends',
+  'implements',
+])
+
+// 与 server/rag/retrieve.ts 的 codeIdentifiers / tagBoost 保持一致
+function codeIdentifiers(code) {
+  const tokens = new Set()
+  for (const raw of code.match(/[A-Za-z_$][\w$]{2,}/g) ?? []) {
+    const token = raw.toLowerCase()
+    if (CODE_STOPWORDS.has(token)) continue
+    tokens.add(token)
+    if (tokens.size >= 200) break
+  }
+  return tokens
+}
+
+function tagBoost(entry, tokens) {
+  let hits = 0
+  for (const tag of entry.tags) {
+    if (tokens.has(tag.toLowerCase())) hits++
+  }
+  return Math.min(hits, 3) * 0.04
+}
+
 function buildQuery(code) {
   const head = code.slice(0, 1500)
   const importLines = code
@@ -656,8 +735,9 @@ async function main() {
     }
 
     const qv = await embed(buildQuery(s.code))
+    const tokens = codeIdentifiers(s.code)
     const scored = candidates
-      .map((e) => ({ id: e.id, score: cosine(qv, byId.get(e.id).vector) }))
+      .map((e) => ({ id: e.id, score: cosine(qv, byId.get(e.id).vector) + tagBoost(e, tokens) }))
       .sort((a, b) => b.score - a.score)
 
     const TOP_K = Number(process.env.PROBE_TOPK || 4)

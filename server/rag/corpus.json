@@ -59,6 +59,7 @@
     "lang": "javascript",
     "tags": ["closure", "scope", "function"],
     "title": "闭包（Closure）",
+    "snippet": "function makeCounter() {\n  let n = 0;\n  return () => ++n;\n}",
     "content": "闭包指一个函数记住了它被定义时所在的那个作用域，即使外层函数已经执行完毕，它依然能访问外层的变量。JavaScript 从 1995 年诞生起就支持闭包，因为它是按词法作用域设计的。闭包的实用价值在于「造出带私有状态的东西」：外层函数存放数据，内层函数读写它，然后把内层函数返回出去——数据只能通过内层函数访问，外部改不了。计数器、函数工厂、以及后来的模块模式都建立在这个机制上。需要注意的是，闭包会让外层变量一直留在内存里不被回收，循环里创建闭包时要特别留意变量捕获的是哪一个值。",
     "source": {
       "label": "MDN · 闭包",
@@ -169,6 +170,7 @@
     "lang": "react",
     "tags": ["component", "props", "data-flow"],
     "title": "Props（组件属性）",
+    "snippet": "function Card({ title }) {\n  return <h3>{title}</h3>;\n}",
     "content": "Props 是 React 组件之间传递数据的唯一方式，方向是单向的：从父组件流向子组件。父组件在标签上写属性，子组件通过第一个参数（通常解构写成 function Card({ title, onClick })）接收。Props 是只读的——子组件不能修改收到的 props，这是 React 从 2013 年开源起就定下的硬规则。它带来两个好处：数据流向清晰，出问题时顺着组件树往下找就能定位；以及组件更容易预测和测试，因为同样的 props 总是渲染出同样的结果。如果子组件需要「往回传消息」，做法是父组件把一个函数当作 prop 传下去，子组件调用它。",
     "source": {
       "label": "React 官方文档 · 将 Props 传递给组件",
@@ -466,6 +468,7 @@
     "lang": "java",
     "tags": ["java", "generics", "type-erasure", "java5"],
     "title": "泛型与类型擦除",
+    "snippet": "List<Integer> nums = List.of(1, 2, 3);\nList<Integer> even = nums.stream().filter(n -> n % 2 == 0).toList();",
     "content": "泛型让集合在编译期就锁定元素类型：List<String> 里只能放字符串，取出来也不用强转。它 2004 年随 Java 5 引入。在此之前，集合里存的全是 Object，取出来必须手写强制类型转换，一旦放错类型只能在运行时抛 ClassCastException —— 泛型把这类错误提前到了编译期。Java 泛型有一个别的语言没有的特点：**类型擦除**。编译之后 String 的类型信息就被抹掉了，运行时 List<String> 和 List<Integer> 是同一个类。这样做是为了兼容 Java 5 之前的老代码，代价是运行时拿不到泛型类型，所以不能写 new T[]，也不能对泛型做重载。",
     "source": {
       "label": "Java 官方 · 泛型",
@@ -642,6 +645,7 @@
     "lang": "typescript",
     "tags": ["typescript", "narrowing", "typeof", "control-flow"],
     "title": "类型收窄（Type Narrowing）",
+    "snippet": "function format(v: string | number) {\n  if (typeof v === 'number') return v.toFixed(2);\n  return v.trim();\n}",
     "content": "联合类型在运行时只是其中一种可能，TypeScript 靠控制流分析把宽类型收窄成窄类型。常见手段有 typeof 判断原始类型、instanceof 判断类实例、in 判断属性是否存在、真值判断排除 null 和 undefined，以及自定义类型守卫 value is T。收窄只在当前分支有效，赋值、函数调用或异步回调之后可能失效，需要重新判断。",
     "source": {
       "label": "TypeScript 手册 · 类型收窄",
@@ -719,6 +723,7 @@
     "lang": "typescript",
     "tags": ["typescript", "union", "discriminated-union", "exhaustive"],
     "title": "可辨识联合",
+    "snippet": "type Result = { ok: true; data: string } | { ok: false; error: string };\nfunction read(r: Result) {\n  if (r.ok) return r.data;\n  return r.error;\n}",
     "content": "可辨识联合由若干对象类型组成，每个成员有一个共同字段，值是不同字面量，例如 type 字段为 success 或 error。用 switch 判断这个字段后，每个分支只保留对应成员，访问其他成员独有的字段会报错。在 default 分支把值赋给 never，可以检查是否漏了情况。它是描述请求状态、事件和表单结果的常用写法。",
     "source": {
       "label": "TypeScript 手册 · 可辨识联合",
@@ -741,6 +746,7 @@
     "lang": "typescript",
     "tags": ["typescript", "tsconfig", "strict", "strictNullChecks"],
     "title": "strict 严格模式",
+    "snippet": "function label(v: string | null) {\n  return v ?? 'unknown';\n}",
     "content": "tsconfig 的 strict 是一组开关的总闸，打开后包含 strictNullChecks、strictFunctionTypes、strictBindCallApply、noImplicitAny、noImplicitThis 等。最直接的影响是 null 和 undefined 不再能赋给其他类型，可选属性必须显式处理。新项目应当一开始就开；老项目可以逐项打开，先开 noImplicitAny 和 strictNullChecks，再处理剩余报错。",
     "source": {
       "label": "TypeScript 文档 · strict",
@@ -752,6 +758,7 @@
     "lang": "typescript",
     "tags": ["typescript", "moduleResolution", "bundler", "paths"],
     "title": "模块解析（moduleResolution）",
+    "snippet": "import { ref } from 'vue';\nimport utils from '@/utils/format';",
     "content": "moduleResolution 决定 import 的路径怎么找到文件。node 旧算法按 node_modules 和扩展名逐级查找；bundler 面向 Vite、webpack 这类打包器，支持 package.json 的 exports 和 imports 字段；nodenext 对应 Node 原生 ESM，相对导入要写扩展名。路径别名要在 tsconfig 的 paths 和打包器里各配一次，只配一边会出现编译通过、运行找不到模块。",
     "source": {
       "label": "TypeScript 手册 · 模块解析",
@@ -774,6 +781,7 @@
     "lang": "typescript",
     "tags": ["typescript", "inference", "contextual-typing"],
     "title": "类型推断与上下文类型",
+    "snippet": "const nums = [1, 2, 3];\nconst doubled = nums.map((n) => n * 2);",
     "content": "TypeScript 会从初始值推断变量类型，从 return 推断函数返回类型，从参数默认值推断参数类型。上下文类型是反向的：回调参数的类型由调用方签名决定，例如数组 map 的回调参数自动是元素类型。推断通常比自己写注解更精确，但公开 API 的返回类型建议显式标注，避免实现改动导致类型悄悄变化。",
     "source": {
       "label": "TypeScript 手册 · 类型推断",
@@ -961,6 +969,7 @@
     "lang": "python",
     "tags": ["python", "scope", "closure", "nonlocal"],
     "title": "作用域与 LEGB",
+    "snippet": "def outer():\n    count = 0\n    def inner():\n        nonlocal count\n        count += 1",
     "content": "Python 查找名字的顺序是 Local → Enclosing → Global → Built-in，也就是 LEGB。函数内部赋值会让名字变成局部变量，除非用 global 或 nonlocal 声明。闭包要修改外层函数的变量时必须写 nonlocal，否则会新建一个同名局部变量并报未赋值错误。",
     "source": {
       "label": "Python 教程 · 作用域",
