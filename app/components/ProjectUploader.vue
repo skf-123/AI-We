@@ -42,22 +42,31 @@ const isBusy = computed(() => Boolean(props.busy) || reading.value)
 
 /**
  * 手机浏览器不支持 webkitdirectory：点“选择文件夹”只会弹普通文件选择，
- * 目录层级会丢。触屏且窄屏时禁用这个入口，改提示用电脑或传 zip。
+ * 目录层级会丢。
+ *
+ * 判断的是“能不能用”，不是“是不是手机”：
+ *   · 没有悬停、主输入是手指 → 手机和平板，横竖屏都算；
+ *   · iPad 桌面模式会把 UA 报成 Macintosh，靠多点触控特征补一条。
+ * 触屏笔记本只要有鼠标或触控板，hover 仍成立，不会被禁用。
  */
 const isMobile = ref(false)
+let coarseQuery: MediaQueryList | null = null
 
 function updateMobile() {
   if (typeof window === 'undefined') return
-  isMobile.value = window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 768
+  const coarse = window.matchMedia('(hover: none) and (pointer: coarse)').matches
+  const iPadDesktop = navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)
+  isMobile.value = coarse || iPadDesktop
 }
 
 onMounted(() => {
   updateMobile()
-  window.addEventListener('resize', updateMobile)
+  coarseQuery = window.matchMedia('(hover: none) and (pointer: coarse)')
+  coarseQuery.addEventListener('change', updateMobile)
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('resize', updateMobile)
+  coarseQuery?.removeEventListener('change', updateMobile)
 })
 
 /**
