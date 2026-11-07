@@ -48,6 +48,13 @@ function stripFence(raw: string): string {
   return (match?.[1] ?? text).trim()
 }
 
+/** 模型偶尔用「（空）」「无」表示没有代码，按空处理，别把这两个字放进输入框 */
+function cleanCode(raw: string): string {
+  const text = stripFence(raw)
+  if (/^(?:（|\(|【|\[)?\s*(?:空|无|没有代码|无代码)\s*(?:）|\)|】|\])?$/.test(text)) return ''
+  return text
+}
+
 export default defineEventHandler(async (event) => {
   const parsed = RequestSchema.safeParse(await readBody(event))
   if (!parsed.success) {
@@ -120,7 +127,7 @@ export default defineEventHandler(async (event) => {
     finishReason: result.finishReason,
   })
 
-  const code = stripFence(result.text)
+  const code = cleanCode(result.text)
 
   if (!code) {
     throw createError({
