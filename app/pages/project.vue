@@ -17,7 +17,7 @@ useHead({ title: '整个项目 · 麦穗 · 代码理解助手' })
  * 展示组件只管 props 进、事件出，不碰网络。
  */
 
-const STEPS = ['上传项目', '勾选要解析的文件', '逐文件解析', '项目总览 + 框架图']
+const STEPS = ['上传项目', '勾选要解析的文件', '逐文件解析', '项目总览 + 项目关系图']
 
 // 项目说明（mapSummary、后端判断、建议先读、结构识别）可以收起，默认展开
 const projectOpen = ref(true)
@@ -270,7 +270,7 @@ const summaryPrimaryLabel = computed(() => {
   if (summaryAction.value === 'parsing-new') return '正在解析新增文件…'
   if (summaryAction.value === 'retry-failed' || summaryAction.value === 'blocked')
     return '没有可生成的文件'
-  return '生成总览 + 思维导图 →'
+  return '生成总览 + 项目关系图 →'
 })
 
 const canRunSummaryPrimary = computed(
@@ -291,9 +291,9 @@ const canRunFullRegenerate = computed(
 const fullRegenerateLabel = computed(() => {
   if (primaryBusy.value) return summaryRunLabel.value
   if (!allSettled.value && newSelectedCount.value > 0) {
-    return `重新生成总览 + 思维导图（先解析新增的 ${newSelectedCount.value} 个）`
+    return `重新生成总览 + 项目关系图（先解析新增的 ${newSelectedCount.value} 个）`
   }
-  return '重新生成总览 + 思维导图'
+  return '重新生成总览 + 项目关系图'
 })
 
 /** 项目图在页面下方，从图里选中后把右侧面板带回视野 */
@@ -554,9 +554,9 @@ onBeforeUnmount(() => {
                     "
                     :title="
                       summaryHasResult
-                        ? '重新生成项目总览和思维导图；有新增文件会先解析新增'
+                        ? '重新生成项目总览和项目关系图；有新增文件会先解析新增'
                         : poolStopped
-                          ? '用已完成文件生成项目总览和思维导图'
+                          ? '用已完成文件生成项目总览和项目关系图'
                           : '点击后会停止剩余解析，用已完成的文件生成'
                     "
                     @click="summaryHasResult ? generateSummary() : generatePartialSummary()"
@@ -571,8 +571,8 @@ onBeforeUnmount(() => {
                         : primaryBusy
                           ? summaryRunLabel
                           : poolStopped
-                            ? '生成项目总览 + 思维导图'
-                            : `生成思维导图（用已完成的 ${doneCount} 个）`
+                            ? '生成项目总览 + 项目关系图'
+                            : `生成项目关系图（用已完成的 ${doneCount} 个）`
                     }}
                   </button>
                   <button
@@ -780,8 +780,8 @@ onBeforeUnmount(() => {
                     : selfCheckRunning
                       ? '图自检正在跑；点它会先停止自检，再只重画项目图'
                       : displayGraph
-                        ? '只重画项目图，项目总览正文保持不变；沿用上次汇总的文件；想以任选节点生图，请点「重新生成总览 + 思维导图」'
-                        : '图生成失败时，重画项目图；沿用上次汇总的文件，新图再失败仍保留原图；想以任选节点生图，请点「重新生成总览 + 思维导图」'
+                        ? '只重画项目图，项目总览正文保持不变；沿用上次汇总的文件；想以任选节点生图，请点「重新生成总览 + 项目关系图」'
+                        : '图生成失败时，重画项目图；沿用上次汇总的文件，新图再失败仍保留原图；想以任选节点生图，请点「重新生成总览 + 项目关系图」'
               "
               @click="runGraphOnly"
             >

@@ -14,7 +14,7 @@ import { normalizePath } from './project-files.ts'
 
 /** 与 server/utils/project-prompt.ts 的 PROJECT_SUMMARY_TITLES 保持一致 */
 export const PROJECT_TEXT_TITLE = '一、整个项目是什么'
-export const PROJECT_GRAPH_TITLE = '二、项目知识框架图'
+export const PROJECT_GRAPH_TITLE = '二、项目关系图'
 
 /** 从汇总输出里抠出图 JSON（流式过程中不完整时返回 null） */
 export function extractGraphJson(rest: string): unknown {
@@ -117,9 +117,7 @@ export function sanitizeProjectGraph(raw: unknown, knownPaths: string[]): Projec
 
   // 代码分组必须落到文件；没有文件的 code 节点只是空壳，不画出来。
   // tech / concept 节点没有文件是正常的，保留。
-  const usableNodes = nodes.filter(
-    (node) => node.type !== 'code' || (node.files?.length ?? 0) > 0,
-  )
+  const usableNodes = nodes.filter((node) => node.type !== 'code' || (node.files?.length ?? 0) > 0)
   if (usableNodes.length === 0) return null
 
   const nodeIds = new Set(usableNodes.map((n) => n.id))

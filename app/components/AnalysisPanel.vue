@@ -357,7 +357,7 @@ defineExpose({ scrollIntoView })
           </span>
           <p class="mt-4 text-base font-semibold text-slate-700">解析结果会出现在这里</p>
           <p class="mt-2 max-w-sm text-sm leading-relaxed text-slate-400">
-            左边粘贴代码，点“开始解析”。这里会依次出现四段解释，再按需画出知识框架图。
+            左边粘贴代码，点“开始解析”。这里会依次出现四段解释，再按需画出项目关系图。
           </p>
           <div class="mt-6 grid w-full max-w-md grid-cols-2 gap-x-6 gap-y-5 text-left">
             <div>
@@ -559,7 +559,7 @@ defineExpose({ scrollIntoView })
         <SourceList v-if="sources.length" ref="sourceListRef" :sources="sources" />
 
         <!--
-          知识框架图的入口。
+          项目关系图的入口。
 
           图必须等四段正文全部生成完才可能出现，而正文有四千多像素 ——
           用户读完正文不会知道下面还有东西。面板此刻已经自动跟到正文末尾，
@@ -574,7 +574,7 @@ defineExpose({ scrollIntoView })
           class="flex w-full items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm font-medium text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
           @click="emit('request-graph')"
         >
-          <span>知识框架图已生成</span>
+          <span>项目关系图已生成</span>
           <span class="text-xs text-emerald-600">查看 ↓</span>
         </button>
 

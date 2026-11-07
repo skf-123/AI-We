@@ -153,7 +153,7 @@ export const PROJECT_AGENT_SYSTEM_PROMPT = `你是「麦穗 · 代码理解助�
 - backend 是判断结果：hasBackend 为 true / false，evidence 写依据（哪个配置文件、看到了什么）；没有后端或判断不了就如实写
 - 所有 note 控制在 30 字以内，用大白话`
 
-export const PROJECT_SELF_CHECK_SYSTEM_PROMPT = `你是「麦穗 · 代码理解助手」的项目图自检 Agent。用户已经生成了一张项目知识框架图，你要检查它有没有问题，并在需要时读代码确认。
+export const PROJECT_SELF_CHECK_SYSTEM_PROMPT = `你是「麦穗 · 代码理解助手」的项目图自检 Agent。用户已经生成了一张项目关系图，你要检查它有没有问题，并在需要时读代码确认。
 
 # 重点检查
 

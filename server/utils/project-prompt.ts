@@ -8,7 +8,7 @@
  *
  * ⚠️ 前端切分依赖的标题文案必须与这里一字不差：
  *     文件级：一、逐词逐句 / 二、局部关系与作用 / 三、整段整体作用 / 四、技术溯源
- *     项目级：一、整个项目是什么 / 二、项目知识框架图
+ *     项目级：一、整个项目是什么 / 二、项目关系图
  */
 
 import type { RetrievedDoc } from '../rag/types'
@@ -22,7 +22,7 @@ export const PROJECT_FILE_SECTIONS = [
 ] as const
 
 /** 项目级两段。与 app/utils/project-graph.ts 的标题保持一致 */
-export const PROJECT_SUMMARY_TITLES = ['一、整个项目是什么', '二、项目知识框架图'] as const
+export const PROJECT_SUMMARY_TITLES = ['一、整个项目是什么', '二、项目关系图'] as const
 
 export const PROJECT_FILE_SYSTEM_PROMPT = `你是一位极其耐心的编程导师，专门帮助「自学编程、但看不懂别人项目」的人。
 
@@ -131,7 +131,7 @@ export const PROJECT_MAP_SYSTEM_PROMPT = `你是一位代码项目结构分析�
 - 拿不准的文件，按文件名和目录位置给出谨慎的描述，不要编造具体业务
 - 只输出 JSON，第一个字符就是 { ，最后一个字符就是 }`
 
-export const PROJECT_SUMMARY_SYSTEM_PROMPT = `你是一位极其耐心的编程导师。用户选中了项目里的一些文件，系统已经把这些文件逐个解析完。现在把「项目结构」「每个文件的一句话职责」「每个文件第三段的摘要」交给你。请只基于这次提供的文件做总结，并画唯一一张知识框架图；这些文件只覆盖项目的一部分时，就按这一部分说，不要补全成整个项目。
+export const PROJECT_SUMMARY_SYSTEM_PROMPT = `你是一位极其耐心的编程导师。用户选中了项目里的一些文件，系统已经把这些文件逐个解析完。现在把「项目结构」「每个文件的一句话职责」「每个文件第三段的摘要」交给你。请只基于这次提供的文件做总结，并画唯一一张项目关系图；这些文件只覆盖项目的一部分时，就按这一部分说，不要补全成整个项目。
 
 # 输出格式（严格遵守）
 
@@ -147,7 +147,7 @@ export const PROJECT_SUMMARY_SYSTEM_PROMPT = `你是一位极其耐心的编程�
 
 如果这次只覆盖了项目的一部分，正文开头要写清「从已解析的 N 个文件看」，不要把这些文件说成整个项目。
 
-## 二、项目知识框架图
+## 二、项目关系图
 
 在这一行标题之后，直接放一个 json 代码块（三个反引号包起来，第一行写 json），结构如下：
 
@@ -210,7 +210,7 @@ export const PROJECT_SUMMARY_SYSTEM_PROMPT = `你是一位极其耐心的编程�
  * 和 PROJECT_SUMMARY_SYSTEM_PROMPT 里的图规则保持一致；改图规则时两处都要改。
  * 这里只输出图 JSON，不写项目总览正文，所以单独一份提示词，避免模型先写一大段文字。
  */
-export const PROJECT_GRAPH_SYSTEM_PROMPT = `你是一位项目结构分析助手。用户选中了项目里的一些文件，系统已经把这些文件逐个解析完。现在把「项目结构」「目录树」「每个文件的职责摘要」「每个文件的引用关系」交给你。请只给这次提供的文件画唯一一张知识框架图；这些文件只覆盖项目的一部分时，就按这一部分画，不要补上未提供的文件。
+export const PROJECT_GRAPH_SYSTEM_PROMPT = `你是一位项目结构分析助手。用户选中了项目里的一些文件，系统已经把这些文件逐个解析完。现在把「项目结构」「目录树」「每个文件的职责摘要」「每个文件的引用关系」交给你。请只给这次提供的文件画唯一一张项目关系图；这些文件只覆盖项目的一部分时，就按这一部分画，不要补上未提供的文件。
 
 # 输出格式（严格遵守）
 
@@ -373,9 +373,7 @@ export function buildProjectGraphPrompt(
   treeText: string,
   summaryText = '',
 ): string {
-  const textBlock = summaryText.trim()
-    ? `\n\n【已有的项目总览】\n${summaryText.trim()}`
-    : ''
+  const textBlock = summaryText.trim() ? `\n\n【已有的项目总览】\n${summaryText.trim()}` : ''
 
   return `【项目结构结论】
 ${projectContext}

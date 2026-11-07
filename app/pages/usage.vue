@@ -50,7 +50,7 @@ interface FeatureInfo {
 const FEATURES: Record<string, FeatureInfo> = {
   'code/analyze': {
     label: '贴代码主链路',
-    detail: '五段讲解：逐词逐句 → 局部关系 → 整段作用 → 技术溯源 → 知识框架图；带知识库引用',
+    detail: '五段讲解：逐词逐句 → 局部关系 → 整段作用 → 技术溯源 → 项目关系图；带知识库引用',
     limit: '输入 ≤20,000 字符；输出 ≤100,000 token；检索 topK 4、阈值 0.38',
     outputLimit: 100_000,
   },
@@ -67,13 +67,14 @@ const FEATURES: Record<string, FeatureInfo> = {
   },
   'project/analyze': {
     label: '项目模式 · 逐文件四段解析',
-    detail: '每个文件一次请求：逐词逐句 → 局部关系 → 整段作用 → 技术溯源；带项目结构结论与按文件检索',
-    limit:
-      '单文件 ≤50,000 字符；项目结构结论 ≤50,000；输出 ≤10,000 token；并发池 h1=5 / h2=100',
+    detail:
+      '每个文件一次请求：逐词逐句 → 局部关系 → 整段作用 → 技术溯源；带项目结构结论与按文件检索',
+    limit: '单文件 ≤50,000 字符；项目结构结论 ≤50,000；输出 ≤10,000 token；并发池 h1=5 / h2=100',
     outputLimit: 10_000,
     context: {
       label: '共用项目前缀',
-      detail: '每个文件是独立请求，但都带同一份项目结构结论作为公共前缀，用于前缀缓存；不是同一段对话',
+      detail:
+        '每个文件是独立请求，但都带同一份项目结构结论作为公共前缀，用于前缀缓存；不是同一段对话',
     },
   },
   'project/summary': {
@@ -84,14 +85,14 @@ const FEATURES: Record<string, FeatureInfo> = {
     outputLimit: 300_000,
     context: {
       label: '与项目图同一请求',
-      detail: '项目总览正文和项目图 JSON 在同一次请求里生成，共用一个上下文和同一个 300,000 输出上限',
+      detail:
+        '项目总览正文和项目图 JSON 在同一次请求里生成，共用一个上下文和同一个 300,000 输出上限',
     },
   },
   'project/graph': {
     label: '项目模式 · 只重画项目图',
     detail: '不重跑正文，沿用上次汇总冻结的输入，只生成图 JSON',
-    limit:
-      '结构结论 ≤50,000 字符；目录树 ≤200,000；正文 ≤20,000；输出 ≤300,000 token；超时 120 秒',
+    limit: '结构结论 ≤50,000 字符；目录树 ≤200,000；正文 ≤20,000；输出 ≤300,000 token；超时 120 秒',
     outputLimit: 300_000,
     context: {
       label: '沿用汇总输入',
@@ -268,10 +269,10 @@ function makeTableRow(feature: string, row?: UsageSummary) {
     missing: row?.missing ?? 0,
     avgTotal: calls ? total / calls : 0,
     avgCompletion: calls ? completion / calls : 0,
-    pct1m: calls ? `${(((total / calls) / 1_000_000) * 100).toFixed(2)}%` : '—',
+    pct1m: calls ? `${((total / calls / 1_000_000) * 100).toFixed(2)}%` : '—',
     pctOutput:
       calls && info.outputLimit
-        ? `${(((completion / calls) / info.outputLimit) * 100).toFixed(2)}%`
+        ? `${((completion / calls / info.outputLimit) * 100).toFixed(2)}%`
         : '—',
     info,
   }
@@ -279,7 +280,9 @@ function makeTableRow(feature: string, row?: UsageSummary) {
 
 const tableRows = computed(() => {
   const byFeature = new Map(rows.value.map((row) => [row.feature, row]))
-  const known = Object.keys(FEATURES).map((feature) => makeTableRow(feature, byFeature.get(feature)))
+  const known = Object.keys(FEATURES).map((feature) =>
+    makeTableRow(feature, byFeature.get(feature)),
+  )
   const unknown = rows.value
     .filter((row) => !FEATURES[row.feature])
     .map((row) => makeTableRow(row.feature, row))
@@ -347,9 +350,7 @@ function formatRange(session: UsageSession): string {
         </div>
       </div>
 
-      <div
-        class="mb-4 rounded-xl border border-slate-200 bg-white p-3"
-      >
+      <div class="mb-4 rounded-xl border border-slate-200 bg-white p-3">
         <div class="flex flex-wrap items-end gap-3">
           <label class="flex flex-col gap-1 text-[11px] text-slate-500">
             查看
@@ -415,7 +416,10 @@ function formatRange(session: UsageSession): string {
         <p v-if="notice" class="mt-1 text-[11px] text-emerald-700">{{ notice }}</p>
       </div>
 
-      <div v-if="error" class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+      <div
+        v-if="error"
+        class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"
+      >
         {{ error }}
       </div>
 
@@ -467,10 +471,7 @@ function formatRange(session: UsageSession): string {
                   {{ row.info.detail }}
                 </p>
                 <p class="mt-0.5 font-mono text-[10px] text-slate-400">{{ row.feature }}</p>
-                <p
-                  v-if="row.info.context"
-                  class="mt-1 text-[10px] leading-relaxed text-slate-500"
-                >
+                <p v-if="row.info.context" class="mt-1 text-[10px] leading-relaxed text-slate-500">
                   {{ row.info.context.detail }}
                 </p>
               </div>
@@ -491,10 +492,13 @@ function formatRange(session: UsageSession): string {
         </div>
 
         <p class="mt-3 text-[11px] leading-relaxed text-slate-500">
-          百分比按平均每次调用算：项目总览和项目图共用一次请求，合在一起算；Agent 每轮一次请求，上下文随轮次增长；embedding 没有输出上限，占输出上限显示 —。
+          百分比按平均每次调用算：项目总览和项目图共用一次请求，合在一起算；Agent
+          每轮一次请求，上下文随轮次增长；embedding 没有输出上限，占输出上限显示 —。
         </p>
 
-        <details class="mt-2 rounded-xl border border-slate-200 bg-white p-3 text-[11px] leading-relaxed text-slate-600">
+        <details
+          class="mt-2 rounded-xl border border-slate-200 bg-white p-3 text-[11px] leading-relaxed text-slate-600"
+        >
           <summary class="cursor-pointer select-none text-slate-500">上下文标记怎么算</summary>
           <ul class="mt-2 space-y-1">
             <li>与项目图同一请求：项目总览（正文和图 JSON 一次生成，共用一个上下文）。</li>
