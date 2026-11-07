@@ -26,6 +26,7 @@
     "lang": "javascript",
     "tags": ["array", "map", "functional", "es5"],
     "title": "Array.prototype.map",
+    "snippet": "const names = users.map((user) => user.name);",
     "content": "map 把数组里每个元素交给同一个函数处理一遍，把返回值收集成一个新数组，长度和原数组一样。它 2009 年随 ES5 进入 JavaScript 标准。在此之前，把数组每个元素变换一次要手写 for 循环加 push，代码里「遍历」和「变换规则」混在一起。map 把这两件事拆开：你只描述「怎么变换一个元素」，遍历交给语言。它不改动原数组，返回新数组——这也是函数式编程风格的体现。注意它的回调实际会收到三个参数（当前元素、下标、原数组），通常只用第一个。",
     "source": {
       "label": "MDN · Array.prototype.map",
@@ -48,6 +49,7 @@
     "lang": "javascript",
     "tags": ["array", "reduce", "functional", "es5", "accumulate"],
     "title": "Array.prototype.reduce",
+    "snippet": "const total = orders.reduce((sum, order) => sum + order.amount, 0);",
     "content": "reduce 把数组「折叠」成一个值。它接收两样东西：一个累加函数 (累计值, 当前元素) => 新的累计值，以及一个初始值。遍历时，上一次的返回值会作为下一次的「累计值」传进来，最后返回最终的累计结果。它 2009 年随 ES5 进入标准。map 是「一变多」，reduce 是「多变一」——求和、求最值、把数组拼成对象、统计词频，都靠它。它把「怎么累积」从「怎么遍历」里解耦出来。如果省略初始值，reduce 会拿数组第一个元素当初始值并从第二个开始遍历，但空数组会直接报错，所以显式写初始值更安全。",
     "source": {
       "label": "MDN · Array.prototype.reduce",
@@ -71,6 +73,7 @@
     "lang": "javascript",
     "tags": ["async", "promise", "es6", "callback-hell"],
     "title": "Promise（ES6）",
+    "snippet": "fetch('/api/user')\n  .then((res) => res.json())\n  .then((data) => console.log(data));",
     "content": "Promise 是一个表示「将来会有结果」的对象，有三种状态：pending（进行中）、fulfilled（成功）、rejected（失败），一旦定型就不再改变。它 2015 年随 ES6 成为标准，但之前已经在 Q、when.js 这类库里流行多年。它要解决的是「回调地狱」：早期异步代码要层层嵌套回调，错误处理要在每一层单独写，代码被挤成向右的三角形。Promise 让异步操作可以链式串联，并且用统一的 .catch 集中处理错误。后来的 async / await 就是在它之上做的语法糖。",
     "source": {
       "label": "MDN · Promise",
@@ -82,6 +85,7 @@
     "lang": "javascript",
     "tags": ["async", "await", "es2017", "promise"],
     "title": "async / await（ES2017）",
+    "snippet": "async function load() {\n  const res = await fetch('/api/user');\n  return res.json();\n}",
     "content": "async / await 是 ES2017（2017 年）引入的语法，让异步代码写起来像同步代码。在函数前面加 async，这个函数就总是返回一个 Promise；在函数体里用 await 等一个 Promise 出结果，后面的代码会等它完成再执行，但并不会阻塞浏览器主线程。它没有引入新机制，只是 Promise 的语法糖——await 表达式实质上等于在那个 Promise 上挂 .then。所以它对错误处理仍然用 try / catch。它在 2017 年落地后迅速成为主流写法，因为相比 then 链，它让「先做 A，再做 B，再做 C」这种顺序逻辑一眼就能看懂。",
     "source": {
       "label": "MDN · async function",
@@ -93,6 +97,7 @@
     "lang": "javascript",
     "tags": ["es6", "destructuring", "syntax"],
     "title": "解构赋值（ES6）",
+    "snippet": "const { name, age } = user;\nconst [first, ...rest] = list;",
     "content": "解构赋值让 JavaScript 能按「形状」从数组或对象里把值取出来，直接赋给变量，不用一层层点下去。数组按位置取：const [a, b] = [1, 2]；对象按键名取：const { name, age } = user。它 2015 年随 ES6 引入，动机是消除大量重复的样板代码——在没有解构之前，取一个对象里的三个字段要写三行 user.xxx。它还能同时声明默认值（{ a = 1 } = obj）和重命名（{ a: x } = obj）。函数参数位置也常用它来直接拆开并声明默认值。",
     "source": {
       "label": "MDN · 解构赋值",
@@ -126,6 +131,7 @@
     "lang": "javascript",
     "tags": ["module", "esm", "import", "export"],
     "title": "ES 模块（import / export）",
+    "snippet": "import { readFile } from 'node:fs/promises';\nexport async function load(path) {\n  return readFile(path, 'utf8');\n}",
     "content": "ES 模块是 JavaScript 官方的模块系统，用 export 导出、用 import 引入。2015 年随 ES6 写进语言标准，但浏览器真正支持要等到 2017 年前后（Node.js 对它的支持更晚，且需要额外配置）。在它之前，JavaScript 没有官方的模块机制，社区各搞各的：Node 用 CommonJS 的 require / module.exports，浏览器端用 AMD、SeaJS 或者干脆挂在全局变量上。ES 模块的引入让同一套写法能在浏览器和 Node 里通用，也让打包工具可以做静态分析——因为 import 的位置是确定的，工具能在打包时就把没用到的代码去掉（tree shaking）。",
     "source": {
       "label": "MDN · JavaScript 模块",
@@ -137,6 +143,7 @@
     "lang": "react",
     "tags": ["jsx", "syntax", "component"],
     "title": "JSX",
+    "snippet": "const element = <h1 className=\"title\">Hello, {name}</h1>;",
     "content": "JSX 是 JavaScript 的语法扩展，允许在代码里直接写类似 HTML 的标签，比如 const el = <div className=\"box\">你好</div>。它在 Facebook 于 2011 年前后随 React 一起出现，2013 年 React 开源时正式公开。它要解决的问题是：用 document.createElement 或者字符串拼装界面既啰嗦又容易漏掉括号，而且结构看不出来。JSX 让界面的结构在代码里一眼可见，写起来和 HTML 差不多。它不是 HTML——属性用驼峰命名（className、onClick），标签必须闭合，而且它最终会被编译成对 createElement 的调用。表达式要嵌进标签里就用一对花括号。",
     "source": {
       "label": "React 官方文档 · 编写标记与 JSX",
@@ -148,6 +155,7 @@
     "lang": "react",
     "tags": ["hooks", "state", "component"],
     "title": "useState",
+    "snippet": "const [count, setCount] = useState(0);\nreturn <button onClick={() => setCount(count + 1)}>{count}</button>;",
     "content": "useState 是最基础的 React Hook，用来给函数组件加「状态」——也就是会变化、变化后需要重新渲染界面的数据。写法是 const [count, setCount] = useState(0)，返回一对：当前值和一个更新函数。React 16.8（2019 年 2 月发布）引入 Hooks，此前只有 class 组件能持有状态，写一个简单的计数器也要写 class、constructor、this.state、this.setState 一整套样板代码，而且逻辑分散在多个生命周期方法里。useState 的更新是「替换」而不是「合并」，而且它是异步批量处理的——连续调用两次 setCount(count + 1) 通常只会加一次，要基于上一状态更新应该写成 setCount(c => c + 1)。",
     "source": {
       "label": "React 官方文档 · useState",
@@ -159,6 +167,7 @@
     "lang": "react",
     "tags": ["hooks", "effect", "side-effect", "lifecycle"],
     "title": "useEffect",
+    "snippet": "useEffect(() => {\n  const id = setInterval(tick, 1000);\n  return () => clearInterval(id);\n}, []);",
     "content": "useEffect 用来在渲染之外做「副作用」——请求数据、订阅事件、直接操作 DOM、设定时器这类不属于「算界面」的事。它接收一个函数和一个依赖数组：依赖数组里的值变化时，这个函数就会重新执行。传空数组表示只在挂载后执行一次；不传依赖数组则每次渲染都执行。它 2019 年随 React 16.8 的 Hooks 一起出现，替代了 class 组件里的 componentDidMount / componentDidUpdate / componentWillUnmount 三个生命周期。它最容易被忽略的一点是「清理」：如果函数里返回了另一个函数，React 会在下次执行前或组件卸载时调用它，用来取消订阅、清除定时器，防止内存泄漏。",
     "source": {
       "label": "React 官方文档 · useEffect",
@@ -182,6 +191,7 @@
     "lang": "react",
     "tags": ["form", "input", "state", "controlled"],
     "title": "受控组件",
+    "snippet": "<input value={name} onChange={(e) => setName(e.target.value)} />",
     "content": "受控组件指表单元素的值由 React 的状态来掌管：input 的 value 绑定到 state，用户每敲一个字都触发 onChange 去更新 state，界面再由 state 重新渲染出来。这是 React 官方推荐的表单处理方式，从 React 早期就确立。它和「非受控组件」相对——后者把值交给 DOM 自己管，需要时用 ref 去读。受控组件的好处是「界面」和「数据」始终是同一份，可以在 onChange 里立刻做校验、格式化、联动，比如把输入转成大写、或者根据前一个框的内容启用后一个框。代价是每次按键都会触发一次渲染，在超大表单里需要留意性能。",
     "source": {
       "label": "React 官方文档 · 响应输入",
@@ -193,6 +203,7 @@
     "lang": "react",
     "tags": ["list", "render", "reconciliation", "key"],
     "title": "列表中的 key",
+    "snippet": "{items.map((item) => (\n  <li key={item.id}>{item.name}</li>\n))}",
     "content": "用 map 渲染列表时，React 要求给每个元素一个 key——一个在同级列表里唯一且稳定的标识。它不是给开发者看的，而是给 React 的「协调」算法用的：重新渲染时，React 靠 key 判断哪些项没变、哪些被新增或删除，从而只更新变化的部分，而不是把整个列表推倒重建。key 应该用数据自身的稳定 id，比如用户 id 或数据库主键；用数组下标当 key 在列表会重排、插入或删除时会让 React 认错元素，导致输入框内容错位、动画乱跳。官方从 React 早期就在控制台对缺失 key 发出警告。",
     "source": {
       "label": "React 官方文档 · 渲染列表",
@@ -204,6 +215,7 @@
     "lang": "react",
     "tags": ["state", "props", "architecture"],
     "title": "State 与 Props 的区别",
+    "snippet": "function Counter({ step }) {\n  const [count, setCount] = useState(0);\n  return <button onClick={() => setCount(count + step)}>{count}</button>;\n}",
     "content": "State 和 Props 都是 React 组件里的数据，区别在于「谁说了算」。Props 由父组件传进来，组件自己不能改，相当于函数的入参；State 由组件内部自己持有和维护，通过 setXxx 更新，更新后会触发重新渲染。判断一个数据该放哪，可以问两个问题：它会不会随用户操作变化？变化后界面要不要跟着变？答案是「会 / 要」就多半是 state。还有一条重要原则叫「状态提升」——当两个兄弟组件需要共享同一份数据时，把这个 state 提到它们共同的父组件里，再通过 props 分发下去，而不是各自存一份。",
     "source": {
       "label": "React 官方文档 · 在组件间共享 State",
@@ -347,6 +359,7 @@
     "lang": "vue",
     "tags": ["vue3", "reactivity", "composition-api", "ref"],
     "title": "ref() 响应式引用",
+    "snippet": "const count = ref(0);\ncount.value++;",
     "content": "ref 是 Vue 3 组合式 API 里创建响应式数据最常用的方式，把一个普通值包成对象，通过 .value 读写。Vue 3 在 2020 年 9 月发布，用组合式 API 取代了 Vue 2 的选项式写法。为什么需要这层包装？因为 JavaScript 的原始类型（数字、字符串）是按值传递的，没法像对象那样「拦截读写」；把它装进一个对象，Vue 才能通过 getter/setter 记录谁读了它、谁改了它，从而知道该重新渲染哪部分。这也是为什么在 <script setup> 里写 ref 要用 .value，而在模板里不用 —— 模板编译时 Vue 会自动帮你拆包。",
     "source": {
       "label": "Vue 官方文档 · ref()",
@@ -358,6 +371,7 @@
     "lang": "vue",
     "tags": ["vue3", "reactivity", "composition-api", "reactive"],
     "title": "reactive() 与 ref() 的区别",
+    "snippet": "const state = reactive({ count: 0, list: [] });\nstate.count++;",
     "content": "reactive 用来把一个对象变成响应式的，直接改属性就能触发更新，不用写 .value。它和 ref 的分工是：reactive 只能用于对象和数组，ref 什么类型都能装。官方推荐「优先用 ref」，原因有两个：一是 ref 可以整体替换（obj.value = 新对象），而 reactive 一旦解构或重新赋值就丢失响应性；二是把 reactive 对象解构出来会立刻失去响应性，这是新手最常踩的坑。所以现在的主流写法是组合式函数里一律用 ref，需要传对象时也包在 ref 里。",
     "source": {
       "label": "Vue 官方文档 · reactive()",
@@ -369,6 +383,7 @@
     "lang": "vue",
     "tags": ["vue3", "computed", "caching"],
     "title": "computed 计算属性",
+    "snippet": "const doubled = computed(() => count.value * 2);",
     "content": "computed 用来声明一个「由其他响应式数据推导出来的值」，它会自动追踪依赖，依赖变了才重新计算，而且会把结果缓存起来 —— 只要依赖没变，反复读它都不会重算。这正是它和普通函数最大的区别：如果在模板里直接调用一个函数做同样的计算，每次重新渲染都会重新执行一遍。Computed 缓存的价值在开销大的计算上尤其明显，比如过滤一个大列表。注意 computed 是只读的，要写就得传 get/set 两个函数。",
     "source": {
       "label": "Vue 官方文档 · computed()",
@@ -380,6 +395,7 @@
     "lang": "vue",
     "tags": ["vue3", "watch", "side-effect"],
     "title": "watch 与 watchEffect",
+    "snippet": "watch(count, (value, oldValue) => {\n  console.log('变了', oldValue, value);\n});",
     "content": "watch 用来观察响应式数据的变化，变化时执行一段副作用（发请求、写 localStorage、操作 DOM 这类不算「算值」的事）。它需要显式指定要观察哪个数据源，好处是能拿到变化前后的旧值和新值。watchEffect 则不用指定数据源，它会自动收集执行过程中读到的所有响应式数据，并在依赖变化时重新执行 —— 写起来更省事，但不容易看出它到底依赖了什么。选择标准：需要在变化时做「有具体目标」的动作，用 watch；只是想跟着数据重新跑一段逻辑，用 watchEffect。",
     "source": {
       "label": "Vue 官方文档 · watch()",
@@ -391,6 +407,7 @@
     "lang": "vue",
     "tags": ["vue", "v-model", "form", "two-way-binding"],
     "title": "v-model 双向绑定",
+    "snippet": "<input v-model=\"name\" />",
     "content": "v-model 是 Vue 的表单双向绑定语法，用在一行里同时完成「把数据填进输入框」和「用户输入写回数据」两件事。它本质上是语法糖：<input v-model=\"name\"> 展开后就是 :value=\"name\" @input=\"name = $event.target.value\"，也就是「绑定值 + 监听输入事件」两个动作的简写。这正是 Vue 从 2014 年诞生起最出名的特性 —— 它把 React 那种「受控组件」要手写的两个步骤合成了一个。Vue 3 里 v-model 还可以用在自定义组件上，默认对应 prop 名 modelValue 和事件名 update:modelValue。",
     "source": {
       "label": "Vue 官方文档 · 表单输入绑定",
@@ -402,6 +419,7 @@
     "lang": "vue",
     "tags": ["vue", "directive", "v-if", "v-for", "render"],
     "title": "v-if 与 v-for",
+    "snippet": "<template v-for=\"item in items\" :key=\"item.id\">\n  <li v-if=\"item.active\">{{ item.name }}</li>\n</template>",
     "content": "v-if 根据条件决定要不要渲染这个元素，条件为假时元素根本不存在于 DOM 里；v-show 则始终渲染，只是切换 display 属性。所以切换频繁时用 v-show（省去反复创建销毁的开销），条件很少变时用 v-if。v-for 用来遍历数组或对象渲染列表，官方要求给每一项加 key —— 这和 React 的 key 是同一个道理：Vue 靠 key 判断哪些项是复用的、哪些是新增或删除的，从而只更新变化的部分。Vue 2 里 v-if 和 v-for 写在同一元素上时 v-for 优先级更高，Vue 3 把这个顺序反了过来，官方建议永远不要把它们写在同一个元素上。",
     "source": {
       "label": "Vue 官方文档 · 条件渲染",
@@ -557,6 +575,7 @@
     "lang": "sql",
     "tags": ["sql", "join", "query", "sql92"],
     "title": "JOIN 连接查询",
+    "snippet": "SELECT u.name, o.id\nFROM users u\nLEFT JOIN orders o ON o.user_id = u.id;",
     "content": "JOIN 把多张表的行按关联条件拼到一起。INNER JOIN 只保留两边都匹配上的行；LEFT JOIN 保留左表全部、右表没匹配上的填 NULL；RIGHT JOIN 反过来；FULL JOIN 两边都保留。这套显式 JOIN 语法是 SQL-92 标准确立的。在那之前，关联查询只能写成 FROM a, b WHERE a.id = b.a_id —— 把「连接条件」和「筛选条件」混在同一个 WHERE 里，表一多，就分不清哪句是连接、哪句是过滤，漏写一句连接条件还会变成笛卡尔积（行数相乘），在大表上足以把数据库拖垮。显式 JOIN 把连接条件和过滤条件分开了。",
     "source": {
       "label": "PostgreSQL 文档 · 表表达式",
@@ -568,6 +587,7 @@
     "lang": "sql",
     "tags": ["sql", "group-by", "aggregate", "having"],
     "title": "GROUP BY 与聚合函数",
+    "snippet": "SELECT user_id, COUNT(*) AS total\nFROM orders\nGROUP BY user_id\nHAVING COUNT(*) > 3;",
     "content": "GROUP BY 把行按某几列的值分组，然后对每组用聚合函数（COUNT / SUM / AVG / MAX / MIN）算出汇总值。它和 WHERE 的分工是：WHERE 在分组**之前**过滤单行，HAVING 在分组**之后**过滤组。这个顺序决定了 WHERE 里不能写聚合函数 —— 因为那时还没分组，COUNT(*) 无从算起。GROUP BY 从 SQL-92 起就是标准的一部分。它解决的问题是「把明细行汇总成统计结果」，背后的思想是集合运算而不是逐行处理，这也正是 SQL 和普通编程语言最不一样的地方。",
     "source": {
       "label": "PostgreSQL 文档 · 聚合函数",
@@ -590,6 +610,7 @@
     "lang": "sql",
     "tags": ["sql", "index", "b-tree", "performance"],
     "title": "索引",
+    "snippet": "CREATE INDEX idx_orders_user ON orders (user_id, created_at);",
     "content": "索引是数据库为某几列额外维护的一份「排好序的查找结构」，让查询不必逐行扫描整张表。最常见的实现是 B+ 树，这个思路可以追溯到 1970 年代 IBM 的 System R 项目。代价是写入变慢、占用额外空间：每次 INSERT / UPDATE / DELETE 都要同步更新所有相关索引。所以索引不是越多越好。另外有一个重要事实：**在列上套函数或运算会让索引用不上** —— 比如 WHERE YEAR(created_at) = 2026 通常无法使用 created_at 上的索引，因为索引是按原始值排的。要改成范围查询 WHERE created_at >= '2026-01-01' AND created_at < '2027-01-01'。",
     "source": {
       "label": "PostgreSQL 文档 · 索引",
@@ -758,7 +779,7 @@
     "lang": "typescript",
     "tags": ["typescript", "moduleResolution", "bundler", "paths"],
     "title": "模块解析（moduleResolution）",
-    "snippet": "import { ref } from 'vue';\nimport utils from '@/utils/format';",
+    "snippet": "import type { User } from './types.js';\nimport { fetchUser } from '@/api/user';\nconst user: User = await fetchUser(1);",
     "content": "moduleResolution 决定 import 的路径怎么找到文件。node 旧算法按 node_modules 和扩展名逐级查找；bundler 面向 Vite、webpack 这类打包器，支持 package.json 的 exports 和 imports 字段；nodenext 对应 Node 原生 ESM，相对导入要写扩展名。路径别名要在 tsconfig 的 paths 和打包器里各配一次，只配一边会出现编译通过、运行找不到模块。",
     "source": {
       "label": "TypeScript 手册 · 模块解析",
@@ -781,7 +802,7 @@
     "lang": "typescript",
     "tags": ["typescript", "inference", "contextual-typing"],
     "title": "类型推断与上下文类型",
-    "snippet": "const nums = [1, 2, 3];\nconst doubled = nums.map((n) => n * 2);",
+    "snippet": "// 返回类型不用写，TypeScript 会从函数体推断\nconst ids = users.map((u) => u.id);",
     "content": "TypeScript 会从初始值推断变量类型，从 return 推断函数返回类型，从参数默认值推断参数类型。上下文类型是反向的：回调参数的类型由调用方签名决定，例如数组 map 的回调参数自动是元素类型。推断通常比自己写注解更精确，但公开 API 的返回类型建议显式标注，避免实现改动导致类型悄悄变化。",
     "source": {
       "label": "TypeScript 手册 · 类型推断",
