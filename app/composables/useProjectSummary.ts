@@ -1,4 +1,5 @@
 import { stripOutputTruncation } from '#shared/stream-meta'
+import { apiFetch } from '~/utils/api'
 
 /**
  * 全部文件解析完之后的一次汇总调用。
@@ -43,7 +44,7 @@ export function useProjectSummary() {
     controller = new AbortController()
 
     try {
-      const res = await fetch('/api/project/summary', {
+      const res = await apiFetch('/api/project/summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

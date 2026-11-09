@@ -1,3 +1,4 @@
+import { apiFetchJson } from '~/utils/api'
 /**
  * 代码截图识别。
  *
@@ -41,7 +42,7 @@ export function useImageCode() {
 
     try {
       const image = await readAsDataUrl(file)
-      const result = await $fetch<{ code: string }>('/api/ocr', {
+      const result = await apiFetchJson<{ code: string }>('/api/ocr', {
         method: 'POST',
         body: { image },
       })

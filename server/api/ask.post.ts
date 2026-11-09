@@ -92,7 +92,8 @@ export default defineEventHandler(async (event) => {
 
   // ---- 2. 取配置（与 /api/analyze 共用同一组 LLM 配置）----
   const config = useRuntimeConfig(event)
-  if (!config.llmApiKey) {
+  const llm = resolveLlmConfig(event)
+  if (!llm.apiKey) {
     throw createError({
       statusCode: 500,
       statusMessage: '服务端未配置大模型 API Key，请检查 .env 文件里的 NUXT_LLM_API_KEY',
@@ -124,14 +125,14 @@ export default defineEventHandler(async (event) => {
   const startedAt = Date.now()
   let upstream: Response
   try {
-    upstream = await fetch(`${config.llmBaseUrl}/chat/completions`, {
+    upstream = await fetch(`${llm.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.llmApiKey}`,
+        Authorization: `Bearer ${llm.apiKey}`,
       },
       body: JSON.stringify({
-        model: config.llmModel,
+        model: llm.model,
         stream: true,
         stream_options: { include_usage: true },
         temperature: 0.3, // 偏低：解释类任务要稳定、少发挥
@@ -154,6 +155,14 @@ export default defineEventHandler(async (event) => {
 
   if (!upstream.ok || !upstream.body) {
     const detail = await upstream.text().catch(() => '')
+
+    if (upstream.status === 401) {
+      throw createError({
+        statusCode: 401,
+        statusMessage: '这个 key 无效，或者已经被停用；如果你填了自己的 key，到设置里检查一下',
+      })
+    }
+
     throw createError({
       statusCode: 502,
       statusMessage: `大模型返回异常（${upstream.status}）：${detail.slice(0, 300)}`,
@@ -190,7 +199,7 @@ export default defineEventHandler(async (event) => {
     toLoggedTextStream(
       upstream.body,
       { truncatedMarker: OUTPUT_TRUNCATED_MARKER },
-      { feature: 'code/ask', model: config.llmModel, startedAt },
+      { feature: 'code/ask', model: llm.model, startedAt },
     ) as unknown as ReadableStream,
     { headers },
   )

@@ -34,7 +34,7 @@ export default defineEventHandler(async (event): Promise<{ text: string }> => {
     })
   }
 
-  const config = useRuntimeConfig(event)
+  const llm = resolveLlmConfig(event)
   const input = parsed.data
 
   const detail = [
@@ -51,9 +51,9 @@ export default defineEventHandler(async (event): Promise<{ text: string }> => {
   try {
     const result = await callLlmText(
       {
-        apiKey: config.llmApiKey,
-        baseUrl: config.llmBaseUrl,
-        model: config.llmModel,
+        apiKey: llm.apiKey,
+        baseUrl: llm.baseUrl,
+        model: llm.model,
       },
       {
         messages: [
@@ -67,14 +67,14 @@ export default defineEventHandler(async (event): Promise<{ text: string }> => {
       },
     )
     logLlmUsage('project/include-hint', result.usage, startedAt, {
-      model: config.llmModel,
+      model: llm.model,
       finishReason: result.finishReason,
     })
 
     return { text: result.text.trim() || FALLBACK }
   } catch (err) {
     logLlmUsage('project/include-hint', null, startedAt, {
-      model: config.llmModel,
+      model: llm.model,
       failed: true,
     })
     console.warn('[project/include-hint] 模型调用失败，使用固定说明：', err)

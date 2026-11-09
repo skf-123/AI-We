@@ -8,6 +8,7 @@
 
 import type { ProjectFileEntry } from '~/types/project'
 import { formatSize, isBinaryFile, normalizePath } from './project-files'
+import { apiFetch } from '~/utils/api'
 
 export interface ProjectToolExecutorOptions {
   entries: ProjectFileEntry[]
@@ -166,7 +167,7 @@ export function createProjectToolExecutor(options: ProjectToolExecutorOptions) {
     const query = String(rawQuery ?? '').trim()
     if (!query) return '错误：query 不能为空'
 
-    const res = await fetch('/api/project/knowledge', {
+    const res = await apiFetch('/api/project/knowledge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query }),

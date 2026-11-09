@@ -31,6 +31,13 @@ export interface LlmCallOptions {
 
 /** 上游返回非 200 时，把状态码翻译成前端该看到的那一种 */
 function upstreamError(status: number, detail: string) {
+  if (status === 401) {
+    return createError({
+      statusCode: 401,
+      statusMessage: '这个 key 无效，或者已经被停用；如果你填了自己的 key，到设置里检查一下',
+    })
+  }
+
   if (status === 429) {
     return createError({
       statusCode: 429,

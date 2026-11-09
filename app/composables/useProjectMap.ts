@@ -1,5 +1,6 @@
 import type { CrossFileEvidence } from '~/types/project'
 import { buildProjectContext } from '~/utils/project-files'
+import { apiFetch } from '~/utils/api'
 
 /**
  * 项目地图调用。
@@ -66,7 +67,7 @@ export function useProjectMap() {
     degraded.value = false
 
     try {
-      const res = await fetch('/api/project/map', {
+      const res = await apiFetch('/api/project/map', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

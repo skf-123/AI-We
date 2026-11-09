@@ -1,5 +1,6 @@
 import type { ProjectGraphData } from '~/types/project'
 import { extractGraphJson, sanitizeProjectGraph } from '~/utils/project-graph'
+import { apiFetch } from '~/utils/api'
 
 /**
  * 只生成项目图的请求。
@@ -46,7 +47,7 @@ export function useProjectGraph() {
     controller = new AbortController()
 
     try {
-      const res = await fetch('/api/project/graph', {
+      const res = await apiFetch('/api/project/graph', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -68,15 +69,10 @@ export function useProjectGraph() {
       const data = (await res.json()) as { content?: string; truncated?: boolean }
       truncated.value = Boolean(data.truncated)
 
-      const graph = sanitizeProjectGraph(
-        extractGraphJson(data.content ?? ''),
-        knownPaths,
-      )
+      const graph = sanitizeProjectGraph(extractGraphJson(data.content ?? ''), knownPaths)
 
       if (!graph) {
-        error.value = truncated.value
-          ? '图内容太长，被输出上限截断'
-          : '图 JSON 没有解析成功'
+        error.value = truncated.value ? '图内容太长，被输出上限截断' : '图 JSON 没有解析成功'
         return null
       }
 

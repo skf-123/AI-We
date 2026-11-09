@@ -61,7 +61,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const config = useRuntimeConfig(event)
+  const llm = resolveLlmConfig(event)
   const systemPrompt =
     parsed.data.mode === 'self-check-batch'
       ? PROJECT_SELF_CHECK_BATCH_SYSTEM_PROMPT
@@ -72,9 +72,9 @@ export default defineEventHandler(async (event) => {
   const startedAt = Date.now()
   const { message, finishReason, usage } = await callLlmMessage(
     {
-      apiKey: config.llmApiKey,
-      baseUrl: config.llmBaseUrl,
-      model: config.llmModel,
+      apiKey: llm.apiKey,
+      baseUrl: llm.baseUrl,
+      model: llm.model,
     },
     {
       messages: [{ role: 'system', content: systemPrompt }, ...parsed.data.messages],
@@ -96,7 +96,7 @@ export default defineEventHandler(async (event) => {
     usage,
     startedAt,
     {
-      model: config.llmModel,
+      model: llm.model,
       finishReason,
       final: parsed.data.final,
     },

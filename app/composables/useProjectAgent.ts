@@ -4,6 +4,7 @@ import type {
   ProjectFileEntry,
   ProjectGraphData,
 } from '~/types/project'
+import { apiFetch } from '~/utils/api'
 import { createProjectToolExecutor } from '~/utils/project-tools'
 import { sanitizeProjectGraph } from '~/utils/project-graph'
 import { formatStepResult } from '~/utils/agent-trace'
@@ -154,11 +155,7 @@ function extractJson(text: string): unknown {
   }
 }
 
-
-function parseBatchDecisions(
-  content: string,
-  allowedIds: Set<string>,
-): SelfCheckDecision[] | null {
+function parseBatchDecisions(content: string, allowedIds: Set<string>): SelfCheckDecision[] | null {
   const raw = extractJson(content) as { decisions?: unknown } | null
   if (!raw || !Array.isArray(raw.decisions)) return null
   const actions = new Set([
@@ -223,7 +220,9 @@ function parseBatchDecisions(
               label: value.label,
               type: typeof value.type === 'string' ? value.type : undefined,
               files: Array.isArray(value.files)
-                ? value.files.filter((file): file is string => typeof file === 'string').slice(0, 50)
+                ? value.files
+                    .filter((file): file is string => typeof file === 'string')
+                    .slice(0, 50)
                 : undefined,
             }
           })()
@@ -242,8 +241,7 @@ function parseBatchDecisions(
       pairs,
       node,
       nodeId: typeof row.nodeId === 'string' ? row.nodeId.slice(0, 100) : undefined,
-      moveFilesTo:
-        typeof row.moveFilesTo === 'string' ? row.moveFilesTo.slice(0, 100) : undefined,
+      moveFilesTo: typeof row.moveFilesTo === 'string' ? row.moveFilesTo.slice(0, 100) : undefined,
       type: typeof row.type === 'string' ? row.type.slice(0, 40) : undefined,
       detail: typeof row.detail === 'string' ? row.detail.slice(0, 500) : undefined,
     })
@@ -369,7 +367,7 @@ export function useProjectAgent() {
   ): Promise<AskResult> {
     controller ??= new AbortController()
 
-    const res = await fetch('/api/project/agent', {
+    const res = await apiFetch('/api/project/agent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode, final, messages }),
@@ -578,7 +576,10 @@ export function useProjectAgent() {
         rounds.value = batch.index
         const allowedIds = new Set(batch.items.map((item) => item.id))
         const messages: AgentMessage[] = [
-          { role: 'user', content: formatBatchContent(batch, input.projectContext, input.plan.overview) },
+          {
+            role: 'user',
+            content: formatBatchContent(batch, input.projectContext, input.plan.overview),
+          },
         ]
         const hardToolLimit = Math.min(8, batch.toolAllowance + 2)
         let batchTools = 0
@@ -728,12 +729,7 @@ export function useProjectAgent() {
       // 最后一道：剩下的边还能不能靠程序证据包救回来。
       // 只处理边的 keep / remove / reverse / relabel / unknown，不再动结构项。
       let evidencePacksUsed = 0
-      if (
-        !stopped.value &&
-        input.graph &&
-        input.getText &&
-        budget.used < EVIDENCE_TOKENS_LIMIT
-      ) {
+      if (!stopped.value && input.graph && input.getText && budget.used < EVIDENCE_TOKENS_LIMIT) {
         const latest = new Map(decisions.map((decision) => [decision.id, decision]))
         const undecided = input.plan.items.filter((item) => {
           if (item.edgeIndex < 0) return false
@@ -777,10 +773,11 @@ export function useProjectAgent() {
               decisions.push({
                 ...decision,
                 action: 'unknown',
-                reason: `${decision.reason ?? '证据不足'}（程序核引用：没有定位到证据包里的原文行）`.slice(
-                  0,
-                  500,
-                ),
+                reason:
+                  `${decision.reason ?? '证据不足'}（程序核引用：没有定位到证据包里的原文行）`.slice(
+                    0,
+                    500,
+                  ),
               })
               continue
             }
@@ -839,7 +836,8 @@ export function useProjectAgent() {
         const decision = decisionById.get(item.id)
         return decision && decision.action !== 'unknown'
       }).length
-      const conflict = validDecisions.length === decisions.length ? 0 : decisions.length - validDecisions.length
+      const conflict =
+        validDecisions.length === decisions.length ? 0 : decisions.length - validDecisions.length
 
       readFiles.value = [...readPaths]
       return {
@@ -978,7 +976,8 @@ ${readableList || '（没有可读文件）'}
       )
     }
 
-    const shown = Math.min(floating.length, 3) + Math.min(mismatched.length, 4) + Math.min(groupOnly.length, 3)
+    const shown =
+      Math.min(floating.length, 3) + Math.min(mismatched.length, 4) + Math.min(groupOnly.length, 3)
     const moreSuspicions =
       suspicions.length > shown ? `\n……另有 ${suspicions.length - shown} 条未列出。` : ''
 

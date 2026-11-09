@@ -1,3 +1,4 @@
+import { apiFetch } from '~/utils/api'
 /**
  * 勾选系统文件前的 AI 提示。
  *
@@ -42,7 +43,7 @@ export function useSystemIncludeHint() {
 
     loading.value = true
     try {
-      const res = await fetch('/api/project/include-hint', {
+      const res = await apiFetch('/api/project/include-hint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),

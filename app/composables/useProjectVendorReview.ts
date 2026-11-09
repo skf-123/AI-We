@@ -1,5 +1,6 @@
 import type { VendorCandidate } from '~/utils/project-vendor'
 import { pickVendorCandidates, vendorReviewCap } from '~/utils/project-vendor'
+import { apiFetch } from '~/utils/api'
 
 /**
  * Agent 对「疑似第三方库」候选池的评审。
@@ -38,7 +39,7 @@ export function useProjectVendorReview() {
     const current = generation
 
     try {
-      const res = await fetch('/api/project/vendor-review', {
+      const res = await apiFetch('/api/project/vendor-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

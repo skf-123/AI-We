@@ -51,7 +51,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const config = useRuntimeConfig(event)
+  const llm = resolveLlmConfig(event)
   const files: SummaryFileInput[] = parsed.data.files
 
   const userPrompt = buildProjectGraphPrompt(
@@ -64,9 +64,9 @@ export default defineEventHandler(async (event) => {
   const startedAt = Date.now()
   const upstream = await callLlm(
     {
-      apiKey: config.llmApiKey,
-      baseUrl: config.llmBaseUrl,
-      model: config.llmModel,
+      apiKey: llm.apiKey,
+      baseUrl: llm.baseUrl,
+      model: llm.model,
     },
     {
       messages: [
@@ -87,7 +87,7 @@ export default defineEventHandler(async (event) => {
     for await (const chunk of toLoggedTextStream(
       upstream.body as ReadableStream<Uint8Array>,
       { truncatedMarker: OUTPUT_TRUNCATED_MARKER },
-      { feature: 'project/graph', model: config.llmModel, startedAt },
+      { feature: 'project/graph', model: llm.model, startedAt },
     )) {
       content += chunk
     }

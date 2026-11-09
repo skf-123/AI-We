@@ -53,15 +53,15 @@ export default defineEventHandler(async (event) => {
 
   const candidates = parsed.data.candidates
   const allowed = new Set(candidates.map((item) => item.path))
-  const config = useRuntimeConfig(event)
+  const llm = resolveLlmConfig(event)
 
   const startedAt = Date.now()
   try {
     const result = await callLlmText(
       {
-        apiKey: config.llmApiKey,
-        baseUrl: config.llmBaseUrl,
-        model: config.llmModel,
+        apiKey: llm.apiKey,
+        baseUrl: llm.baseUrl,
+        model: llm.model,
       },
       {
         messages: [
@@ -75,7 +75,7 @@ export default defineEventHandler(async (event) => {
       },
     )
     logLlmUsage('project/vendor-review', result.usage, startedAt, {
-      model: config.llmModel,
+      model: llm.model,
       finishReason: result.finishReason,
     })
 
@@ -102,7 +102,7 @@ export default defineEventHandler(async (event) => {
     return { suggestions: suggestions.slice(0, candidates.length) }
   } catch (err) {
     logLlmUsage('project/vendor-review', null, startedAt, {
-      model: config.llmModel,
+      model: llm.model,
       failed: true,
     })
     console.warn('[project/vendor-review] 模型调用失败，跳过建议：', err)

@@ -55,6 +55,7 @@ export default defineEventHandler(async (event) => {
   const code = truncated ? parsed.data.code.slice(0, PROJECT_ANALYZE_MODEL_MAX_CHARS) : parsed.data.code
 
   const config = useRuntimeConfig(event)
+  const llm = resolveLlmConfig(event)
 
   // ---- 知识库检索：按文件内容判语言，不把整个项目塞进一次检索 ----
   const ragConfig: RagConfig = {
@@ -94,9 +95,9 @@ export default defineEventHandler(async (event) => {
   const startedAt = Date.now()
   const upstream = await callLlm(
     {
-      apiKey: config.llmApiKey,
-      baseUrl: config.llmBaseUrl,
-      model: config.llmModel,
+      apiKey: llm.apiKey,
+      baseUrl: llm.baseUrl,
+      model: llm.model,
     },
     {
       messages: [
@@ -129,7 +130,7 @@ export default defineEventHandler(async (event) => {
     toLoggedTextStream(
       upstream.body as ReadableStream<Uint8Array>,
       { truncatedMarker: OUTPUT_TRUNCATED_MARKER },
-      { feature: 'project/analyze', model: config.llmModel, startedAt },
+      { feature: 'project/analyze', model: llm.model, startedAt },
     ) as unknown as ReadableStream,
     {
       headers,

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { stripOutputTruncation } from '#shared/stream-meta'
+import { apiFetch } from '~/utils/api'
 
 /**
  * 追问气泡：在解析结果里选中一段代码，就地接着问。
@@ -322,7 +323,7 @@ async function ask(text: string) {
   controller = new AbortController()
 
   try {
-    const res = await fetch('/api/ask', {
+    const res = await apiFetch('/api/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

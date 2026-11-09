@@ -81,17 +81,17 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const config = useRuntimeConfig(event)
+  const llm = resolveLlmConfig(event)
   const startedAt = Date.now()
 
   let result: Awaited<ReturnType<typeof callLlmText>>
   try {
     result = await callLlmText(
       {
-        apiKey: config.llmApiKey,
-        baseUrl: config.llmBaseUrl,
+        apiKey: llm.apiKey,
+        baseUrl: llm.baseUrl,
         // 留空时回退到主模型（2026-11-07 实测 deepseek-chat 这个别名也能读图）
-        model: config.llmVisionModel || config.llmModel,
+        model: llm.visionModel,
       },
       {
         messages: [
@@ -122,7 +122,7 @@ export default defineEventHandler(async (event) => {
   }
 
   logLlmUsage('code/ocr', result.usage, startedAt, {
-    model: config.llmVisionModel || config.llmModel,
+    model: llm.visionModel,
     imageBytes,
     finishReason: result.finishReason,
   })

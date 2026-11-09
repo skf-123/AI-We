@@ -82,7 +82,7 @@ export default defineEventHandler(async (event): Promise<MapResult> => {
     })
   }
 
-  const config = useRuntimeConfig(event)
+  const llm = resolveLlmConfig(event)
   const fileHeads: MapFileHead[] = parsed.data.fileHeads
 
   let raw: string
@@ -90,9 +90,9 @@ export default defineEventHandler(async (event): Promise<MapResult> => {
   try {
     const result = await callLlmText(
       {
-        apiKey: config.llmApiKey,
-        baseUrl: config.llmBaseUrl,
-        model: config.llmModel,
+        apiKey: llm.apiKey,
+        baseUrl: llm.baseUrl,
+        model: llm.model,
       },
       {
         messages: [
@@ -114,12 +114,12 @@ export default defineEventHandler(async (event): Promise<MapResult> => {
     )
     raw = result.text
     logLlmUsage('project/map', result.usage, startedAt, {
-      model: config.llmModel,
+      model: llm.model,
       finishReason: result.finishReason,
     })
   } catch (err) {
     // 地图生成失败不该挡住后面的逐文件解析：返回空说明，让前端降级
-    logLlmUsage('project/map', null, startedAt, { model: config.llmModel, failed: true })
+    logLlmUsage('project/map', null, startedAt, { model: llm.model, failed: true })
     console.warn('[project/map] 模型调用失败，降级为空说明：', err)
     return { summary: '', folders: [], files: [], degraded: true }
   }

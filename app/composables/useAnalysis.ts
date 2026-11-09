@@ -2,6 +2,7 @@ import { stripOutputTruncation } from '#shared/stream-meta'
 import type { RagSource } from '~/types/analysis'
 import type { FactClaim } from '~/types/facts'
 import { stripFactsBlock } from '~/utils/project-facts'
+import { apiFetch } from '~/utils/api'
 
 /**
  * 「贴代码 → 流式出解析结果」这条链路的全部状态与请求逻辑。
@@ -68,7 +69,7 @@ export function useAnalysis(options: UseAnalysisOptions = {}) {
     controller = new AbortController()
 
     try {
-      const res = await fetch(endpoint, {
+      const res = await apiFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(buildBody(code)),
