@@ -46,6 +46,33 @@ const isBusy = computed(() => Boolean(props.busy) || reading.value)
  */
 const { touchLike: isMobile } = useTouchInput()
 
+/** 手机端点“选择文件夹”时，在按钮上方弹一句说明 */
+const folderHintOpen = ref(false)
+let folderHintTimer: ReturnType<typeof setTimeout> | null = null
+
+function showFolderHint(autoHide = false) {
+  if (!isMobile.value) return
+  folderHintOpen.value = true
+  if (folderHintTimer) {
+    clearTimeout(folderHintTimer)
+    folderHintTimer = null
+  }
+  if (autoHide) {
+    folderHintTimer = setTimeout(() => {
+      folderHintOpen.value = false
+      folderHintTimer = null
+    }, 3000)
+  }
+}
+
+function hideFolderHint() {
+  if (folderHintTimer) {
+    clearTimeout(folderHintTimer)
+    folderHintTimer = null
+  }
+  folderHintOpen.value = false
+}
+
 /**
  * 让浏览器先画一帧，再交给父组件做同步建树。
  *
@@ -61,6 +88,10 @@ function nextPaint(): Promise<void> {
 }
 
 function pick() {
+  if (isMobile.value) {
+    showFolderHint(true)
+    return
+  }
   inputRef.value?.click()
 }
 
@@ -318,18 +349,41 @@ function emitFiles(raw: { path: string; file: File }[], preferredRoot = '') {
       </template>
 
       <template v-else>
-        <p v-if="isMobile" class="mt-1.5 px-2 text-sm leading-relaxed text-amber-700">
-          手机上不能选择整个文件夹：浏览器不支持带目录结构的文件夹选择。请用电脑打开，或传一个 zip
-          压缩包。
+        <p v-if="!isMobile" class="mt-1.5 text-sm text-slate-500">
+          也可以选择本地文件夹，或一个 zip 压缩包
         </p>
-        <p v-else class="mt-1.5 text-sm text-slate-500">也可以选择本地文件夹，或一个 zip 压缩包</p>
+        <!-- 提示占一个固定高度的位置，出现时不盖住上面的标题，也不把按钮顶下去 -->
+        <div v-if="isMobile" class="mt-2 flex h-8 items-center justify-center" aria-live="polite">
+          <div
+            v-if="folderHintOpen"
+            class="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-rose-700 shadow-md"
+            role="status"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              class="h-4 w-4 shrink-0"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+            移动端不适配文件夹上传
+          </div>
+        </div>
         <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
           <button
             type="button"
-            class="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-emerald-600"
-            :disabled="isMobile"
-            :title="isMobile ? '手机浏览器不支持选择整个文件夹' : ''"
+            class="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-500"
+            :class="{ 'cursor-not-allowed opacity-40 hover:bg-emerald-600': isMobile }"
+            :aria-disabled="isMobile"
             @click="pick"
+            @mouseenter="isMobile && showFolderHint()"
+            @mouseleave="hideFolderHint"
+            @focus="isMobile && showFolderHint()"
+            @blur="hideFolderHint"
           >
             选择文件夹
           </button>
