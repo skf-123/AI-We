@@ -21,7 +21,7 @@ import { logLlmUsage } from '../utils/usage-log'
 /** 图片原始字节上限；base64 会膨胀约 4/3，所以请求体比这个大 */
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
-/** 和贴代码入口保持一致 */
+/** 和复制代码入口保持一致 */
 const MAX_CODE_CHARS = 20_000
 
 const RequestSchema = z.object({

@@ -49,13 +49,13 @@ interface FeatureInfo {
 
 const FEATURES: Record<string, FeatureInfo> = {
   'code/analyze': {
-    label: '贴代码主链路',
+    label: '复制代码主链路',
     detail: '五段讲解：逐词逐句 → 局部关系 → 整段作用 → 技术溯源 → 代码关系图；带知识库引用',
     limit: '输入 ≤20,000 字符；输出 ≤100,000 token；检索 topK 4、阈值 0.38',
     outputLimit: 100_000,
   },
   'code/ask': {
-    label: '贴代码追问',
+    label: '复制代码追问',
     detail: '选中解析结果里的一段代码就地提问，可多轮',
     limit:
       '代码 ≤50,000 字符；选中 ≤2,000；刚生成的解析 ≤20,000；问题 ≤500；历史 ≤100,000 token；输出 ≤5,000 token',
@@ -505,7 +505,7 @@ function formatRange(session: UsageSession): string {
             <li>多轮共用对话：地图侦查、图自检（各自多轮累积，互不共享）。</li>
             <li>共用项目前缀：逐文件解析（每个文件独立请求，但都带同一份项目结构结论）。</li>
             <li>沿用汇总输入：只重画图（独立请求，沿用上次汇总冻结的数据）。</li>
-            <li>多轮历史（前端重发）：贴代码追问（服务端不存会话）。</li>
+            <li>多轮历史（前端重发）：复制代码追问（服务端不存会话）。</li>
             <li>其他功能是独立请求，不标记。</li>
           </ul>
         </details>

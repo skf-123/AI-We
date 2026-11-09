@@ -32,7 +32,7 @@ const IDLE_CLASS = 'rounded-full px-3 py-1 text-slate-500 transition hover:text-
           class="flex shrink-0 items-center gap-1 rounded-full bg-slate-100 p-1 text-xs"
         >
           <NuxtLink to="/code" :class="active === 'code' ? ACTIVE_CLASS : IDLE_CLASS">
-            贴代码
+            复制代码
           </NuxtLink>
           <NuxtLink to="/project" :class="active === 'project' ? ACTIVE_CLASS : IDLE_CLASS">
             整个项目

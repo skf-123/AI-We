@@ -15,7 +15,7 @@ import { resolveEmbeddingConfig } from '../../utils/embedding-config'
  * 项目入口的逐文件解析：一次一个文件，四段输出，流式返回。
  *
  * 与 /api/analyze 的关系：
- *   · 现有主链路一行不动（红线：贴代码入口的输出内容不许变）；
+ *   · 现有主链路一行不动（红线：复制代码入口的输出内容不许变）；
  *   · 这里复用 toTextStream、retrieveDocs、RAG_INSTRUCTION 与 runtimeConfig，
  *     但提示词、接口入参、四段约定都是项目模式自己的。
  *

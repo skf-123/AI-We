@@ -4,10 +4,10 @@ import { useSelectionAsk, type SelectionPayload } from '~/composables/useSelecti
 import { parseGraphData } from '~/utils/analysis-sections'
 import { resolveLines } from '~/utils/locate-lines'
 
-useHead({ title: '贴代码 · 麦穗 · 代码理解助手' })
+useHead({ title: '复制代码 · 麦穗 · 代码理解助手' })
 
 /**
- * 主页面。贴代码 → 自动出四段解析 + 代码关系图。
+ * 主页面。复制代码 → 自动出四段解析 + 代码关系图。
  *
  * 这个文件现在只干两件事：**排版**和**编排**。
  *   · 排版：顶栏 / 两栏主区 / 图区 / 页脚
@@ -132,7 +132,7 @@ function clearAll() {
           单段代码理解
         </span>
         <h1 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-          贴代码，开始理解
+          复制代码，开始理解
         </h1>
         <p class="mt-3 max-w-3xl text-sm leading-relaxed text-slate-500 sm:text-base">
           粘贴你想理解的代码，麦穗将为你拆解语法、分析关系，并梳理代码背后的技术知识。

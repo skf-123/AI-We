@@ -131,7 +131,7 @@ const {
 const analysisRef = ref<{ scrollIntoView: () => void } | null>(null)
 
 /**
- * 项目模式追问：与贴代码页共用同一份页面状态。
+ * 项目模式追问：与复制代码页共用同一份页面状态。
  * 只接“当前文件的四段解析”，项目总览和项目图没有单一文件上下文，不接。
  */
 const {

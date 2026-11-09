@@ -26,7 +26,7 @@ const props = defineProps<{
   done: boolean
   /** 图 JSON 是否已经解析成功 —— 决定要不要显示「图已生成」入口 */
   graphReady: boolean
-  /** 空状态提示。项目入口传自己的文案，默认是贴代码入口那一套 */
+  /** 空状态提示。项目入口传自己的文案，默认是复制代码入口那一套 */
   emptyHint?: string
   /** 面板标题。默认「解析结果」 */
   title?: string
@@ -34,7 +34,7 @@ const props = defineProps<{
   subtitle?: string
   /** 模型输出撞到上限，后面的内容没有讲完 */
   outputTruncated?: boolean
-  /** 跨文件事实块核对结果；贴代码入口不传 */
+  /** 跨文件事实块核对结果；复制代码入口不传 */
   facts?: FactCheck
   /** 事实块没闭合或不是合法 JSON */
   factsError?: string
@@ -48,7 +48,7 @@ const props = defineProps<{
   claimWarnings?: string[]
   /**
    * 高度模式。
-   * false：贴代码入口，锁一屏高度（桌面端）
+   * false：复制代码入口，锁一屏高度（桌面端）
    * true：项目入口，跟随左侧目录树的高度（grid 行高由左栏决定）
    */
   fillHeight?: boolean

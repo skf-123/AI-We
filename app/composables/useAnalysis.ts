@@ -5,7 +5,7 @@ import { stripFactsBlock } from '~/utils/project-facts'
 import { apiFetch } from '~/utils/api'
 
 /**
- * 「贴代码 → 流式出解析结果」这条链路的全部状态与请求逻辑。
+ * 「复制代码 → 流式出解析结果」这条链路的全部状态与请求逻辑。
  *
  * 抽出来是为了让**页面只做排版**：页面拿到 output / sources / loading 这些
  * 值往下传，至于这些值是怎么来的（fetch 哪个接口、怎么拆流、引用来源藏在
@@ -39,7 +39,7 @@ export function useAnalysis(options: UseAnalysisOptions = {}) {
   const errorMsg = ref('')
   const loading = ref(false)
   const done = ref(false)
-  /** 服务端是否因为超长截断过（X-Project-Truncated），贴代码入口恒为 false */
+  /** 服务端是否因为超长截断过（X-Project-Truncated），复制代码入口恒为 false */
   const truncated = ref(false)
   /** 输出是否撞到模型上限（流末尾的标记），和输入截断是两回事 */
   const outputTruncated = ref(false)

@@ -12,7 +12,7 @@ useHead({ title: '麦穗 · 代码理解助手' })
 const ENTRIES = [
   {
     key: 'code',
-    title: '贴代码',
+    title: '复制代码',
     description: '理解一段代码的语法、关系、作用与技术背景。',
     tag: '单段代码理解',
     cta: '开始理解代码',
