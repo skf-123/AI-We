@@ -5,6 +5,7 @@ import { resolveLlmConfig } from '../../utils/llm-config'
  * 永远不返回 key 本身。
  */
 export default defineEventHandler((event) => {
+  const config = useRuntimeConfig(event)
   const llm = resolveLlmConfig(event)
 
   return {
@@ -13,5 +14,11 @@ export default defineEventHandler((event) => {
     visionModel: llm.visionModel,
     defaultKeyConfigured: Boolean(llm.apiKey),
     usingOwnKey: llm.usingOwnKey,
+    embedding: {
+      provider: '智谱',
+      model: config.embeddingModel,
+      dimensions: config.embeddingDimensions,
+      defaultKeyConfigured: Boolean(config.embeddingApiKey),
+    },
   }
 })

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { searchKnowledge } from '../../rag/retrieve'
-import type { EmbedConfig, RagConfig } from '../../rag/types'
+import type { RagConfig } from '../../rag/types'
+import { resolveEmbeddingConfig } from '../../utils/embedding-config'
 
 /**
  * POST /api/project/knowledge
@@ -28,12 +29,7 @@ export default defineEventHandler(async (event) => {
     topK: config.ragTopK,
     minScore: config.ragMinScore,
   }
-  const embedConfig: EmbedConfig = {
-    apiKey: config.embeddingApiKey,
-    baseUrl: config.embeddingBaseUrl,
-    model: config.embeddingModel,
-    dimensions: config.embeddingDimensions,
-  }
+  const embedConfig = resolveEmbeddingConfig(event)
 
   const docs = await searchKnowledge(parsed.data.query, ragConfig, embedConfig).catch(() => [])
 

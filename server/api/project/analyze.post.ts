@@ -1,15 +1,13 @@
 import { z } from 'zod'
-import {
-  PROJECT_ANALYZE_MAX_CHARS,
-  PROJECT_ANALYZE_MODEL_MAX_CHARS,
-} from '#shared/project-limits'
+import { PROJECT_ANALYZE_MAX_CHARS, PROJECT_ANALYZE_MODEL_MAX_CHARS } from '#shared/project-limits'
 import { OUTPUT_TRUNCATED_MARKER } from '#shared/stream-meta'
 import { RAG_INSTRUCTION } from '../../utils/prompt'
 import { toLoggedTextStream } from '../../utils/stream'
 import { callLlm } from '../../utils/llm'
 import { PROJECT_FILE_SYSTEM_PROMPT, buildProjectFilePrompt } from '../../utils/project-prompt'
 import { retrieveDocs } from '../../rag/retrieve'
-import type { EmbedConfig, RagConfig, RagSource } from '../../rag/types'
+import type { RagConfig, RagSource } from '../../rag/types'
+import { resolveEmbeddingConfig } from '../../utils/embedding-config'
 
 /**
  * POST /api/project/analyze
@@ -31,11 +29,7 @@ import type { EmbedConfig, RagConfig, RagSource } from '../../rag/types'
 
 const RequestSchema = z.object({
   path: z.string().trim().min(1).max(1000),
-  code: z
-    .string()
-    .trim()
-    .min(1)
-    .max(PROJECT_ANALYZE_MAX_CHARS, '文件太大了'),
+  code: z.string().trim().min(1).max(PROJECT_ANALYZE_MAX_CHARS, '文件太大了'),
   projectContext: z.string().max(50_000).default(''),
   /** 前端从源码解析出的、与本文件相关的硬事实；没有就是空字符串 */
   verifiedFacts: z.string().max(20_000).default(''),
@@ -52,7 +46,9 @@ export default defineEventHandler(async (event) => {
 
   const { path: filePath, projectContext, verifiedFacts } = parsed.data
   const truncated = parsed.data.code.length > PROJECT_ANALYZE_MODEL_MAX_CHARS
-  const code = truncated ? parsed.data.code.slice(0, PROJECT_ANALYZE_MODEL_MAX_CHARS) : parsed.data.code
+  const code = truncated
+    ? parsed.data.code.slice(0, PROJECT_ANALYZE_MODEL_MAX_CHARS)
+    : parsed.data.code
 
   const config = useRuntimeConfig(event)
   const llm = resolveLlmConfig(event)
@@ -63,12 +59,7 @@ export default defineEventHandler(async (event) => {
     topK: config.ragTopK,
     minScore: config.ragMinScore,
   }
-  const embedConfig: EmbedConfig = {
-    apiKey: config.embeddingApiKey,
-    baseUrl: config.embeddingBaseUrl,
-    model: config.embeddingModel,
-    dimensions: config.embeddingDimensions,
-  }
+  const embedConfig = resolveEmbeddingConfig(event)
 
   const docs = await retrieveDocs(code, ragConfig, embedConfig).catch(() => [])
 
@@ -83,13 +74,7 @@ export default defineEventHandler(async (event) => {
   const systemPrompt =
     docs.length > 0 ? PROJECT_FILE_SYSTEM_PROMPT + RAG_INSTRUCTION : PROJECT_FILE_SYSTEM_PROMPT
 
-  const userPrompt = buildProjectFilePrompt(
-    projectContext,
-    filePath,
-    code,
-    docs,
-    verifiedFacts,
-  )
+  const userPrompt = buildProjectFilePrompt(projectContext, filePath, code, docs, verifiedFacts)
 
   // ---- 上游调用（callLlm 内部处理 429 / 超时 / 非 200）----
   const startedAt = Date.now()

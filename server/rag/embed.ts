@@ -98,3 +98,29 @@ export async function embedQuery(text: string, cfg: EmbedConfig): Promise<number
     return null
   }
 }
+
+export interface EmbeddingProbeResult {
+  ok: boolean
+  status?: number
+  dimensions?: number
+  message?: string
+}
+
+/**
+ * 设置页验证用：拿一个极短文本真的调一次 embedding，确认 key 能用。
+ * 和 embedQuery 的区别是它不吞错误，把状态码带出来给接口判断。
+ */
+export async function probeEmbedding(
+  cfg: EmbedConfig,
+  timeoutMs = 15_000,
+): Promise<EmbeddingProbeResult> {
+  try {
+    const [vector] = await embedTexts(['设置页验证'], cfg, AbortSignal.timeout(timeoutMs))
+    if (!Array.isArray(vector)) return { ok: false, message: 'embedding 没有返回向量' }
+    return { ok: true, dimensions: vector.length }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const match = /HTTP (\d{3})/.exec(message)
+    return { ok: false, status: match ? Number(match[1]) : undefined, message }
+  }
+}

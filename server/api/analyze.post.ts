@@ -2,7 +2,8 @@ import { z } from 'zod'
 import { SYSTEM_PROMPT, RAG_INSTRUCTION, buildUserPrompt } from '../utils/prompt'
 import { toLoggedTextStream } from '../utils/stream'
 import { retrieveDocs } from '../rag/retrieve'
-import type { EmbedConfig, RagConfig, RagSource } from '../rag/types'
+import type { RagConfig, RagSource } from '../rag/types'
+import { resolveEmbeddingConfig } from '../utils/embedding-config'
 
 /**
  * POST /api/analyze
@@ -54,12 +55,7 @@ export default defineEventHandler(async (event) => {
     topK: config.ragTopK,
     minScore: config.ragMinScore,
   }
-  const embedConfig: EmbedConfig = {
-    apiKey: config.embeddingApiKey,
-    baseUrl: config.embeddingBaseUrl,
-    model: config.embeddingModel,
-    dimensions: config.embeddingDimensions,
-  }
+  const embedConfig = resolveEmbeddingConfig(event)
 
   // retrieveDocs 内部已把所有异常降级成空数组，这里再兜一层，确保永不影响主流程
   const docs = await retrieveDocs(parsed.data.code, ragConfig, embedConfig).catch(() => [])
