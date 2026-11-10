@@ -304,7 +304,7 @@ B 臂的提示词从 `server/utils/prompt.ts` 导入、模型参数照抄接口�
 | 样式 | Tailwind CSS 4 | |
 | 图渲染 | Vue Flow + dagre | 节点图渲染 + 自动排版 |
 | 数据校验 | Zod | 校验接口入参 |
-| 文本生成 | **DeepSeek**（`deepseek-chat`） | 生成四段解释文字 |
+| 文本生成 | **DeepSeek**（`deepseek-flash`） | 生成四段解释文字 |
 | 向量化 | **智谱 GLM**（`embedding-3`） | 把文字变成向量，供知识库检索 |
 | 部署 | **阿里云 ECS（中国香港）+ Caddy** | 香港免备案；Caddy 自动申请并续期 HTTPS 证书、自动开 HTTP/2，反代本机 3000 —— **应用代码一行没改** |
 
