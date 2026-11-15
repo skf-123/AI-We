@@ -11,9 +11,30 @@
  */
 import type { GraphData } from '~/types/analysis'
 
-defineProps<{ data: GraphData | null; loading: boolean }>()
+const props = defineProps<{ data: GraphData | null; loading: boolean }>()
+
+interface GraphViewHandle {
+  exportImage: () => Promise<void>
+}
 
 const panelRef = ref<HTMLElement | null>(null)
+const graphViewRef = ref<GraphViewHandle | null>(null)
+const exporting = ref(false)
+const exportError = ref('')
+
+async function exportImage() {
+  if (!props.data || exporting.value) return
+
+  exporting.value = true
+  exportError.value = ''
+  try {
+    await graphViewRef.value?.exportImage()
+  } catch (err) {
+    exportError.value = err instanceof Error ? err.message : '导出失败，请重试'
+  } finally {
+    exporting.value = false
+  }
+}
 
 /** 滚到本区域。入口在「解析结果」面板末尾，由页面转接过来 */
 function scrollIntoView() {
@@ -40,10 +61,21 @@ defineExpose({ scrollIntoView })
           </span>
         </div>
         <span class="text-[11px] text-slate-400">可拖拽节点 · 滚轮 / 双指缩放</span>
+        <button
+          type="button"
+          class="ml-auto rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="!data || exporting"
+          @click="exportImage"
+        >
+          {{ exporting ? '导出中…' : '导出图片' }}
+        </button>
       </div>
+      <p v-if="exportError" class="mb-2 text-[11px] text-rose-600" role="alert">
+        {{ exportError }}
+      </p>
 
       <div :class="data ? 'h-[420px] sm:h-[520px]' : 'h-[240px] sm:h-[300px]'">
-        <GraphView v-if="data" :data="data" />
+        <GraphView v-if="data" ref="graphViewRef" :data="data" />
 
         <!--
           正在解析：把占位文字换成「代码块 → 代码关系图」的动画。

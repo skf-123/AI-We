@@ -11,6 +11,7 @@ import '@vue-flow/controls/dist/style.css'
 import type { GraphNodeType } from '~/types/analysis'
 import type { ProjectGraphData, ProjectGraphEdge } from '~/types/project'
 import { defaultCollapsed, resolveGraphEdges } from '~/utils/project-graph'
+import { exportGraphImage, graphFileName } from '~/utils/graph-export'
 
 /**
  * 项目关系图 —— 分组可展开 / 收起。
@@ -77,10 +78,14 @@ function onEdgeClick(payload: { edge?: { data?: { edge?: ProjectGraphEdge } } })
 }
 
 const containerRef = ref<HTMLElement | null>(null)
+const graphRef = ref<HTMLElement | null>(null)
 const isFullscreen = ref(false)
 const mounted = ref(false)
+const exporting = ref(false)
+const exportMenuOpen = ref(false)
+const exportError = ref('')
 
-const { fitView } = useVueFlow(GRAPH_ID)
+const { fitView, getViewport, setViewport } = useVueFlow(GRAPH_ID)
 
 async function refit() {
   if (!mounted.value) return
@@ -106,6 +111,41 @@ function expandAll() {
 function collapseAll() {
   expanded.value = new Set()
   void refit()
+}
+
+/** 导出前把图切到指定展开状态；导出后恢复用户原来的状态和视口 */
+async function exportGraph(mode: 'expanded' | 'collapsed') {
+  if (exporting.value) return
+
+  exportMenuOpen.value = false
+  exporting.value = true
+  exportError.value = ''
+  const previousExpanded = new Set(expanded.value)
+  const previousViewport = getViewport()
+
+  try {
+    expanded.value =
+      mode === 'expanded'
+        ? new Set(props.data.nodes.filter((n) => n.files && n.files.length > 0).map((n) => n.id))
+        : new Set()
+
+    // 等 canvas 高度切到导出尺寸、Vue Flow 重排完再截
+    await nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    await fitView({ padding: 0.1 })
+    await exportGraphImage(
+      graphRef.value,
+      graphFileName('项目关系图', mode === 'expanded' ? '全部展开' : '全部收起'),
+    )
+  } catch (err) {
+    exportError.value = err instanceof Error ? err.message : '导出失败，请重试'
+  } finally {
+    expanded.value = previousExpanded
+    exporting.value = false
+    await nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    await setViewport(previousViewport).catch(() => {})
+  }
 }
 
 function styleOf(type: GraphNodeType) {
@@ -328,6 +368,11 @@ const layout = computed(() => {
   return { nodes, edges: flowEdges, realEdgeCount: realEdges.length }
 })
 
+/** 导出时按节点数给一个够用的画布高度，避免小图上下留一大片空白 */
+const exportHeight = computed(() =>
+  Math.min(2200, Math.max(620, 300 + layout.value.nodes.length * 8)),
+)
+
 const hasGroups = computed(() => props.data.nodes.some((n) => n.files && n.files.length > 0))
 const hasEdges = computed(() => layout.value.realEdgeCount > 0)
 const unownedCount = computed(() => props.data.unownedFiles?.length ?? 0)
@@ -371,12 +416,18 @@ onMounted(() => {
   }
 
   document.addEventListener('fullscreenchange', onFullscreenChange)
+  document.addEventListener('click', onDocumentClick)
   void refit()
 })
+
+function onDocumentClick() {
+  exportMenuOpen.value = false
+}
 
 onBeforeUnmount(() => {
   observer?.disconnect()
   document.removeEventListener('fullscreenchange', onFullscreenChange)
+  document.removeEventListener('click', onDocumentClick)
   if (resizeTimer) clearTimeout(resizeTimer)
 })
 </script>
@@ -429,6 +480,40 @@ onBeforeUnmount(() => {
         >
           全部收起
         </button>
+        <span class="h-3 w-px bg-slate-200" />
+        <div class="relative">
+          <button
+            type="button"
+            class="text-slate-500 hover:text-emerald-700 disabled:opacity-50"
+            :disabled="exporting"
+            @click.stop="exportMenuOpen = !exportMenuOpen"
+          >
+            {{ exporting ? '导出中…' : '导出' }}
+          </button>
+          <div
+            v-if="exportMenuOpen"
+            class="absolute right-0 top-full z-20 mt-1 w-36 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+            @click.stop
+          >
+            <button
+              type="button"
+              class="block w-full px-3 py-1.5 text-left text-[11px] text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
+              @click="exportGraph('expanded')"
+            >
+              导出全部展开
+            </button>
+            <button
+              type="button"
+              class="block w-full px-3 py-1.5 text-left text-[11px] text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
+              @click="exportGraph('collapsed')"
+            >
+              导出全部收起
+            </button>
+          </div>
+        </div>
+        <span v-if="exportError" class="max-w-[180px] truncate text-rose-600" :title="exportError">
+          {{ exportError }}
+        </span>
         <span class="h-3 w-px bg-slate-200" />
         <button
           type="button"
@@ -513,7 +598,17 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div :class="isFullscreen ? 'h-[calc(100vh-44px)] w-full' : 'h-[420px] w-full sm:h-[520px]'">
+    <div
+      ref="graphRef"
+      :class="
+        isFullscreen
+          ? 'h-[calc(100vh-44px)] w-full'
+          : exporting
+            ? 'w-full'
+            : 'h-[420px] w-full sm:h-[520px]'
+      "
+      :style="exporting && !isFullscreen ? { height: `${exportHeight}px` } : undefined"
+    >
       <ClientOnly>
         <VueFlow
           :id="GRAPH_ID"

@@ -8,7 +8,7 @@
  * 我们自己只负责把 AI 给的数据喂给它们。
  */
 import dagre from 'dagre'
-import { MarkerType, VueFlow } from '@vue-flow/core'
+import { MarkerType, VueFlow, useVueFlow } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 
@@ -17,8 +17,30 @@ import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
 
 import type { GraphData, GraphNodeType } from '~/types/analysis'
+import { exportGraphImage, graphFileName } from '~/utils/graph-export'
 
 const props = defineProps<{ data: GraphData }>()
+
+const GRAPH_ID = 'code-graph'
+const containerRef = ref<HTMLElement | null>(null)
+const { fitView, getViewport, setViewport } = useVueFlow(GRAPH_ID)
+
+/** 导出当前代码关系图；导出前先把整张图 fit 进画布，导完恢复原来的缩放和位置 */
+async function exportImage(): Promise<void> {
+  const element = containerRef.value
+  if (!element) return
+
+  const viewport = getViewport()
+  try {
+    await fitView({ padding: 0.1 })
+    await exportGraphImage(element, graphFileName('代码关系图'))
+  } finally {
+    await nextTick()
+    await setViewport(viewport).catch(() => {})
+  }
+}
+
+defineExpose({ exportImage })
 
 /** 节点卡片的尺寸，dagre 要靠它算间距 */
 const NODE_W = 190
@@ -82,10 +104,14 @@ function styleOf(type: GraphNodeType) {
 </script>
 
 <template>
-  <div class="h-full w-full overflow-hidden rounded-xl border border-slate-200 bg-[#fbfcfd]">
+  <div
+    ref="containerRef"
+    class="h-full w-full overflow-hidden rounded-xl border border-slate-200 bg-[#fbfcfd]"
+  >
     <!-- Vue Flow 依赖浏览器 API，必须只在客户端渲染 -->
     <ClientOnly>
       <VueFlow
+        :id="GRAPH_ID"
         :nodes="layout.nodes"
         :edges="layout.edges"
         :fit-view-on-init="true"
