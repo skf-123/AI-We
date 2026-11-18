@@ -84,16 +84,20 @@ const balanceUpdatedAt = ref('')
 
 let timer: ReturnType<typeof setInterval> | undefined
 
+function apiUrl(path: string): string {
+  const url = new URL(path, window.location.href)
+  url.username = ''
+  url.password = ''
+  return url.toString()
+}
+
 async function load(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
     // 如果用户把账号密码写进了地址栏，fetch 会拒绝带 credentials 的 URL；
-    // 这里把 URL 里的账号密码去掉，Basic Auth 仍由浏览器缓存的凭据负责。
-    const endpoint = new URL('/api/admin/traffic', window.location.href)
-    endpoint.username = ''
-    endpoint.password = ''
-    data.value = await $fetch<TrafficResponse>(endpoint.toString(), {
+    // apiUrl 会去掉账号密码，Basic Auth 仍由浏览器缓存的凭据负责。
+    data.value = await $fetch<TrafficResponse>(apiUrl('/api/admin/traffic'), {
       query: {
         hours: rangeHours.value,
         limit: 500,
@@ -111,8 +115,8 @@ async function loadBalances(): Promise<void> {
   balanceLoading.value = true
   balanceError.value = ''
   const [deepseek, zhipu] = await Promise.allSettled([
-    $fetch<DeepSeekBalance>('/api/settings/balance'),
-    $fetch<ZhipuBalance>('/api/settings/embedding-balance'),
+    $fetch<DeepSeekBalance>(apiUrl('/api/settings/balance')),
+    $fetch<ZhipuBalance>(apiUrl('/api/settings/embedding-balance')),
   ])
   if (deepseek.status === 'fulfilled') {
     deepseekBalance.value = deepseek.value
