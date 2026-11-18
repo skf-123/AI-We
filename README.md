@@ -325,7 +325,7 @@ B 臂的提示词从 `server/utils/prompt.ts` 导入、模型参数照抄接口�
 
 **环境要求**：Node.js **^22.22.3 ‖ ^24.15.0 ‖ >=26**
 （数字取自 nuxt 4.6.1 的 `engines`。本项目在 22.14 上实测过 —— 会触发 Nuxt 的"版本不受支持"警告，
-虽然能跑但不建议；线上跑的是 22.23.3。）
+虽然能跑但不建议；线上跑的是 22.23.5。）
 
 ```bash
 # 1. 安装依赖
@@ -361,7 +361,7 @@ npm run dev
 |---|---|---|---|
 | `NUXT_LLM_API_KEY` | ✅ **必填** | — | DeepSeek 的 key。申请：https://platform.deepseek.com |
 | `NUXT_LLM_BASE_URL` | 可选 | `https://api.deepseek.com` | 换生成模型的服务商时改这里 |
-| `NUXT_LLM_MODEL` | 可选 | `deepseek-chat` | 生成用的模型名 |
+| `NUXT_LLM_MODEL` | 可选 | `deepseek-flash` | 生成用的模型名 |
 | `NUXT_EMBEDDING_API_KEY` | 建议填 | — | 智谱的 key。申请：https://open.bigmodel.cn<br>**不填则知识库检索自动跳过**，其余功能正常 |
 | `NUXT_EMBEDDING_BASE_URL` | 可选 | `https://open.bigmodel.cn/api/paas/v4` | |
 | `NUXT_EMBEDDING_MODEL` | 可选 | `embedding-3` | |
@@ -383,29 +383,22 @@ AI-Web/
 │   ├── app.vue                    # 应用外壳
 │   ├── error.vue                  # 全局错误页（接口挂了/页面出错时接管）
 │   ├── assets/css/main.css        # 全局样式 + markdown 正文排版 + Vue Flow 浅色覆盖
-│   ├── components/
-│   │   ├── CodePane.vue           # 左栏：输入 + 行高亮（镜像层）
-│   │   ├── AnalysisPanel.vue      # 右栏：解析结果 + 流式自动跟随
-│   │   ├── GraphPanel.vue         # 代码关系图区域（三种状态）
-│   │   ├── GraphView.vue          # 代码关系图本体（Vue Flow + dagre）
-│   │   ├── MarkdownBlock.vue      # 模型输出的 markdown 渲染
-│   │   ├── SourceList.vue         # 引用来源卡片
-│   │   ├── TermCard.vue           # 术语解释卡（点了正文里的术语弹出）
-│   │   ├── SelectionAsk.vue       # 追问气泡（复制代码 / 项目模式共用，可多轮）
-│   │   ├── BookLoader.vue         # 等待动画：摊开翻页的书
-│   │   └── CodeToGraphHint.vue    # 等待动画：代码块 → 代码关系图
-│   ├── composables/useAnalysis.ts # 解析链路的状态与请求（页面只管排版）
-│   ├── composables/useSelectionAsk.ts # 追问的页面状态（选区 / 开合，两个页面共用）
+│   ├── pages/                     # index 首页 / code 复制代码 / project 整个项目 / usage 用量
+│   ├── components/                # 代码区、解析区、项目树、项目图、Agent 轨迹、设置、追问等
+│   ├── composables/               # 单段分析、项目会话、项目解析、Agent、总览、追问、截图
 │   ├── data/glossary.json         # 术语词表（给前端用，不参与向量检索）
 │   ├── types/analysis.ts          # 跨组件共享的数据形状（单一来源）
-│   ├── utils/                     # 纯函数：切分 / 定位 / markdown 插件
-│   └── pages/index.vue            # 主页面（只剩排版与编排）
+│   └── utils/                     # 纯函数：切分 / 定位 / markdown / 图导出 / 项目文件 / ZIP / 事实
 ├── server/                        # 后端（Nitro，跑在同一个进程里）
-│   ├── api/analyze.post.ts        # POST /api/analyze —— 主链路：五段解析
+│   ├── api/analyze.post.ts        # POST /api/analyze —— 单段解析
 │   ├── api/ask.post.ts            # POST /api/ask     —— 针对选中片段的追问
+│   ├── api/ocr.post.ts            # POST /api/ocr     —— 截图识别
+│   ├── api/project/               # 侦查、逐文件解析、总览、项目图、图自检、项目知识库
+│   ├── api/settings/              # key 验证、余额、模型信息
 │   ├── api/source/[id].get.ts     # GET  /api/source/:id —— 取一条语料正文
-│   ├── utils/prompt.ts            # 提示词（核心资产）
-│   ├── utils/stream.ts            # 把上游 SSE 拆成纯文本流（两个接口共用）
+│   ├── api/usage.get.ts           # GET /api/usage —— 按功能统计
+│   ├── api/usage/                 # 保留、清空和删除记录
+│   ├── utils/                     # 提示词、流式转发、配置、用量记账、项目提示词
 │   └── rag/                       # ★ 知识库
 │       ├── corpus.json            #   人工整理的语料（改这个）
 │       ├── corpus.embeddings.json #   预计算向量（脚本生成，要提交）
