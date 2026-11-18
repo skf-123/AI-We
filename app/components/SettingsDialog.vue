@@ -313,7 +313,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         <div class="space-y-5 px-5 py-5 sm:px-6">
           <div class="flex flex-wrap items-center gap-2 text-[11px]">
             <span class="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700">
-              DeepSeek：{{ info?.model || 'deepseek-chat' }}
+              DeepSeek：{{ info?.model || 'deepseek-flash' }}
             </span>
             <span class="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
               智谱：{{ info?.embedding.model || 'embedding-3' }} ·

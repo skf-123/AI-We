@@ -28,7 +28,7 @@ import { loadSamples } from './lib/code-samples.mjs'
 
 const BASE = (process.env.NUXT_LLM_BASE_URL || 'https://api.deepseek.com').replace(/\/$/, '')
 const KEY = process.env.NUXT_LLM_API_KEY
-const MODEL = process.env.NUXT_LLM_MODEL || 'deepseek-chat'
+const MODEL = process.env.NUXT_LLM_MODEL || 'deepseek-flash'
 const APP = process.env.NUXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
 /** 从提示词模块导入 —— 提示词是核心资产，探针必须用同一份，不能复制 */

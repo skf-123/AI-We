@@ -26,7 +26,7 @@ import crypto from 'node:crypto'
 
 const KEY = process.env.NUXT_LLM_API_KEY
 const BASE = (process.env.NUXT_LLM_BASE_URL ?? 'https://api.deepseek.com').replace(/\/$/, '')
-const MODEL = process.env.NUXT_LLM_MODEL ?? 'deepseek-chat'
+const MODEL = process.env.NUXT_LLM_MODEL ?? 'deepseek-flash'
 
 if (!KEY) {
   console.error('读不到 NUXT_LLM_API_KEY —— 用 npm run ask:probe 跑（它会带上 --env-file=.env）')

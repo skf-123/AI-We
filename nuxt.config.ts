@@ -46,7 +46,7 @@ export default defineNuxtConfig({
     // 环境变量：NUXT_LLM_API_KEY / NUXT_LLM_BASE_URL / NUXT_LLM_MODEL
     llmApiKey: '',
     llmBaseUrl: 'https://api.deepseek.com',
-    llmModel: 'deepseek-chat',
+    llmModel: 'deepseek-flash',
 
     // ---------- 截图识别：只给 /api/ocr 用 ----------
     // 环境变量：NUXT_LLM_VISION_MODEL

@@ -90,7 +90,7 @@ export default defineEventHandler(async (event) => {
       {
         apiKey: llm.apiKey,
         baseUrl: llm.baseUrl,
-        // 留空时回退到主模型（2026-11-07 实测 deepseek-chat 这个别名也能读图）
+        // 留空时回退到主模型（当前 deepseek-flash；2026-11-07 实测 deepseek-chat 别名也能读图）
         model: llm.visionModel,
       },
       {

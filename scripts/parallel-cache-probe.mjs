@@ -35,7 +35,7 @@ import { loadSamples } from './lib/code-samples.mjs'
 
 const BASE = (process.env.NUXT_LLM_BASE_URL || 'https://api.deepseek.com').replace(/\/$/, '')
 const KEY = process.env.NUXT_LLM_API_KEY
-const MODEL = process.env.NUXT_LLM_MODEL || 'deepseek-chat'
+const MODEL = process.env.NUXT_LLM_MODEL || 'deepseek-flash'
 
 if (!KEY)
   throw new Error('缺少 NUXT_LLM_API_KEY —— 请用 `npm run cache:probe`（它会带上 --env-file=.env）')
