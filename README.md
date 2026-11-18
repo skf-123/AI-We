@@ -133,7 +133,7 @@
 
 ## 访问统计（仅管理员）
 
-`/admin/traffic` 读取 Caddy 的访问日志，只展示时间、来源 IP、方法、路径、状态码、耗时和 User-Agent，不展示请求正文或代码内容。页面默认省略我们自己的出口 IP 和 `curl` / HeadlessChrome 探针，也可以一键切回全部访问。
+`/admin/traffic` 读取 Caddy 的访问日志，只展示时间、来源 IP、方法、路径、状态码、耗时和 User-Agent，不展示请求正文或代码内容。页面默认省略我们自己的出口 IP 和 `curl` / HeadlessChrome 探针，也可以一键切回全部访问；顶部同时显示 DeepSeek 和智谱默认 key 的余额，复用设置页的余额接口。
 
 这个页面不放进站点导航，默认由 Caddy 的 Basic Auth 保护；接口 `/api/admin/traffic` 同样要经过认证。日志按 50 MB × 4 份轮转，保留 30 天。完整配置和日志权限见 [`docs/访问统计说明.md`](docs/访问统计说明.md)。
 

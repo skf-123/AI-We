@@ -45,6 +45,24 @@ interface TrafficResponse {
   byPath: PathRow[]
 }
 
+interface DeepSeekBalance {
+  usingOwnKey: boolean
+  isAvailable: boolean
+  balances: {
+    currency: string
+    total: string
+    granted: string
+    toppedUp: string
+  }[]
+}
+
+interface ZhipuBalance {
+  usingOwnKey: boolean
+  currency: string
+  balance: string
+  availableBalance: string
+}
+
 useHead({
   title: '访问统计 · 麦穗',
   meta: [{ name: 'robots', content: 'noindex,nofollow' }],
@@ -58,6 +76,11 @@ const autoRefresh = ref(true)
 const excludeOwn = ref(true)
 const ipQuery = ref('')
 const pathQuery = ref('')
+const deepseekBalance = ref<DeepSeekBalance | null>(null)
+const zhipuBalance = ref<ZhipuBalance | null>(null)
+const balanceLoading = ref(false)
+const balanceError = ref('')
+const balanceUpdatedAt = ref('')
 
 let timer: ReturnType<typeof setInterval> | undefined
 
@@ -84,8 +107,35 @@ async function load(): Promise<void> {
   }
 }
 
+async function loadBalances(): Promise<void> {
+  balanceLoading.value = true
+  balanceError.value = ''
+  const [deepseek, zhipu] = await Promise.allSettled([
+    $fetch<DeepSeekBalance>('/api/settings/balance'),
+    $fetch<ZhipuBalance>('/api/settings/embedding-balance'),
+  ])
+  if (deepseek.status === 'fulfilled') {
+    deepseekBalance.value = deepseek.value
+  } else {
+    balanceError.value = 'DeepSeek 余额查询失败'
+  }
+  if (zhipu.status === 'fulfilled') {
+    zhipuBalance.value = zhipu.value
+  } else {
+    balanceError.value = balanceError.value
+      ? `${balanceError.value}；智谱余额查询失败`
+      : '智谱余额查询失败'
+  }
+  balanceUpdatedAt.value = new Date().toISOString()
+  balanceLoading.value = false
+}
+
+async function refreshAll(): Promise<void> {
+  await Promise.all([load(), loadBalances()])
+}
+
 onMounted(() => {
-  void load()
+  void refreshAll()
   timer = setInterval(() => {
     if (autoRefresh.value) void load()
   }, 10_000)
@@ -116,6 +166,15 @@ const filteredByIp = computed(() => {
 
 const topPath = computed(() => data.value?.byPath[0] ?? null)
 const lastSeen = computed(() => data.value?.records[0]?.time ?? '')
+const deepseekRow = computed(() => deepseekBalance.value?.balances[0] ?? null)
+const zhipuAmount = computed(
+  () => zhipuBalance.value?.availableBalance || zhipuBalance.value?.balance || '—',
+)
+
+function formatMoney(value: string): string {
+  const number = Number(value)
+  return Number.isFinite(number) ? number.toFixed(2) : value
+}
 
 function formatTime(iso: string): string {
   if (!iso) return '—'
@@ -180,10 +239,10 @@ function methodClass(method: string): string {
           <button
             type="button"
             class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-            :disabled="loading"
-            @click="load"
+            :disabled="loading || balanceLoading"
+            @click="refreshAll"
           >
-            {{ loading ? '刷新中…' : '刷新' }}
+            {{ loading || balanceLoading ? '刷新中…' : '刷新' }}
           </button>
         </div>
       </div>
@@ -221,6 +280,65 @@ function methodClass(method: string): string {
             <p class="mt-1 text-sm font-medium">{{ formatTime(lastSeen) }}</p>
           </div>
         </div>
+
+        <div class="mb-4 grid gap-3 sm:grid-cols-2">
+          <div class="rounded-xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <p class="text-[11px] text-slate-400">DeepSeek 默认 key</p>
+                <p class="mt-1 text-lg font-semibold">
+                  <template v-if="deepseekRow">
+                    ¥ {{ formatMoney(deepseekRow.total) }}
+                    <span class="text-xs font-normal text-slate-400">{{ deepseekRow.currency }}</span>
+                  </template>
+                  <span v-else class="text-sm font-normal text-slate-400">
+                    {{ balanceLoading ? '查询中…' : '暂时查不到' }}
+                  </span>
+                </p>
+              </div>
+              <button
+                type="button"
+                class="shrink-0 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] text-slate-500 transition hover:bg-slate-50 disabled:text-slate-300"
+                :disabled="balanceLoading"
+                @click="loadBalances"
+              >
+                刷新余额
+              </button>
+            </div>
+            <p v-if="deepseekBalance && !deepseekBalance.isAvailable" class="mt-2 text-[11px] text-amber-600">
+              账户当前不可用
+            </p>
+          </div>
+
+          <div class="rounded-xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <p class="text-[11px] text-slate-400">智谱默认 key</p>
+                <p class="mt-1 text-lg font-semibold">
+                  <template v-if="zhipuBalance">
+                    ¥ {{ formatMoney(zhipuAmount) }}
+                    <span class="text-xs font-normal text-slate-400">{{ zhipuBalance.currency }}</span>
+                  </template>
+                  <span v-else class="text-sm font-normal text-slate-400">
+                    {{ balanceLoading ? '查询中…' : '暂时查不到' }}
+                  </span>
+                </p>
+              </div>
+              <button
+                type="button"
+                class="shrink-0 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] text-slate-500 transition hover:bg-slate-50 disabled:text-slate-300"
+                :disabled="balanceLoading"
+                @click="loadBalances"
+              >
+                刷新余额
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <p v-if="balanceError" class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+          {{ balanceError }}<span v-if="balanceUpdatedAt"> · {{ formatTime(balanceUpdatedAt) }}</span>
+        </p>
 
         <div class="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
           <input
