@@ -131,6 +131,14 @@
 
 ---
 
+## 访问统计（仅管理员）
+
+`/admin/traffic` 读取 Caddy 的访问日志，只展示时间、来源 IP、方法、路径、状态码、耗时和 User-Agent，不展示请求正文或代码内容。
+
+这个页面不放进站点导航，默认由 Caddy 的 Basic Auth 保护；接口 `/api/admin/traffic` 同样要经过认证。日志按 50 MB × 4 份轮转，保留 30 天。完整配置和日志权限见 [`docs/访问统计说明.md`](docs/访问统计说明.md)。
+
+---
+
 ## 系统架构
 
 ### 一次请求的完整链路
@@ -383,7 +391,7 @@ AI-Web/
 │   ├── app.vue                    # 应用外壳
 │   ├── error.vue                  # 全局错误页（接口挂了/页面出错时接管）
 │   ├── assets/css/main.css        # 全局样式 + markdown 正文排版 + Vue Flow 浅色覆盖
-│   ├── pages/                     # index 首页 / code 复制代码 / project 整个项目 / usage 用量
+│   ├── pages/                     # index / code / project / usage / admin/traffic（仅管理员）
 │   ├── components/                # 代码区、解析区、项目树、项目图、Agent 轨迹、设置、追问等
 │   ├── composables/               # 单段分析、项目会话、项目解析、Agent、总览、追问、截图
 │   ├── data/glossary.json         # 术语词表（给前端用，不参与向量检索）
@@ -395,6 +403,7 @@ AI-Web/
 │   ├── api/ocr.post.ts            # POST /api/ocr     —— 截图识别
 │   ├── api/project/               # 侦查、逐文件解析、总览、项目图、图自检、项目知识库
 │   ├── api/settings/              # key 验证、余额、模型信息
+│   ├── api/admin/                 # 访问统计只读接口（Caddy Basic Auth 保护）
 │   ├── api/source/[id].get.ts     # GET  /api/source/:id —— 取一条语料正文
 │   ├── api/usage.get.ts           # GET /api/usage —— 按功能统计
 │   ├── api/usage/                 # 保留、清空和删除记录
@@ -416,7 +425,7 @@ AI-Web/
 │   ├── parallel-cache-probe.mjs   # npm run cache:probe —— 前缀缓存命中
 │   └── lib/code-samples.mjs       # 上面几个脚本共用的示例来源（从 CodePane.vue 读，防漂移）
 ├── deploy/                        # 部署（同样不在请求链路上，在服务器上跑）
-│   ├── Caddyfile                  #   反代 3000 + 自动 HTTPS + HTTP/2（配置就 3 行）
+│   ├── Caddyfile                  #   反代 3000 + 自动 HTTPS/HTTP2 + 访问日志
 │   ├── ai-web.service             #   systemd 常驻单元（密钥走 EnvironmentFile，unit 里无明文）
 │   ├── install-server.sh          #   新机器一次性初始化：Node + Caddy + 专用用户
 │   └── deploy.sh                  #   每次更新：拉代码 → 装依赖 → 构建 → 重启
@@ -425,6 +434,7 @@ AI-Web/
 │   ├── 响应式与浏览器兼容说明.md     #   支持的视口范围、布局陷阱（min-w-0）、浏览器要求
 │   ├── 追问上下文预算说明.md        #   追问带多少历史、各字段上限，参数怎么用实测定下来的
 │   ├── AI调用与上下文设计.md        #   一个模型、很多次独立请求；每个功能占多少上下文、哪些共用
+│   ├── 访问统计说明.md              #   Caddy 访问日志、管理员页面、Basic Auth 和轮转
 │   └── 部署说明.md                 #   从买服务器到上线的完整顺序 + 8 条已知的坑
 ├── nuxt.config.ts                 # 框架配置 + 服务端私有配置
 ├── package.json                   # 依赖清单

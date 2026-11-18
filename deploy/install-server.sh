@@ -35,7 +35,7 @@ export DEBIAN_FRONTEND=noninteractive
 step "1/5 基础工具"
 # ------------------------------------------------------------
 apt-get update -y
-apt-get install -y curl git gnupg ca-certificates \
+apt-get install -y curl git gnupg ca-certificates acl \
 	debian-keyring debian-archive-keyring apt-transport-https
 
 # ------------------------------------------------------------
@@ -82,6 +82,11 @@ if ! id -u "$APP_USER" >/dev/null 2>&1; then
 	echo "已创建用户 $APP_USER"
 fi
 mkdir -p "$APP_DIR"
+
+# Caddy 访问日志：caddy 写，aiweb 只读；目录默认 ACL 让轮转出来的新文件也继承只读权限。
+install -d -m 2750 -o caddy -g caddy /var/log/caddy
+setfacl -m "u:$APP_USER:r-x" /var/log/caddy
+setfacl -d -m "u:$APP_USER:r--" /var/log/caddy
 
 # 把当前仓库挪到 /opt/ai-web（如果脚本是在别处克隆的）
 if [ "$(pwd -P)" != "$(cd "$APP_DIR" && pwd -P)" ] && [ ! -e "$APP_DIR/package.json" ]; then

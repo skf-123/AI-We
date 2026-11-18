@@ -2,9 +2,10 @@
 #
 # 用法：整份覆盖 /etc/caddy/Caddyfile，然后 sudo systemctl reload caddy
 #
-# 这份配置刻意只做两件事，别的都不写：
+# 这份配置刻意只做三件事，别的都不写：
 #   1. 收到 ai-web.work / www.ai-web.work 的请求，转给本机 3000 的 Nuxt
 #   2. 自动申请并续期 Let's Encrypt 证书、自动开 HTTP/2
+#   3. 记录访问日志；/admin/traffic 默认 404，避免统计页裸奔
 #
 # 为什么必须 HTTP/2：浏览器在 HTTP/1.1 下同源最多 6 条连接，而压缩包入口是
 # 「一个文件一路流式请求」。本地实测：并发 10 比并发 5 慢 1.7 倍，并发 40 慢 6 倍，
@@ -21,6 +22,25 @@
 #                        静态资源那点传输量不值得拿打字机效果去换。
 
 ai-web.work, www.ai-web.work {
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 50MiB
+			roll_keep 4
+			roll_keep_for 720h
+		}
+		format json
+	}
+
+	# 访问统计页默认不暴露公网。要启用，把下面这行删掉，换成：
+	# @traffic path /admin/traffic* /api/admin/traffic*
+	# basic_auth @traffic {
+	#	admin <caddy hash-password 生成的 bcrypt 哈希>
+	# }
+	#
+	# 密码哈希只放服务器上的 /etc/caddy/Caddyfile，不要提交进仓库。
+	@traffic path /admin/traffic* /api/admin/traffic*
+	respond @traffic 404
+
 	reverse_proxy 127.0.0.1:3000
 }
 
