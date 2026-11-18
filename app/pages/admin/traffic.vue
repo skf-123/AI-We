@@ -39,6 +39,7 @@ interface TrafficResponse {
   total: number
   uniqueIps: number
   errorCount: number
+  excludedOwn: number
   records: TrafficRecord[]
   byIp: IpRow[]
   byPath: PathRow[]
@@ -54,6 +55,7 @@ const loading = ref(false)
 const error = ref('')
 const rangeHours = ref(24)
 const autoRefresh = ref(true)
+const excludeOwn = ref(true)
 const ipQuery = ref('')
 const pathQuery = ref('')
 
@@ -63,8 +65,17 @@ async function load(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
-    data.value = await $fetch<TrafficResponse>('/api/admin/traffic', {
-      query: { hours: rangeHours.value, limit: 500 },
+    // 如果用户把账号密码写进了地址栏，fetch 会拒绝带 credentials 的 URL；
+    // 这里把 URL 里的账号密码去掉，Basic Auth 仍由浏览器缓存的凭据负责。
+    const endpoint = new URL('/api/admin/traffic', window.location.href)
+    endpoint.username = ''
+    endpoint.password = ''
+    data.value = await $fetch<TrafficResponse>(endpoint.toString(), {
+      query: {
+        hours: rangeHours.value,
+        limit: 500,
+        excludeOwn: excludeOwn.value ? 1 : 0,
+      },
     })
   } catch (err) {
     error.value = err instanceof Error ? err.message : '读取访问日志失败'
@@ -84,7 +95,7 @@ onBeforeUnmount(() => {
   if (timer) clearInterval(timer)
 })
 
-watch(rangeHours, () => {
+watch([rangeHours, excludeOwn], () => {
   void load()
 })
 
@@ -144,6 +155,19 @@ function methodClass(method: string): string {
             <input v-model="autoRefresh" type="checkbox" class="accent-emerald-600" />
             自动刷新
           </label>
+          <button
+            type="button"
+            class="rounded-full border px-3 py-1.5 text-xs transition"
+            :class="
+              excludeOwn
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+            "
+            :aria-pressed="excludeOwn"
+            @click="excludeOwn = !excludeOwn"
+          >
+            {{ excludeOwn ? '已省略我们的访问' : '显示全部访问' }}
+          </button>
           <select
             v-model.number="rangeHours"
             class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700"
@@ -213,6 +237,9 @@ function methodClass(method: string): string {
           />
           <span class="text-[11px] text-slate-400">
             当前显示 {{ filteredRecords.length }} 条；汇总按最近 {{ data.windowHours }} 小时计算
+            <template v-if="excludeOwn && data.excludedOwn > 0">
+              · 已省略我们的访问 {{ data.excludedOwn }} 条
+            </template>
           </span>
           <span v-if="topPath" class="ml-auto text-[11px] text-slate-500">
             访问最多：{{ topPath.path }} · {{ topPath.count }} 次

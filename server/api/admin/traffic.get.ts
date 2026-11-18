@@ -15,6 +15,19 @@ const MAX_HOURS = 24 * 30
 const DEFAULT_LIMIT = 300
 const MAX_LIMIT = 1_000
 
+/** 这些 IP 和 UA 是我们的访问/探针，默认从统计里省略。 */
+const OWN_IPS = new Set(
+  (process.env.TRAFFIC_OWN_IPS || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean),
+)
+const OWN_UA = [/curl\//i, /headlesschrome/i]
+
+function isOwn(record: TrafficRecord): boolean {
+  return OWN_IPS.has(record.ip) || OWN_UA.some((pattern) => pattern.test(record.ua))
+}
+
 interface TrafficRecord {
   ts: number
   ip: string
@@ -114,6 +127,7 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const hours = numberParam(query.hours, DEFAULT_HOURS, 1, MAX_HOURS)
   const limit = numberParam(query.limit, DEFAULT_LIMIT, 1, MAX_LIMIT)
+  const excludeOwn = String(query.excludeOwn ?? '') === '1'
 
   let lines: string[]
   try {
@@ -129,6 +143,7 @@ export default defineEventHandler(async (event) => {
         total: 0,
         uniqueIps: 0,
         errorCount: 0,
+        excludedOwn: 0,
         records: [],
         byIp: [],
         byPath: [],
@@ -141,10 +156,12 @@ export default defineEventHandler(async (event) => {
   }
 
   const since = Date.now() / 1000 - hours * 3600
-  const records = lines
+  const allRecords = lines
     .map(parseRecord)
     .filter((row): row is TrafficRecord => row !== null && row.ts >= since)
     .sort((a, b) => b.ts - a.ts)
+  const excludedOwn = excludeOwn ? allRecords.filter(isOwn).length : 0
+  const records = excludeOwn ? allRecords.filter((row) => !isOwn(row)) : allRecords
 
   const byIpMap = new Map<string, { count: number; first: number; last: number }>()
   const byPathMap = new Map<string, number>()
@@ -185,6 +202,7 @@ export default defineEventHandler(async (event) => {
     total: records.length,
     uniqueIps: byIp.length,
     errorCount,
+    excludedOwn,
     records: records.slice(0, limit).map((record) => ({
       ...record,
       time: new Date(record.ts * 1000).toISOString(),
