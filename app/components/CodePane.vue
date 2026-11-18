@@ -308,7 +308,7 @@ const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const mirrorRef = ref<HTMLElement | null>(null)
 
 /**
- * 代码截图上传（M9）。
+ * 代码截图上传（M7）。
  *
  * 识别结果只放进输入框，不自动开始解析：用户要先看一眼识别得对不对。
  * 输入框里已经有代码时直接拒绝，避免把用户手写的内容悄悄覆盖掉。
